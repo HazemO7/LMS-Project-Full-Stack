@@ -128,11 +128,4 @@ LMS-Project/
 | `POST` | `/api/lessons/:id/complete` | Mark a lesson as complete |
 | `GET` | `/api/courses/:id/progress` | Get student progress for a course |
 
----
-
-## 📄 License
-This project is licensed under the **ISC License**.
-
----
-
 Developed with ❤️ for the education community.
