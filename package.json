@@ -1,7 +1,7 @@
 {
   "name": "lms-project",
   "version": "1.0.0",
-  "description": "",
+  "description": "A modern, full-stack Learning Management System (LMS) designed for a seamless educational experience. This project features a robust Node.js backend and a responsive React frontend, providing everything needed to manage courses, lessons, and student progress.",
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -13,11 +13,19 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
-    "dotenv": "^17.3.1",
+    "dotenv": "^17.4.1",
     "express": "^5.2.1",
     "joi": "^18.1.1",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.3.0",
+    "mongoose": "^9.4.1",
     "nodemon": "^3.1.14"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HazemO7/LMS-Project-Full-Stack.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HazemO7/LMS-Project-Full-Stack/issues"
+  },
+  "homepage": "https://github.com/HazemO7/LMS-Project-Full-Stack#readme"
 }

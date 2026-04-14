@@ -46,7 +46,9 @@ const register = async (req, res) => {
     });
   } catch (error) {
     console.log(error);
-    if (!res.headersSent) res.status(500).json({ msg: error.message || "Internal Server Error" });
+    if (!res.headersSent) res.status(500).json({
+       msg: error.message || "Internal Server Error"
+       });
   }
 };
 //////////////// login user ///////////////////////  

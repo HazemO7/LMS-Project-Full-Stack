@@ -24,7 +24,7 @@ export const Navbar = () => {
     };
 
     return (
-        <BootstrapNavbar bg="dark" variant="dark" expand="lg" className="mb-4">
+        <BootstrapNavbar bg="dark" variant="dark" expand="lg" >
             <Container>
                 <BootstrapNavbar.Brand as={Link} to="/">LMS Project</BootstrapNavbar.Brand>
                 <BootstrapNavbar.Toggle aria-controls="basic-navbar-nav" />

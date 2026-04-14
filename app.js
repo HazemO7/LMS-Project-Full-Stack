@@ -25,6 +25,7 @@ const userRoutes = require("./src/routes/userRoutes");
 app.use("/api/courses", courseRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
+
 app.use("/api/modules", moduleRoutes);
 app.use("/api/lessons", lessonRoutes);
 
@@ -41,7 +42,7 @@ console.log("Registered /api/auth successfully");
 
 
 // data base connection 
-async function DBconted() {
+async function DBconnected() {
     try {
         await mongoose.connect(process.env.DB_URL)
         console.log("Data Base Connected");
@@ -51,7 +52,7 @@ async function DBconted() {
 
 }
 
-DBconted();
+DBconnected();
 
 
 //port listen

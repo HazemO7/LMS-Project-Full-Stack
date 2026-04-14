@@ -44,7 +44,7 @@ export const Footer = () => {
                 <div className="mt-5 pt-4 border-top border-secondary border-opacity-25 d-flex justify-content-between align-items-center flex-wrap gap-3">
                     <p className="text-light opacity-50 mb-0">© {new Date().getFullYear()} LMS Premium Project. All systems secure.</p>
                     <div className="d-flex gap-4">
-                        <a href="#" className="text-light opacity-50 nav-hover transition-colors"><i className="bi bi-github fs-5"></i></a>
+                        <a href="https://github.com/HazemO7" className="text-light opacity-50 nav-hover transition-colors"><i className="bi bi-github fs-5"></i></a>
                         <a href="#" className="text-light opacity-50 nav-hover transition-colors"><i className="bi bi-twitter-x fs-5"></i></a>
                         <a href="#" className="text-light opacity-50 nav-hover transition-colors"><i className="bi bi-discord fs-5"></i></a>
                     </div>

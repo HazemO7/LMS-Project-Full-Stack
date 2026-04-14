@@ -24,7 +24,7 @@ export const Home = () => {
                 <Row className="align-items-center gy-5">
                     <Col lg={6} className="text-center text-lg-start z-3">
                         <Badge bg="primary" pill className="px-3 py-2 mb-3 bg-opacity-25 border border-primary text-primary" style={{ fontSize: '0.9rem' }}>
-                            🚀 LMS Framework 2.0
+                            🚀 Learning Management System
                         </Badge>
                         <h1 className="display-3 fw-bold mb-4">
                             Master Your Future with <span className="gradient-text">Elite Learning</span>
@@ -33,7 +33,7 @@ export const Home = () => {
                             Join thousands of ambitious students. Access world-class courses, track your progress flawlessly, and connect with top-tier instructors in our premium ecosystem.
                         </p>
                         {showAlert && (
-                            <Alert variant="danger" className="glass-alert border-danger border-opacity-50 text-light mb-4 fade show">
+                            <Alert variant="danger" className="glass-alert border-danger border-opacity-50 text-danger mb-4 fade show">
                                 <i className="bi bi-exclamation-triangle-fill me-2"></i>
                                 🔒 You need to login first to explore our courses.
                             </Alert>
