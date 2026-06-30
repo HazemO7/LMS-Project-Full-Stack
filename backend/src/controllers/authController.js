@@ -3,7 +3,7 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-const { registerSchema, loginSchema } = require("./validation/authValidation");
+const { registerSchema, loginSchema } = require("./validation/authvalidation");
 
 
 /////////////// register user ////////////////////
