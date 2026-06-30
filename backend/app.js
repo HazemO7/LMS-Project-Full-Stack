@@ -41,11 +41,14 @@ app.use("/api/auth", authRoutes);
 console.log("Registered /api/auth successfully");
 
 
+const seedAll = require("./src/seed/index");
+
 // data base connection 
 async function DBconnected() {
     try {
         await mongoose.connect(process.env.DB_URL)
         console.log("Data Base Connected");
+        await seedAll(); // run the seed orchestrator
     } catch (error) {
         console.log("error in connction Data Base");
     }
