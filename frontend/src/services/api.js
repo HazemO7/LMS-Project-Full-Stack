@@ -32,6 +32,31 @@ export const authAPI = {
             throw new Error(data.msg || data.message || 'Registration failed');
         }
         return res.json();
+    },
+    forgotPassword: async (email) => {
+        const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        // 200 is always returned for security (anti-enumeration), but network errors can still throw
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            throw new Error(data.msg || data.message || 'Request failed. Please try again.');
+        }
+        return data;
+    },
+    resetPassword: async (token, password) => {
+        const res = await fetch(`${BASE_URL}/auth/reset-password/${token}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            throw new Error(data.msg || data.message || 'Password reset failed. The link may be invalid or expired.');
+        }
+        return data;
     }
 };
 

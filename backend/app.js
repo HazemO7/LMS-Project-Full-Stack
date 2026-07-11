@@ -1,16 +1,27 @@
 // import libraryes
-
 const express = require("express")
 const cors = require("cors");
+const helmet = require("helmet");
 
 const app = express();
 const mongoose = require("mongoose");
 
-
 require("dotenv").config();
-app.use(cors());
-app.use(express.json());
 
+app.use(helmet({
+    crossOriginResourcePolicy: false
+}));
+
+app.disable("x-powered-by");
+
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL || "http://localhost",
+    credentials: true
+  })
+);
+
+app.use(express.json());
 
 const port = process.env.PORT || 3000;
 
@@ -21,6 +32,10 @@ const lessonRoutes = require("./src/routes/lessonRoutes");
 const progressRoutes = require("./src/routes/progressRoutes");
 const authRoutes = require("./src/routes/authRouters");
 const userRoutes = require("./src/routes/userRoutes");
+
+// import error middleware
+const globalErrorHandler = require("./src/middleware/errorMiddleware");
+
 // use routes
 app.use("/api/courses", courseRoutes);
 app.use("/api/users", userRoutes);
@@ -36,29 +51,36 @@ const { protect, authorize } = require("./src/middleware/authmiddleware");
 app.get("/api/my-courses", protect, authorize("student"), enrollmentController.getMyCourses);
 app.post("/api/lessons/:id/complete", protect, authorize("student"), progressController.completeLesson);
 app.get("/api/courses/:id/progress", protect, authorize("student"), progressController.getCourseProgress);
-app.use("/api/auth", authRoutes);
 
-console.log("Registered /api/auth successfully");
-
+console.log("Registered routes successfully");
 
 const seedAll = require("./src/seed/index");
 
 // data base connection 
 async function DBconnected() {
     try {
-        await mongoose.connect(process.env.DB_URL)
+        const dbUrl = process.env.DB_URL || process.env.MONGO_URI;
+        if (!dbUrl) {
+            throw new Error("DB_URL is not configured");
+        }
+
+        await mongoose.connect(dbUrl)
         console.log("Data Base Connected");
         await seedAll(); // run the seed orchestrator
     } catch (error) {
-        console.log("error in connction Data Base");
+        console.error("error in connction Data Base:", error.message);
     }
-
 }
 
-DBconnected();
-
+// Register Error Middleware as the last middleware
+app.use(globalErrorHandler);
 
 //port listen
-app.listen(port, () => {
-    console.log(`server is listning on port ${port}`);
-});
+if (require.main === module) {
+    DBconnected();
+    app.listen(port, () => {
+        console.log(`server is listning on port ${port}`);
+    });
+}
+
+module.exports = app;

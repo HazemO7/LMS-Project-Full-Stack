@@ -70,7 +70,7 @@ export const Login = () => {
                                 <Form.Group className="mb-5">
                                     <div className="d-flex justify-content-between">
                                         <Form.Label className="text-light opacity-75 fw-bold">Secure Password</Form.Label>
-                                        <a href="#" className="text-primary text-decoration-none small">Forgot password?</a>
+                                        <Link to="/forgot-password" className="text-primary text-decoration-none small">Forgot password?</Link>
                                     </div>
                                     <Form.Control
                                         {...register("password", {
