@@ -16,7 +16,11 @@ app.disable("x-powered-by");
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost",
+    origin: [
+      process.env.CLIENT_URL,
+      "http://localhost",
+      "http://localhost:5173"
+    ].filter(Boolean),
     credentials: true
   })
 );

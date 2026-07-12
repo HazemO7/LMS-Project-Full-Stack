@@ -31,7 +31,14 @@ const sendPasswordResetEmail = async (email, resetUrl) => {
     const transporter = createTransporter();
 
     if (!transporter) {
-        throw new AppError("Email service temporarily unavailable", 503);
+        // Fallback for local development when no SMTP credentials are provided
+        console.log("\n=======================================================");
+        console.log("📧 MOCK EMAIL DISPATCHED (No SMTP credentials found)");
+        console.log("To:", email);
+        console.log("Click this link to reset password:");
+        console.log(resetUrl);
+        console.log("=======================================================\n");
+        return;
     }
 
     const mailOptions = {

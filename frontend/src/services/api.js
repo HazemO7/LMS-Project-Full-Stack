@@ -8,9 +8,20 @@ const getHeaders = () => {
     };
 };
 
+const customFetch = async (url, options) => {
+    try {
+        return await fetch(url, options);
+    } catch (error) {
+        if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+            throw new Error('Network error: Cannot connect to the server (CORS issue or server is down).');
+        }
+        throw error;
+    }
+};
+
 export const authAPI = {
     login: async (credentials) => {
-        const res = await fetch(`${BASE_URL}/auth/login`, {
+        const res = await customFetch(`${BASE_URL}/auth/login`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(credentials)
@@ -22,7 +33,7 @@ export const authAPI = {
         return res.json();
     },
     register: async (userData) => {
-        const res = await fetch(`${BASE_URL}/auth/register`, {
+        const res = await customFetch(`${BASE_URL}/auth/register`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(userData)
@@ -34,7 +45,7 @@ export const authAPI = {
         return res.json();
     },
     forgotPassword: async (email) => {
-        const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
+        const res = await customFetch(`${BASE_URL}/auth/forgot-password`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })
@@ -47,7 +58,7 @@ export const authAPI = {
         return data;
     },
     resetPassword: async (token, password) => {
-        const res = await fetch(`${BASE_URL}/auth/reset-password/${token}`, {
+        const res = await customFetch(`${BASE_URL}/auth/reset-password/${token}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ password })
@@ -61,22 +72,22 @@ export const authAPI = {
 };
 
 export const coursesAPI = {
-    getAll: async () => {
-        const res = await fetch(`${BASE_URL}/courses`, {
+    getAll: async (page = 1, limit = 10) => {
+        const res = await customFetch(`${BASE_URL}/courses?page=${page}&limit=${limit}`, {
             headers: getHeaders()
         });
         if (!res.ok) throw new Error('Failed to fetch courses');
         return res.json();
     },
     getById: async (id) => {
-        const res = await fetch(`${BASE_URL}/courses/${id}`, {
+        const res = await customFetch(`${BASE_URL}/courses/${id}`, {
             headers: getHeaders()
         });
         if (!res.ok) throw new Error('Failed to fetch course');
         return res.json();
     },
     getByIdFull: async (id) => {
-        const res = await fetch(`${BASE_URL}/courses/${id}/full`, {
+        const res = await customFetch(`${BASE_URL}/courses/${id}/full`, {
             headers: getHeaders()
         });
         if (!res.ok) {
@@ -86,7 +97,7 @@ export const coursesAPI = {
         return res.json();
     },
     enroll: async (id) => {
-        const res = await fetch(`${BASE_URL}/courses/${id}/enroll`, {
+        const res = await customFetch(`${BASE_URL}/courses/${id}/enroll`, {
             method: 'POST',
             headers: getHeaders()
         });
@@ -97,7 +108,7 @@ export const coursesAPI = {
         return res.json();
     },
     create: async (courseData) => {
-        const res = await fetch(`${BASE_URL}/courses`, {
+        const res = await customFetch(`${BASE_URL}/courses`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(courseData)
@@ -106,7 +117,7 @@ export const coursesAPI = {
         return res.json();
     },
     update: async (id, courseData) => {
-        const res = await fetch(`${BASE_URL}/courses/${id}`, {
+        const res = await customFetch(`${BASE_URL}/courses/${id}`, {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify(courseData)
@@ -118,7 +129,7 @@ export const coursesAPI = {
 
 export const modulesAPI = {
     create: async (moduleData) => {
-        const res = await fetch(`${BASE_URL}/modules`, {
+        const res = await customFetch(`${BASE_URL}/modules`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(moduleData)
@@ -127,7 +138,7 @@ export const modulesAPI = {
         return res.json();
     },
     update: async (id, moduleData) => {
-        const res = await fetch(`${BASE_URL}/modules/${id}`, {
+        const res = await customFetch(`${BASE_URL}/modules/${id}`, {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify(moduleData)
@@ -136,7 +147,7 @@ export const modulesAPI = {
         return res.json();
     },
     delete: async (id) => {
-        const res = await fetch(`${BASE_URL}/modules/${id}`, {
+        const res = await customFetch(`${BASE_URL}/modules/${id}`, {
             method: 'DELETE',
             headers: getHeaders()
         });
@@ -147,7 +158,7 @@ export const modulesAPI = {
 
 export const lessonsAPI = {
     create: async (lessonData) => {
-        const res = await fetch(`${BASE_URL}/lessons`, {
+        const res = await customFetch(`${BASE_URL}/lessons`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify(lessonData)
@@ -156,7 +167,7 @@ export const lessonsAPI = {
         return res.json();
     },
     update: async (id, lessonData) => {
-        const res = await fetch(`${BASE_URL}/lessons/${id}`, {
+        const res = await customFetch(`${BASE_URL}/lessons/${id}`, {
             method: 'PUT',
             headers: getHeaders(),
             body: JSON.stringify(lessonData)
@@ -165,7 +176,7 @@ export const lessonsAPI = {
         return res.json();
     },
     delete: async (id) => {
-        const res = await fetch(`${BASE_URL}/lessons/${id}`, {
+        const res = await customFetch(`${BASE_URL}/lessons/${id}`, {
             method: 'DELETE',
             headers: getHeaders()
         });
@@ -176,7 +187,7 @@ export const lessonsAPI = {
 
 export const progressAPI = {
     getCourseProgress: async (courseId) => {
-        const res = await fetch(`${BASE_URL}/courses/${courseId}/progress`, { headers: getHeaders() });
+        const res = await customFetch(`${BASE_URL}/courses/${courseId}/progress`, { headers: getHeaders() });
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             throw new Error(data.message || data.msg || 'Failed to fetch progress');
@@ -184,7 +195,7 @@ export const progressAPI = {
         return res.json();
     },
     completeLesson: async (lessonId, courseId) => {
-        const res = await fetch(`${BASE_URL}/lessons/${lessonId}/complete`, {
+        const res = await customFetch(`${BASE_URL}/lessons/${lessonId}/complete`, {
             method: 'POST',
             headers: getHeaders(),
             body: JSON.stringify({ courseId })
@@ -196,7 +207,7 @@ export const progressAPI = {
 
 export const usersAPI = {
     getMe: async () => {
-        const res = await fetch(`${BASE_URL}/users/me`, { headers: getHeaders() });
+        const res = await customFetch(`${BASE_URL}/users/me`, { headers: getHeaders() });
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             throw new Error(data.message || data.msg || 'Failed to fetch user profile');
@@ -204,7 +215,7 @@ export const usersAPI = {
         return res.json();
     },
     updateMe: async (userData) => {
-        const res = await fetch(`${BASE_URL}/users/me`, {
+        const res = await customFetch(`${BASE_URL}/users/me`, {
             method: 'PATCH',
             headers: getHeaders(),
             body: JSON.stringify(userData)

@@ -8,15 +8,23 @@ export const Courses = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [currentUser, setCurrentUser] = useState(null);
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const limit = 6;
 
     useEffect(() => {
         import('../services/api').then(({ usersAPI }) => {
             usersAPI.getMe().then(res => setCurrentUser(res.data || res)).catch(() => { });
         });
+    }, []);
+
+    useEffect(() => {
         const fetchCourses = async () => {
+            setLoading(true);
             try {
-                const data = await coursesAPI.getAll();
+                const data = await coursesAPI.getAll(page, limit);
                 setCourses(Array.isArray(data) ? data : data.courses || data.data || []);
+                if (data.totalPages) setTotalPages(data.totalPages);
             } catch (err) {
                 setError(err.message || 'Failed to fetch courses');
             } finally {
@@ -24,7 +32,7 @@ export const Courses = () => {
             }
         };
         fetchCourses();
-    }, []);
+    }, [page]);
 
     if (loading) {
         return (
@@ -88,6 +96,28 @@ export const Courses = () => {
                         ))
                     )}
                 </Row>
+
+                {totalPages > 1 && (
+                    <div className="d-flex justify-content-center align-items-center mt-5 gap-3">
+                        <button 
+                            className="btn btn-outline-light px-4" 
+                            disabled={page === 1} 
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                        >
+                            Previous
+                        </button>
+                        <span className="text-light opacity-75 fw-bold">
+                            Page {page} of {totalPages}
+                        </span>
+                        <button 
+                            className="btn btn-outline-light px-4" 
+                            disabled={page >= totalPages} 
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        >
+                            Next
+                        </button>
+                    </div>
+                )}
             </Container>
         </div>
     );

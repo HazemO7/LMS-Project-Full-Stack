@@ -33,10 +33,24 @@ const createCourse = async (req, res) => {
 // Get All Courses
 const getCourses = async (req, res) => {
     try {
-        const courses = await Course.find();
+        let { page = 1, limit = 6 } = req.query;
+        page = parseInt(page);
+        limit = parseInt(limit);
+
+        if (isNaN(page) || page < 1) page = 1;
+        if (isNaN(limit) || limit < 1) limit = 6;
+
+        const skip = (page - 1) * limit;
+
+        const totalCourses = await Course.countDocuments();
+        const courses = await Course.find().skip(skip).limit(limit);
 
         res.json({
             status: "success",
+            page,
+            limit,
+            totalCourses,
+            totalPages: Math.ceil(totalCourses / limit),
             results: courses.length,
             data: courses
         });

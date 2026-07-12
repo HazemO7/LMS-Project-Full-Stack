@@ -72,11 +72,8 @@ const login = catchAsync(async (req, res, next) => {
     });
 });
 
-const logout = catchAsync(async (req, res, next) => {
-    res.status(200).json({
-        msg: "Success Logout",
-    });
-});
+
+
 
 // POST /api/auth/forgot-password
 const forgotPassword = catchAsync(async (req, res, next) => {
@@ -113,6 +110,8 @@ const forgotPassword = catchAsync(async (req, res, next) => {
         return next(new AppError("Email service temporarily unavailable", 503));
     }
 });
+
+
 
 // PUT /api/auth/reset-password/:token
 const resetPassword = catchAsync(async (req, res, next) => {
@@ -173,6 +172,13 @@ const changePassword = catchAsync(async (req, res, next) => {
     res.status(200).json({ message: "Password changed successfully." });
 });
 
+// POST /api/auth/logout
+const logout = catchAsync(async (req, res, next) => {
+    res.status(200).json({
+        msg: "Success Logout",
+    });
+});
+
 module.exports = {
     register,
     login,
@@ -181,3 +187,4 @@ module.exports = {
     resetPassword,
     changePassword,
 };
+
