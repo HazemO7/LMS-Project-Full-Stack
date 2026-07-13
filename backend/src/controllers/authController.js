@@ -7,6 +7,9 @@ const AppError = require("../utils/AppError");
 const { generateResetToken, hashToken } = require("../services/authService");
 const { sendPasswordResetEmail } = require("../services/emailService");
 
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_TIME = 5 * 60 * 1000; // 5 minutes
+
 // The validation for these is now handled by middleware in authRouters.js
 // so we don't need to manually call Joi here for register and login if we update the routes.
 // However, to keep existing logic working without breaking things unexpectedly, 
@@ -43,12 +46,51 @@ const login = catchAsync(async (req, res, next) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-        return next(new AppError("Your Account Not Found Please Create Account", 404));
+        // Step 2: Return generic message if user doesn't exist
+        return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Step 3: Check if locked
+    if (user.isLocked()) {
+        console.warn(`[Security] Account locked attempt for email: ${email}`);
+        return res.status(423).json({
+            message: "Account is temporarily locked. Please try again later.",
+            lockedUntil: user.lockUntil
+        });
+    }
+
+    // Step 4: If lock expired in the past, reset attempts
+    if (user.lockUntil && user.lockUntil <= Date.now()) {
+        user.resetLoginAttempts();
+        await user.save();
     }
 
     const matchPassword = await bcrypt.compare(password, user.password);
     if (!matchPassword) {
-        return next(new AppError("Invalid Password", 400));
+        // Step 5: Password incorrect, increment attempts
+        user.loginAttempts += 1;
+        
+        if (user.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+            user.lockUntil = new Date(Date.now() + LOCK_TIME);
+            console.warn(`[Security] Account locked for email: ${email}`);
+        } else {
+            console.warn(`[Security] Failed login attempt for email: ${email} (${user.loginAttempts}/${MAX_LOGIN_ATTEMPTS})`);
+        }
+        
+        await user.save();
+
+        const remainingAttempts = Math.max(MAX_LOGIN_ATTEMPTS - user.loginAttempts, 0);
+        return res.status(401).json({
+            message: "Invalid email or password",
+            remainingAttempts
+        });
+    }
+
+    // Step 6: Successful login
+    if (user.loginAttempts > 0 || user.lockUntil) {
+        user.resetLoginAttempts();
+        await user.save();
+        console.log(`[Security] Successful login after previous failures/lock for email: ${email}`);
     }
 
     if (!process.env.JWT_SECRET) {

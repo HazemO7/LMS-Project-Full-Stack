@@ -28,7 +28,11 @@ export const authAPI = {
         });
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            throw new Error(data.msg || data.message || 'Login failed');
+            const error = new Error(data.msg || data.message || 'Login failed');
+            error.status = res.status;
+            error.remainingAttempts = data.remainingAttempts;
+            error.lockedUntil = data.lockedUntil;
+            throw error;
         }
         return res.json();
     },

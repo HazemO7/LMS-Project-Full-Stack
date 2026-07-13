@@ -32,8 +32,25 @@ const userSchema = new mongoose.Schema(
         passwordChangedAt: {
             type: Date,
         },
+        loginAttempts: {
+            type: Number,
+            default: 0,
+        },
+        lockUntil: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true });
+
+userSchema.methods.isLocked = function() {
+    return !!(this.lockUntil && this.lockUntil > Date.now());
+};
+
+userSchema.methods.resetLoginAttempts = function() {
+    this.loginAttempts = 0;
+    this.lockUntil = null;
+};
 
 const User = mongoose.model("User", userSchema);
 

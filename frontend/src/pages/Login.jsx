@@ -11,16 +11,52 @@ export const Login = () => {
     const { register, handleSubmit, formState: { errors } } = useForm();
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [remainingAttempts, setRemainingAttempts] = useState(null);
+    const [lockedUntil, setLockedUntil] = useState(null);
+    const [countdown, setCountdown] = useState('');
 
     useEffect(() => {
-        if (error) {
+        if (!lockedUntil) {
+            setCountdown('');
+            return;
+        }
+
+        const calculateTimeLeft = () => {
+            const difference = new Date(lockedUntil).getTime() - new Date().getTime();
+            if (difference <= 0) {
+                setLockedUntil(null);
+                setCountdown('');
+                setError('');
+                return null;
+            }
+            
+            const minutes = Math.floor((difference / 1000 / 60) % 60);
+            const seconds = Math.floor((difference / 1000) % 60);
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        };
+
+        let timeString = calculateTimeLeft();
+        if (!timeString) return;
+        setCountdown(timeString);
+
+        const interval = setInterval(() => {
+            timeString = calculateTimeLeft();
+            if (timeString) setCountdown(timeString);
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [lockedUntil]);
+
+    useEffect(() => {
+        if (error && !lockedUntil) {
             const timer = setTimeout(() => setError(''), 5000);
             return () => clearTimeout(timer);
         }
-    }, [error]);
+    }, [error, lockedUntil]);
 
     const onSubmit = async (data) => {
         setError('');
+        setRemainingAttempts(null);
         setLoading(true);
         try {
             const res = await authAPI.login(data);
@@ -28,6 +64,12 @@ export const Login = () => {
             navigate('/courses');
         } catch (err) {
             setError(err.message || 'Login failed');
+            if (err.status === 401 && err.remainingAttempts !== undefined) {
+                setRemainingAttempts(err.remainingAttempts);
+            }
+            if (err.status === 423 && err.lockedUntil) {
+                setLockedUntil(err.lockedUntil);
+            }
         } finally {
             setLoading(false);
         }
@@ -45,7 +87,20 @@ export const Login = () => {
                             <p className="text-light opacity-75">Sign in to access your secure learning environment.</p>
                         </div>
                         <div className="glass-card p-4 p-md-5">
-                            {error && <Alert variant="danger" className="mb-4 shadow-sm border-0">{error}</Alert>}
+                            {error && !lockedUntil && remainingAttempts === null && (
+                                <Alert variant="danger" className="mb-4 shadow-sm border-0">{error}</Alert>
+                            )}
+                            {error && !lockedUntil && remainingAttempts !== null && (
+                                <Alert variant="danger" className="mb-4 shadow-sm border-0">
+                                    {error}. {remainingAttempts} attempts remaining.
+                                </Alert>
+                            )}
+                            {lockedUntil && (
+                                <Alert variant="danger" className="mb-4 shadow-sm border-0">
+                                    Your account has been locked due to multiple failed login attempts.<br/>
+                                    Try again in {countdown}.
+                                </Alert>
+                            )}
                             <Form onSubmit={handleSubmit(onSubmit)}>
                                 <Form.Group className="mb-4">
                                     <Form.Label className="text-light opacity-75 fw-bold">Email Address</Form.Label>

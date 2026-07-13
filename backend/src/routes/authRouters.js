@@ -24,12 +24,13 @@ const {
   forgotPasswordLimiter,
   resetPasswordLimiter,
   changePasswordLimiter,
+  loginLimiter,
 } = require("../middleware/rateLimiter");
 
 const { protect } = require("../middleware/authmiddleware");
 
 router.post("/register", validateRequest(registerSchema), register);
-router.post("/login", validateRequest(loginSchema), login);
+router.post("/login", loginLimiter, validateRequest(loginSchema), login);
 router.post("/logout", logout);
 router.post(
   "/forgot-password",
