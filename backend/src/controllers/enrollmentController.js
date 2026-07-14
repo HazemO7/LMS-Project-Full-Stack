@@ -1,5 +1,6 @@
 const Enrollment = require('../models/Enrollment');
 const Course = require('../models/Course');
+const logger = require('../utils/logger');
 
 const enrollCourse = async (req, res) => {
     try {
@@ -16,6 +17,8 @@ const enrollCourse = async (req, res) => {
 
         const enrollment = new Enrollment({ user: userId, course: courseId });
         await enrollment.save();
+
+        logger.info("User enrolled in course successfully", { userId, courseId, requestId: req.id });
 
         res.status(201).json({ status: "success", data: enrollment });
     } catch (error) {

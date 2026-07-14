@@ -1,6 +1,7 @@
 const Progress = require('../models/Progress');
 const Course = require('../models/Course');
 const Enrollment = require('../models/Enrollment');
+const logger = require('../utils/logger');
 
 
 // when a student clicks "complete" on a lesson, we toggle their progress for that lesson
@@ -31,6 +32,10 @@ const completeLesson = async (req, res) => {
             });
             await progress.save();
         }
+
+        logger.info(`Lesson progress toggled to ${progress.completed ? 'complete' : 'incomplete'}`, { 
+            lessonId, courseId, userId: req.user._id, completed: progress.completed, requestId: req.id 
+        });
 
         res.status(200).json({ 
             status: "success", data: progress 

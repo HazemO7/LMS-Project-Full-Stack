@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const AppError = require('../utils/AppError');
+const logger = require('../utils/logger');
 
 const createTransporter = () => {
     const host = process.env.SMTP_HOST;
@@ -32,12 +33,7 @@ const sendPasswordResetEmail = async (email, resetUrl) => {
 
     if (!transporter) {
         // Fallback for local development when no SMTP credentials are provided
-        console.log("\n=======================================================");
-        console.log("📧 MOCK EMAIL DISPATCHED (No SMTP credentials found)");
-        console.log("To:", email);
-        console.log("Click this link to reset password:");
-        console.log(resetUrl);
-        console.log("=======================================================\n");
+        logger.info(`MOCK EMAIL DISPATCHED (No SMTP credentials found) | To: ${email} | Link: ${resetUrl}`);
         return;
     }
 
@@ -57,7 +53,9 @@ const sendPasswordResetEmail = async (email, resetUrl) => {
 
     try {
         await transporter.sendMail(mailOptions);
+        logger.info(`Password reset email successfully sent via SMTP to: ${email}`);
     } catch (error) {
+        logger.error(`Failed to send email to ${email}`, { error: error.message });
         throw new AppError("Email service temporarily unavailable", 503);
     }
 };

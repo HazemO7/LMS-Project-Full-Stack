@@ -1,4 +1,5 @@
 const Module = require('../models/Module');
+const logger = require('../utils/logger');
 
 // Create Module
 const createModule = async (req, res) => {
@@ -6,6 +7,9 @@ const createModule = async (req, res) => {
         const { title, description, content } = req.body;
         const module = new Module({ title, description, content });
         await module.save();
+        
+        logger.info("Module created successfully", { moduleId: module._id, requestId: req.id });
+        
         res.status(201).json(module);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -42,6 +46,9 @@ const updateModule = async (req, res) => {
         if (!module) {
             return res.status(404).json({ message: 'Module not found' });
         }
+        
+        logger.info("Module updated successfully", { moduleId: module._id, requestId: req.id });
+        
         res.status(200).json(module);
     } catch (error) {
         res.status(400).json({ message: error.message });
@@ -54,6 +61,9 @@ const deleteModule = async (req, res) => {
         if (!module) {
             return res.status(404).json({ message: 'Module not found' });
         }
+
+        logger.info("Module deleted successfully", { moduleId: module._id, requestId: req.id });
+
         res.status(200).json({ message: 'Module deleted successfully' });
     } catch (error) {
         res.status(500).json({ message: error.message });

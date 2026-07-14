@@ -1,5 +1,5 @@
-
 const Course = require("../models/Course");
+const logger = require("../utils/logger");
 
 
 // Create Course
@@ -15,6 +15,9 @@ const createCourse = async (req, res) => {
         });
         // save course to database
         const savedCourse = await course.save();
+        
+        logger.info("Course created successfully", { courseId: savedCourse._id, instructorId: req.user._id, requestId: req.id });
+        
         // send response
         res.status(201).json({
             status: "success",
@@ -130,6 +133,8 @@ const updateCourse = async (req, res) => {
 
         course = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true });
 
+        logger.info("Course updated successfully", { courseId: course._id, userId: req.user._id, requestId: req.id });
+
         res.json({
             status: "success",
             data: course
@@ -156,6 +161,8 @@ const deleteCourse = async (req, res) => {
         }
 
         await Course.findByIdAndDelete(req.params.id);
+
+        logger.info("Course deleted successfully", { courseId: req.params.id, userId: req.user._id, requestId: req.id });
 
         res.json({
             status: "success",

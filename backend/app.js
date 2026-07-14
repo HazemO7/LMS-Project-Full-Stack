@@ -5,8 +5,13 @@ const helmet = require("helmet");
 
 const app = express();
 const mongoose = require("mongoose");
+const logger = require("./src/utils/logger");
+const { assignId, requestLogger } = require("./src/middleware/requestLogger");
 
 require("dotenv").config();
+
+app.use(assignId);
+app.use(requestLogger);
 
 app.use(helmet({
     crossOriginResourcePolicy: false
@@ -56,7 +61,7 @@ app.get("/api/my-courses", protect, authorize("student"), enrollmentController.g
 app.post("/api/lessons/:id/complete", protect, authorize("student"), progressController.completeLesson);
 app.get("/api/courses/:id/progress", protect, authorize("student"), progressController.getCourseProgress);
 
-console.log("Registered routes successfully");
+logger.info("Registered routes successfully");
 
 const seedAll = require("./src/seed/index");
 
@@ -69,10 +74,10 @@ async function DBconnected() {
         }
 
         await mongoose.connect(dbUrl)
-        console.log("Data Base Connected");
+        logger.info("Data Base Connected");
         await seedAll(); // run the seed orchestrator
     } catch (error) {
-        console.error("error in connction Data Base:", error.message);
+        logger.error("error in connction Data Base: " + error.message, { stack: error.stack });
     }
 }
 
@@ -83,7 +88,7 @@ app.use(globalErrorHandler);
 if (require.main === module) {
     DBconnected();
     app.listen(port, () => {
-        console.log(`server is listning on port ${port}`);
+        logger.info(`server is listning on port ${port}`);
     });
 }
 

@@ -1,4 +1,5 @@
 const AppError = require('../utils/AppError');
+const logger = require('../utils/logger');
 
 const globalErrorHandler = (err, req, res, next) => {
     err.statusCode = err.statusCode || 500;
@@ -23,7 +24,14 @@ const globalErrorHandler = (err, req, res, next) => {
         } else {
             // Programming or other unknown error: don't leak error details
             // Log securely here (e.g., Winston, but skipping sensitive info)
-            console.error('ERROR 💥', err);
+            logger.error(err.message, {
+                stack: err.stack,
+                method: req.method,
+                url: req.originalUrl,
+                ip: req.ip,
+                userId: req.user ? req.user.id : 'unauthenticated',
+                requestId: req.id
+            });
 
             // Send generic message
             res.status(500).json({

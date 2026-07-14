@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
+const logger = require("../utils/logger");
 const { generateResetToken, hashToken } = require("../services/authService");
 const { sendPasswordResetEmail } = require("../services/emailService");
 
@@ -35,6 +36,8 @@ const register = catchAsync(async (req, res, next) => {
         role: 'student',
     });
 
+    logger.info("New user registered successfully", { userId: user._id, role: user.role, requestId: req.id });
+
     res.status(201).json({
         msg: "Done Created User",
         data: user,
@@ -52,7 +55,7 @@ const login = catchAsync(async (req, res, next) => {
 
     // Step 3: Check if locked
     if (user.isLocked()) {
-        console.warn(`[Security] Account locked attempt for email: ${email}`);
+        logger.warn("Account locked attempt", { userId: user._id, requestId: req.id, ip: req.ip });
         return res.status(423).json({
             message: "Account is temporarily locked. Please try again later.",
             lockedUntil: user.lockUntil
@@ -72,9 +75,9 @@ const login = catchAsync(async (req, res, next) => {
         
         if (user.loginAttempts >= MAX_LOGIN_ATTEMPTS) {
             user.lockUntil = new Date(Date.now() + LOCK_TIME);
-            console.warn(`[Security] Account locked for email: ${email}`);
+            logger.warn("Account locked due to multiple failed attempts", { userId: user._id, requestId: req.id, ip: req.ip });
         } else {
-            console.warn(`[Security] Failed login attempt for email: ${email} (${user.loginAttempts}/${MAX_LOGIN_ATTEMPTS})`);
+            logger.warn(`Failed login attempt (${user.loginAttempts}/${MAX_LOGIN_ATTEMPTS})`, { userId: user._id, requestId: req.id, ip: req.ip });
         }
         
         await user.save();
@@ -90,8 +93,10 @@ const login = catchAsync(async (req, res, next) => {
     if (user.loginAttempts > 0 || user.lockUntil) {
         user.resetLoginAttempts();
         await user.save();
-        console.log(`[Security] Successful login after previous failures/lock for email: ${email}`);
+        logger.info("Successful login after previous failures/lock", { userId: user._id, requestId: req.id, ip: req.ip });
     }
+
+    logger.info("User logged in successfully", { userId: user._id, role: user.role, requestId: req.id });
 
     if (!process.env.JWT_SECRET) {
         return next(new AppError("JWT_SECRET is not configured on the server", 500));
@@ -141,6 +146,7 @@ const forgotPassword = catchAsync(async (req, res, next) => {
 
     try {
         await sendPasswordResetEmail(user.email, resetUrl);
+        logger.info("Password reset email sent", { userId: user._id, requestId: req.id });
         res.status(200).json({ message: successMessage });
     } catch (error) {
         // Clear token if email fails
@@ -149,6 +155,7 @@ const forgotPassword = catchAsync(async (req, res, next) => {
         user.resetPasswordTokenCreatedAt = undefined;
         await user.save();
 
+        logger.error("Failed to send password reset email", { error: error.message, userId: user._id, requestId: req.id });
         return next(new AppError("Email service temporarily unavailable", 503));
     }
 });
@@ -181,6 +188,7 @@ const resetPassword = catchAsync(async (req, res, next) => {
     
     await user.save();
 
+    logger.info("Password reset completed successfully", { userId: user._id, requestId: req.id });
     res.status(200).json({ message: "Password reset successfully." });
 });
 
@@ -211,11 +219,18 @@ const changePassword = catchAsync(async (req, res, next) => {
     user.passwordChangedAt = new Date(Date.now() - 1000);
     await user.save();
 
+    logger.info("Password changed successfully", { userId: user._id, requestId: req.id });
     res.status(200).json({ message: "Password changed successfully." });
 });
 
 // POST /api/auth/logout
 const logout = catchAsync(async (req, res, next) => {
+    // If we have an authenticated user, we can log who logged out
+    const userId = req.user ? req.user.id : null;
+    if (userId) {
+        logger.info("User logged out successfully", { userId, requestId: req.id });
+    }
+
     res.status(200).json({
         msg: "Success Logout",
     });
