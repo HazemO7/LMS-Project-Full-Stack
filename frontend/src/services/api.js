@@ -76,8 +76,8 @@ export const authAPI = {
 };
 
 export const coursesAPI = {
-    getAll: async (page = 1, limit = 10) => {
-        const res = await customFetch(`${BASE_URL}/courses?page=${page}&limit=${limit}`, {
+    getAll: async (page = 1, limit = 10, search = '') => {
+        const res = await customFetch(`${BASE_URL}/courses?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`, {
             headers: getHeaders()
         });
         if (!res.ok) throw new Error('Failed to fetch courses');

@@ -34,9 +34,11 @@ const createCourse = async (req, res) => {
 
 
 // Get All Courses
+
 const getCourses = async (req, res) => {
     try {
-        let { page = 1, limit = 6 } = req.query;
+        let { page = 1, limit = 6, search = "" } = req.query;
+
         page = parseInt(page);
         limit = parseInt(limit);
 
@@ -45,8 +47,20 @@ const getCourses = async (req, res) => {
 
         const skip = (page - 1) * limit;
 
-        const totalCourses = await Course.countDocuments();
-        const courses = await Course.find().skip(skip).limit(limit);
+        const query = {};
+
+        if (search) {
+            query.title = {
+                $regex: search,
+                $options: "i"
+            };
+        }
+
+        const totalCourses = await Course.countDocuments(query);
+
+        const courses = await Course.find(query)
+            .skip(skip)
+            .limit(limit);
 
         res.json({
             status: "success",
@@ -65,6 +79,7 @@ const getCourses = async (req, res) => {
         });
     }
 };
+
 // Get Course By ID
 const getCourseById = async (req, res) => {
     try {
@@ -89,6 +104,7 @@ const getCourseById = async (req, res) => {
         });
     }
 };
+
 
 const getCourseByIdFull = async (req, res) => {
     try {

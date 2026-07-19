@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { coursesAPI } from '../services/api';
-import { Container, Row, Col, Spinner, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Spinner, Alert, Form, InputGroup, Button } from 'react-bootstrap';
 
 export const Courses = () => {
     const [courses, setCourses] = useState([]);
@@ -10,6 +10,9 @@ export const Courses = () => {
     const [currentUser, setCurrentUser] = useState(null);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [searchInput, setSearchInput] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    
     const limit = 6;
 
     useEffect(() => {
@@ -22,7 +25,7 @@ export const Courses = () => {
         const fetchCourses = async () => {
             setLoading(true);
             try {
-                const data = await coursesAPI.getAll(page, limit);
+                const data = await coursesAPI.getAll(page, limit, searchQuery);
                 setCourses(Array.isArray(data) ? data : data.courses || data.data || []);
                 if (data.totalPages) setTotalPages(data.totalPages);
             } catch (err) {
@@ -32,9 +35,15 @@ export const Courses = () => {
             }
         };
         fetchCourses();
-    }, [page]);
+    }, [page, searchQuery]);
 
-    if (loading) {
+    const handleSearch = (e) => {
+        e.preventDefault();
+        setPage(1);
+        setSearchQuery(searchInput);
+    };
+
+    if (loading && courses.length === 0) {
         return (
             <div className="premium-dark-section d-flex align-items-center justify-content-center" style={{ minHeight: 'calc(100vh - 76px)' }}>
                 <Spinner animation="grow" variant="primary" />
@@ -42,7 +51,7 @@ export const Courses = () => {
         );
     }
 
-    if (error) {
+    if (error && courses.length === 0) {
         return (
             <div className="premium-dark-section py-5 hero-min-height">
                 <Container>
@@ -56,25 +65,52 @@ export const Courses = () => {
         <div className="premium-dark-section bg-mesh hero-min-height py-5">
             <Container className="position-relative z-1">
                 <div className="glow-effect" style={{ background: 'radial-gradient(circle, rgba(96,165,250,0.15) 0%, rgba(0,0,0,0) 70%)', top: '10%' }}></div>
-                <div className="d-flex justify-content-between align-items-center mb-5 border-bottom border-light border-opacity-10 pb-4 flex-wrap gap-3">
+                <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-5 border-bottom border-light border-opacity-10 pb-4 gap-4">
                     <div>
                         <h2 className="display-5 fw-bold text-white mb-2">My <span className="gradient-text">Dashboard</span></h2>
                         <p className="text-light opacity-50 mb-0">Browse and manage your active learning curriculum.</p>
                     </div>
-                    {currentUser && (currentUser.role === 'admin' || currentUser.role === 'instructor') && (
-                        <Link to="/course/new" className="btn btn-outline-light px-4 py-2" style={{ borderRadius: '8px' }}>
-                            <i className="bi bi-plus-lg me-2"></i>Create Course
-                        </Link>
-                    )}
+                    
+                    <div className="d-flex flex-column flex-sm-row gap-3">
+                        <Form onSubmit={handleSearch} style={{ minWidth: '250px' }}>
+                            <InputGroup>
+                                <Form.Control
+                                    type="text"
+                                    placeholder="Search courses..."
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
+                                    className="bg-dark text-light border-secondary"
+                                    style={{ color: '#fff' }}
+                                />
+                                <Button type="submit" variant="primary">
+                                    <i className="bi bi-search"></i>
+                                </Button>
+                            </InputGroup>
+                        </Form>
+                        
+                        {currentUser && (currentUser.role === 'admin' || currentUser.role === 'instructor') && (
+                            <Link to="/course/new" className="btn btn-outline-light px-4 py-2 text-nowrap" style={{ borderRadius: '8px' }}>
+                                <i className="bi bi-plus-lg me-2"></i>Create Course
+                            </Link>
+                        )}
+                    </div>
                 </div>
 
+                {loading && courses.length > 0 && (
+                    <div className="text-center mb-4">
+                        <Spinner animation="grow" variant="primary" size="sm" />
+                    </div>
+                )}
+
                 <Row xs={1} md={2} lg={3} className="g-4">
-                    {courses.length === 0 ? (
+                    {!loading && courses.length === 0 ? (
                         <Col xs={12}>
                             <div className="glass-card p-5 text-center w-100 mt-4">
                                 <i className="bi bi-journal-x display-1 text-light opacity-25 mb-4 d-block"></i>
                                 <h4 className="text-white fw-bold">No Curriculum Available</h4>
-                                <p className="text-light opacity-50 mb-0">The academy is silent. Why not deploy the first module container?</p>
+                                <p className="text-light opacity-50 mb-0">
+                                    {searchQuery ? "No courses matched your search." : "The academy is silent. Why not deploy the first module container?"}
+                                </p>
                             </div>
                         </Col>
                     ) : (
@@ -119,6 +155,11 @@ export const Courses = () => {
                     </div>
                 )}
             </Container>
+            <style>{`
+                .form-control::placeholder {
+                    color: rgba(255, 255, 255, 0.5) !important;
+                }
+            `}</style>
         </div>
     );
 };

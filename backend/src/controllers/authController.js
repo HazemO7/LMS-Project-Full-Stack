@@ -18,6 +18,7 @@ const LOCK_TIME = 5 * 60 * 1000; // 5 minutes
 // I will move validation to routes for the new endpoints, and keep manual for old if necessary,
 // OR just update all to use middleware. The plan says "Use Joi validation middleware."
 
+// POST /api/auth/register
 const register = catchAsync(async (req, res, next) => {
     // get Data (assuming validation middleware passed and attached req.body)
     const { name, email, password } = req.body;
@@ -36,7 +37,11 @@ const register = catchAsync(async (req, res, next) => {
         role: 'student',
     });
 
-    logger.info("New user registered successfully", { userId: user._id, role: user.role, requestId: req.id });
+    logger.info("New user registered successfully", {
+         userId: user._id,
+          role: user.role,
+           requestId: req.id
+         });
 
     res.status(201).json({
         msg: "Done Created User",
@@ -44,6 +49,7 @@ const register = catchAsync(async (req, res, next) => {
     });
 });
 
+// POST /api/auth/login 
 const login = catchAsync(async (req, res, next) => {
     const { email, password } = req.body;
 
@@ -89,6 +95,7 @@ const login = catchAsync(async (req, res, next) => {
         });
     }
 
+    
     // Step 6: Successful login
     if (user.loginAttempts > 0 || user.lockUntil) {
         user.resetLoginAttempts();
