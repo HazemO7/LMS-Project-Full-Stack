@@ -7,6 +7,7 @@ import { CreateLessonModal } from '../components/CreateLessonModal';
 import { EditCourseModal } from '../components/EditCourseModal';
 import { EditModuleModal } from '../components/EditModuleModal';
 import { EditLessonModal } from '../components/EditLessonModal';
+import { getYouTubeEmbedUrl } from '../utils/youtube';
 
 export const CourseDetails = () => {
     const { id } = useParams();
@@ -230,12 +231,37 @@ export const CourseDetails = () => {
                                                                     )}
                                                                 </div>
                                                                 <Card.Text className="mb-4 fs-6">{lessonObj.content}</Card.Text>
+                                                                
+                                                                {lessonObj.videoUrl && (
+                                                                    <div className="mb-4">
+                                                                        {(() => {
+                                                                            const embedUrl = getYouTubeEmbedUrl(lessonObj.videoUrl);
+                                                                            if (embedUrl) {
+                                                                                return (
+                                                                                    <div className="ratio ratio-16x9 shadow-sm rounded overflow-hidden" style={{ maxHeight: '600px' }}>
+                                                                                        <iframe 
+                                                                                            src={embedUrl} 
+                                                                                            title={lessonObj.title} 
+                                                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                                                                            allowFullScreen
+                                                                                            className="w-100 h-100 border-0"
+                                                                                        ></iframe>
+                                                                                    </div>
+                                                                                );
+                                                                            } else {
+                                                                                return (
+                                                                                    <Alert variant="secondary" className="border-0 shadow-sm text-center mb-0 p-4">
+                                                                                        <i className="bi bi-camera-video-off display-6 d-block mb-3 opacity-50"></i>
+                                                                                        <p className="mb-0 text-muted fw-bold">Invalid or unsupported video link provided.</p>
+                                                                                    </Alert>
+                                                                                );
+                                                                            }
+                                                                        })()}
+                                                                    </div>
+                                                                )}
+
                                                                 <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 pt-3 border-top border-secondary border-opacity-10">
-                                                                    {lessonObj.videoUrl ? (
-                                                                        <a href={lessonObj.videoUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm px-4 fw-bold shadow-sm rounded-pill">
-                                                                            <i className="bi bi-play-circle-fill me-2 fs-5 align-middle"></i> Watch Media Material
-                                                                        </a>
-                                                                    ) : <div></div>}
+                                                                    <div></div>
                                                                     {progressData && progressData.completedLessons && (
                                                                         <Button
                                                                             variant={progressData.completedLessons.includes(lessonObj._id || lessonObj.id) ? "success" : "outline-success"}
