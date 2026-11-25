@@ -4,6 +4,8 @@
   "description": "A modern, full-stack Learning Management System (LMS) designed for a seamless educational experience. This project features a robust Node.js backend and a responsive React frontend, providing everything needed to manage courses, lessons, and student progress.",
   "main": "app.js",
   "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

@@ -1,131 +1,137 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Row, Col, Form, Button, Alert } from 'react-bootstrap';
 import { useForm } from 'react-hook-form';
+import { ArrowLeft, EnvelopeOpen, PaperPlaneTilt } from '@phosphor-icons/react';
 import { authAPI } from '../services/api';
+import { AuthShell } from '../components/AuthShell';
+import { AlertBanner } from '../components/ui/AlertBanner';
 
 export const ForgotPassword = () => {
-    const { register, handleSubmit, formState: { errors } } = useForm();
-    const [loading, setLoading] = useState(false);
-    const [success, setSuccess] = useState('');
-    const [error, setError] = useState('');
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm();
 
-    const onSubmit = async (data) => {
-        setError('');
-        setSuccess('');
-        setLoading(true);
-        try {
-            const res = await authAPI.forgotPassword(data.email);
-            // Always show the generic message from the backend (anti-enumeration)
-            setSuccess(res.message || 'If an account exists, a password reset email has been sent.');
-        } catch (err) {
-            if (err.message && err.message.toLowerCase().includes('fetch')) {
-                setError('Network error. Please check your connection and try again.');
-            } else {
-                setError(err.message || 'Something went wrong. Please try again.');
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
 
-    return (
-        <div className="premium-dark-section bg-mesh hero-min-height d-flex align-items-center justify-content-center py-5">
-            <Container>
-                <div className="glow-effect"></div>
-                <Row className="justify-content-center position-relative z-1 w-100 mx-0">
-                    <Col md={8} lg={6} xl={5}>
-                        <div className="text-center mb-4">
-                            <i className="bi bi-shield-lock display-4 text-primary mb-3 d-inline-block"></i>
-                            <h2 className="fw-bold text-white">Forgot Password?</h2>
-                            <p className="text-light opacity-75">
-                                Enter your email and we'll send you a reset link if an account exists.
-                            </p>
-                        </div>
-                        <div className="glass-card p-4 p-md-5">
-                            {success && (
-                                <Alert variant="success" className="mb-4 border-0 shadow-sm d-flex align-items-start gap-2">
-                                    <i className="bi bi-check-circle-fill flex-shrink-0 mt-1"></i>
-                                    <span>{success}</span>
-                                </Alert>
-                            )}
-                            {error && (
-                                <Alert variant="danger" className="mb-4 border-0 shadow-sm d-flex align-items-start gap-2">
-                                    <i className="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
-                                    <span>{error}</span>
-                                </Alert>
-                            )}
+  const onSubmit = async (data) => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+    try {
+      const res = await authAPI.forgotPassword(data.email.trim());
+      setSuccess(
+        res.message || 'If an account exists, a password reset email has been sent.'
+      );
+    } catch (err) {
+      setError(err.message || 'Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                            {!success ? (
-                                <Form onSubmit={handleSubmit(onSubmit)} noValidate>
-                                    <Form.Group className="mb-4">
-                                        <Form.Label className="text-light opacity-75 fw-bold">
-                                            Email Address
-                                        </Form.Label>
-                                        <Form.Control
-                                            {...register('email', {
-                                                required: 'Email address is required',
-                                                pattern: {
-                                                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                                    message: 'Please enter a valid email address'
-                                                }
-                                            })}
-                                            type="email"
-                                            id="forgot-email"
-                                            className={`bg-dark text-light border-secondary py-3 placeholder-faded ${errors.email ? 'is-invalid' : ''}`}
-                                            placeholder="Enter your registered email"
-                                            autoComplete="email"
-                                            disabled={loading}
-                                        />
-                                        {errors.email && (
-                                            <div className="invalid-feedback d-block mt-1">
-                                                {errors.email.message}
-                                            </div>
-                                        )}
-                                    </Form.Group>
+  return (
+    <AuthShell
+      title="Reset your password"
+      subtitle="Enter your registered email and we will send you a time-limited reset link."
+      asideTitle="Account recovery"
+      asideBody="Reset links are cryptographically hashed on the server and expire automatically after 15 minutes."
+      asidePoints={[
+        'For security, responses never reveal whether an email is registered',
+        'Reset links expire after 15 minutes',
+      ]}
+    >
+      <div className="space-y-4">
+        {success && <AlertBanner variant="success">{success}</AlertBanner>}
+        {error && (
+          <AlertBanner variant="error" onDismiss={() => setError('')}>
+            {error}
+          </AlertBanner>
+        )}
+      </div>
 
-                                    <Button
-                                        type="submit"
-                                        id="forgot-submit-btn"
-                                        className="btn-premium w-100 fs-5 mb-4 py-3"
-                                        disabled={loading}
-                                    >
-                                        {loading ? (
-                                            <>
-                                                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                                                Sending Reset Link...
-                                            </>
-                                        ) : (
-                                            <>Send Reset Link <i className="bi bi-envelope-arrow-up-fill ms-2"></i></>
-                                        )}
-                                    </Button>
+      {!success ? (
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-5 space-y-5">
+          <div>
+            <label
+              htmlFor="forgot-email"
+              className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+            >
+              Email address
+            </label>
+            <input
+              id="forgot-email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              disabled={loading}
+              aria-invalid={Boolean(errors.email)}
+              {...register('email', {
+                required: 'Email address is required',
+                pattern: {
+                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                  message: 'Please enter a valid email address',
+                },
+              })}
+              className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 ${
+                errors.email
+                  ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                  : 'border-[#CBD5E1] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20'
+              }`}
+            />
+            {errors.email && (
+              <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
+                {errors.email.message}
+              </p>
+            )}
+          </div>
 
-                                    <div className="text-center">
-                                        <span className="text-light opacity-50">Remember your password? </span>
-                                        <Link to="/login" className="text-info text-decoration-none fw-bold ms-1">
-                                            Back to Login
-                                        </Link>
-                                    </div>
-                                </Form>
-                            ) : (
-                                <div className="text-center py-3">
-                                    <i className="bi bi-envelope-check-fill display-1 text-success mb-3 d-block"></i>
-                                    <p className="text-light opacity-75 mb-4">
-                                        Check your inbox and click the link in the email. The link expires in <strong className="text-warning">15 minutes</strong>.
-                                    </p>
-                                    <p className="text-light opacity-50 small mb-4">
-                                        Didn't receive an email? Check your spam folder, or try again with a different email address.
-                                    </p>
-                                    <Link to="/login" className="btn btn-outline-light px-4 py-2">
-                                        <i className="bi bi-arrow-left me-2"></i>Back to Login
-                                    </Link>
-                                </div>
-                            )}
-                        </div>
-                    </Col>
-                </Row>
-            </Container>
-            <style>{`.placeholder-faded::placeholder { color: rgba(255,255,255,0.3) !important; }`}</style>
+          <button
+            type="submit"
+            id="forgot-submit-btn"
+            disabled={loading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1D4ED8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-2 disabled:opacity-60"
+          >
+            <PaperPlaneTilt size={16} weight="bold" aria-hidden="true" />
+            {loading ? 'Sending reset link...' : 'Send reset link'}
+          </button>
+
+          <p className="text-center text-sm text-[#475569]">
+            Remembered your password?{' '}
+            <Link
+              to="/login"
+              className="font-semibold text-[#1D4ED8] hover:text-[#1E40AF]"
+            >
+              Back to sign in
+            </Link>
+          </p>
+        </form>
+      ) : (
+        <div className="mt-6 rounded-xl border border-[#E2E8F0] bg-[#F7F8FA] p-6 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#ECFDF5] text-[#059669]">
+            <EnvelopeOpen size={24} weight="duotone" aria-hidden="true" />
+          </div>
+          <h2 className="mt-4 font-display text-lg font-semibold text-[#0F172A]">
+            Check your inbox
+          </h2>
+          <p className="mt-2 text-sm text-[#475569]">
+            Open the link in the email within <strong>15 minutes</strong> to choose a new password.
+          </p>
+          <p className="mt-2 text-xs text-[#64748B]">
+            Did not receive an email? Check your spam folder or verify the address you entered.
+          </p>
+          <Link
+            to="/login"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg border border-[#CBD5E1] bg-white px-4 py-2 text-sm font-medium text-[#0F172A] hover:bg-[#EEF1F6]"
+          >
+            <ArrowLeft size={15} aria-hidden="true" />
+            Back to sign in
+          </Link>
         </div>
-    );
+      )}
+    </AuthShell>
+  );
 };

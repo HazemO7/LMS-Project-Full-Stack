@@ -1,56 +1,101 @@
 import React from 'react';
-import { Container, Row, Col } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import { GithubLogo } from '@phosphor-icons/react';
+import { BrandMark } from './BrandMark';
 
 export const Footer = () => {
-    return (
-        <footer className="py-5" style={{ backgroundColor: '#0f172a', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-            <Container>
-                <Row className="gy-4">
-                    <Col lg={4} md={6}>
-                        <h4 className="fw-bold text-white mb-3 d-flex align-items-center">
-                            <i className="bi bi-mortarboard-fill text-primary me-2 fs-3"></i>
-                            <span>LMS<span className="text-primary">Premium</span></span>
-                        </h4>
-                        <p className="text-light opacity-50 pe-md-4" style={{ fontSize: '1rem' }}>
-                            The definitive Learning Management ecosystem. Engineered with Node.js, React, and absolute administrative security boundaries.
-                        </p>
-                    </Col>
-                    <Col lg={2} md={3} xs={6}>
-                        <h5 className="text-white mb-3">Platform</h5>
-                        <ul className="list-unstyled mb-0 d-flex flex-column gap-2">
-                            <li><Link to="/" className="text-light opacity-75 text-decoration-none nav-hover transition-colors">Home</Link></li>
-                            <li><Link to="/courses" className="text-light opacity-75 text-decoration-none nav-hover transition-colors">Curriculum</Link></li>
-                            <li><Link to="/profile" className="text-light opacity-75 text-decoration-none nav-hover transition-colors">Dashboard</Link></li>
-                        </ul>
-                    </Col>
-                    <Col lg={2} md={3} xs={6}>
-                        <h5 className="text-white mb-3">Company</h5>
-                        <ul className="list-unstyled mb-0 d-flex flex-column gap-2">
-                            <li><Link to="/about" className="text-light opacity-75 text-decoration-none nav-hover transition-colors">Our Story</Link></li>
-                            <li><Link to="/contact" className="text-light opacity-75 text-decoration-none nav-hover transition-colors">Contact Hub</Link></li>
-                            <li><a href="#" className="text-light opacity-75 text-decoration-none nav-hover transition-colors">API Docs</a></li>
-                        </ul>
-                    </Col>
-                    <Col lg={4} md={12}>
-                        <h5 className="text-white mb-3">Join the Terminal</h5>
-                        <p className="text-light opacity-50 mb-3">Subscribe to system architecture updates mapping the future of EdTech.</p>
-                        <div className="d-flex gap-2">
-                            <input type="email" className="form-control bg-dark text-light border-secondary" placeholder="Transmission email..." style={{ borderRadius: '8px' }} />
-                            <button className="btn btn-primary fw-bold px-4" style={{ borderRadius: '8px' }}>Subscribe</button>
-                        </div>
-                    </Col>
-                </Row>
-                <div className="mt-5 pt-4 border-top border-secondary border-opacity-25 d-flex justify-content-between align-items-center flex-wrap gap-3">
-                    <p className="text-light opacity-50 mb-0">© {new Date().getFullYear()} LMS Premium Project. All systems secure.</p>
-                    <div className="d-flex gap-4">
-                        <a href="https://github.com/HazemO7" className="text-light opacity-50 nav-hover transition-colors"><i className="bi bi-github fs-5"></i></a>
-                        <a href="#" className="text-light opacity-50 nav-hover transition-colors"><i className="bi bi-twitter-x fs-5"></i></a>
-                        <a href="#" className="text-light opacity-50 nav-hover transition-colors"><i className="bi bi-discord fs-5"></i></a>
-                    </div>
-                </div>
-            </Container>
-            <style>{`.nav-hover:hover { opacity: 1 !important; color: #60a5fa !important; } .transition-colors { transition: color 0.2s ease, opacity 0.2s ease; }`}</style>
-        </footer>
-    );
+  return (
+    <footer className="border-t border-[#E2E8F0] bg-white">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+        <div className="grid gap-10 md:grid-cols-12">
+          <div className="md:col-span-5">
+            <Link
+              to="/"
+              className="inline-block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+            >
+              <BrandMark />
+            </Link>
+            <p className="mt-3 max-w-sm text-sm leading-relaxed text-[#475569]">
+              Structured technical courses, module-based authoring, and verified lesson progress tracking in a calm study workspace.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:col-span-7">
+            <div>
+              <h3 className="text-xs font-semibold text-[#0F172A]">Platform</h3>
+              <ul className="mt-3 space-y-2.5 text-sm text-[#475569]">
+                <li>
+                  <Link to="/courses" className="hover:text-[#0F172A]">
+                    Course catalog
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/profile" className="hover:text-[#0F172A]">
+                    Account settings
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/course/new" className="hover:text-[#0F172A]">
+                    Publish a course
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-semibold text-[#0F172A]">Academy</h3>
+              <ul className="mt-3 space-y-2.5 text-sm text-[#475569]">
+                <li>
+                  <Link to="/about" className="hover:text-[#0F172A]">
+                    About Foundry
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/contact" className="hover:text-[#0F172A]">
+                    Contact
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h3 className="text-xs font-semibold text-[#0F172A]">Access</h3>
+              <ul className="mt-3 space-y-2.5 text-sm text-[#475569]">
+                <li>
+                  <Link to="/login" className="hover:text-[#0F172A]">
+                    Sign in
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/register" className="hover:text-[#0F172A]">
+                    Create account
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/forgot-password" className="hover:text-[#0F172A]">
+                    Reset password
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-10 flex flex-col items-start justify-between gap-4 border-t border-[#E2E8F0] pt-6 sm:flex-row sm:items-center">
+          <p className="text-xs text-[#64748B]">
+            © {new Date().getFullYear()} Foundry Learning Management System.
+          </p>
+          <a
+            href="https://github.com/HazemO7/LMS-Project-Full-Stack"
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#475569] transition-colors hover:text-[#0F172A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+          >
+            <GithubLogo size={16} aria-hidden="true" />
+            Source repository
+          </a>
+        </div>
+      </div>
+    </footer>
+  );
 };

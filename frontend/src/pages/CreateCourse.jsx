@@ -1,82 +1,125 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, BookBookmark, Plus } from '@phosphor-icons/react';
 import { coursesAPI } from '../services/api';
-import { Container, Form, Button, Alert, Row, Col } from 'react-bootstrap';
+import { AlertBanner } from '../components/ui/AlertBanner';
 
 export const CreateCourse = () => {
-    const [courseData, setCourseData] = useState({ title: '', description: '' });
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
+  const [courseData, setCourseData] = useState({ title: '', description: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-    const handleChange = (e) => {
-        setCourseData({ ...courseData, [e.target.name]: e.target.value });
-    };
+  const handleChange = (e) => {
+    setCourseData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-        try {
-            const response = await coursesAPI.create(courseData);
-            const newCourseId = response.data?._id || response._id;
-            navigate(`/course/${newCourseId || ''}`);
-        } catch (err) {
-            setError(err.message || 'Failed to create course');
-        } finally {
-            setLoading(false);
-        }
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      const response = await coursesAPI.create({
+        title: courseData.title.trim(),
+        description: courseData.description.trim(),
+      });
+      const newCourseId = response.data?._id || response._id;
+      navigate(newCourseId ? `/course/${newCourseId}` : '/courses');
+    } catch (err) {
+      setError(err.message || 'Failed to create course');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return (
-        <div className="premium-dark-section bg-mesh hero-min-height py-5">
-            <Container className="position-relative z-1">
-                <div className="glow-effect" style={{ background: 'radial-gradient(circle, rgba(96,165,250,0.3) 0%, rgba(0,0,0,0) 70%)', top: '20%' }}></div>
-                <Row className="justify-content-center">
-                    <Col lg={8}>
-                        <div className="text-center mb-5">
-                            <i className="bi bi-pencil-square display-4 text-primary mb-3 d-inline-block"></i>
-                            <h2 className="display-5 fw-bold text-white mb-2">Build <span className="gradient-text">Curriculum</span></h2>
-                            <p className="text-light opacity-50">Deploy a new course container to your platform.</p>
-                        </div>
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6 lg:py-12 lg:px-8">
+      <Link
+        to="/courses"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-[#475569] hover:text-[#0F172A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+      >
+        <ArrowLeft size={15} aria-hidden="true" />
+        Back to courses
+      </Link>
 
-                        <div className="glass-card p-4 p-md-5 mx-auto">
-                            {error && <Alert variant="danger" className="mb-4 shadow-sm border-0">{error}</Alert>}
-                            <Form onSubmit={handleSubmit}>
-                                <Form.Group className="mb-4" controlId="title">
-                                    <Form.Label className="text-light opacity-75 fw-bold">Course Title</Form.Label>
-                                    <Form.Control
-                                        type="text"
-                                        name="title"
-                                        value={courseData.title}
-                                        onChange={handleChange}
-                                        className="bg-dark text-light border-secondary py-3 placeholder-white"
-                                        required
-                                        placeholder="Engineering 101"
-                                    />
-                                </Form.Group>
-                                <Form.Group className="mb-5" controlId="description">
-                                    <Form.Label className="text-light opacity-75 fw-bold">Description Syllabus</Form.Label>
-                                    <Form.Control
-                                        as="textarea"
-                                        rows={6}
-                                        name="description"
-                                        value={courseData.description}
-                                        onChange={handleChange}
-                                        className="bg-dark text-light border-secondary placeholder-white"
-                                        required
-                                        placeholder="What will students learn in this module container?"
-                                    />
-                                </Form.Group>
-                                <Button type="submit" className="btn-premium w-100 fs-5 py-3" disabled={loading}>
-                                    {loading ? 'Compiling Container...' : 'Publish Course'} <i className="bi bi-cloud-arrow-up-fill ms-2"></i>
-                                </Button>
-                            </Form>
-                        </div>
-                    </Col>
-                </Row>
-            </Container>
-            <style>{`.placeholder-white::placeholder { color: rgba(255,255,255,0.3) !important; }`}</style>
+      <div className="mt-6 rounded-2xl border border-[#E2E8F0] bg-white p-6 sm:p-8">
+        <div className="flex items-start gap-3.5 border-b border-[#E2E8F0] pb-6">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#1D4ED8]">
+            <BookBookmark size={22} weight="duotone" aria-hidden="true" />
+          </div>
+          <div>
+            <h1 className="font-display text-2xl font-bold tracking-tight text-[#0F172A]">
+              Create a new course
+            </h1>
+            <p className="mt-1 text-sm text-[#475569]">
+              Start with the course title and syllabus overview. You can add modules and video lessons right after publishing.
+            </p>
+          </div>
         </div>
-    );
+
+        {error && (
+          <AlertBanner variant="error" className="mt-6" onDismiss={() => setError('')}>
+            {error}
+          </AlertBanner>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-5">
+          <div>
+            <label
+              htmlFor="course-title"
+              className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+            >
+              Course title
+            </label>
+            <input
+              id="course-title"
+              type="text"
+              name="title"
+              required
+              value={courseData.title}
+              onChange={handleChange}
+              placeholder="e.g. Distributed Systems in Practice"
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:border-[#1D4ED8] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20"
+            />
+          </div>
+
+          <div>
+            <label
+              htmlFor="course-description"
+              className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+            >
+              Course overview
+            </label>
+            <textarea
+              id="course-description"
+              name="description"
+              rows={5}
+              required
+              value={courseData.description}
+              onChange={handleChange}
+              placeholder="Summarize what students will build, prerequisites, and the core topics covered..."
+              className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:border-[#1D4ED8] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[#E2E8F0] pt-5">
+            <Link
+              to="/courses"
+              className="rounded-lg border border-[#CBD5E1] bg-white px-4 py-2.5 text-sm font-medium text-[#0F172A] hover:bg-[#F7F8FA]"
+            >
+              Cancel
+            </Link>
+            <button
+              type="submit"
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#1D4ED8] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-2 disabled:opacity-60"
+            >
+              <Plus size={16} weight="bold" aria-hidden="true" />
+              {loading ? 'Publishing...' : 'Publish course'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 };

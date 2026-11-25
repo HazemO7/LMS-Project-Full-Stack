@@ -1,82 +1,233 @@
-import React, { useContext, useState } from 'react';
-import { Container, Row, Col, Badge, Alert } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowRight, BookOpen, CheckSquareOffset, ShieldCheck } from '@phosphor-icons/react';
+import { coursesAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { HeroWorkspacePreview } from '../components/HeroWorkspacePreview';
+
+const WORKFLOW_STEPS = [
+  {
+    step: '01',
+    title: 'Explore the catalog and enroll',
+    description:
+      'Browse published engineering curricula openly, inspect course summaries, and enroll in one click once signed in.',
+  },
+  {
+    step: '02',
+    title: 'Learn in a focused lesson workspace',
+    description:
+      'Navigate module by module with a persistent syllabus sidebar, dedicated video theater, and clean reading notes.',
+  },
+  {
+    step: '03',
+    title: 'Track completion across every module',
+    description:
+      'Mark individual lessons complete and monitor verified course progress percentages tied directly to your account.',
+  },
+];
 
 export const Home = () => {
-    const { userToken } = useContext(AuthContext);
-    const navigate = useNavigate();
-    const [showAlert, setShowAlert] = useState(false);
+  const { userToken } = useAuth();
+  const [featuredCourses, setFeaturedCourses] = useState([]);
+  const [loadingCourses, setLoadingCourses] = useState(true);
 
-    const handleExploreClick = (e) => {
-        e.preventDefault();
-        if (userToken) {
-            navigate('/courses');
-        } else {
-            setShowAlert(true);
-            setTimeout(() => setShowAlert(false), 5000); // Hide after 5 seconds
-        }
+  useEffect(() => {
+    let active = true;
+    coursesAPI
+      .getAll(1, 3, '')
+      .then((res) => {
+        if (!active) return;
+        const list = Array.isArray(res) ? res : res.courses || res.data || [];
+        setFeaturedCourses(list.slice(0, 3));
+      })
+      .catch(() => {
+        if (active) setFeaturedCourses([]);
+      })
+      .finally(() => {
+        if (active) setLoadingCourses(false);
+      });
+
+    return () => {
+      active = false;
     };
+  }, []);
 
-    return (
-        <div className="premium-dark-section bg-mesh hero-min-height">
-            <Container className="py-5 position-relative">
-                <Row className="align-items-center gy-5">
-                    <Col lg={6} className="text-center text-lg-start z-3">
-                        <Badge bg="primary" pill className="px-3 py-2 mb-3 bg-opacity-25 border border-primary text-primary" style={{ fontSize: '0.9rem' }}>
-                            🚀 Learning Management System
-                        </Badge>
-                        <h1 className="display-3 fw-bold mb-4">
-                            Master Your Future with <span className="gradient-text">Elite Learning</span>
-                        </h1>
-                        <p className="lead text-light opacity-75 mb-5" style={{ fontSize: '1.25rem' }}>
-                            Join thousands of ambitious students. Access world-class courses, track your progress flawlessly, and connect with top-tier instructors in our premium ecosystem.
-                        </p>
-                        {showAlert && (
-                            <Alert variant="danger" className="glass-alert border-danger border-opacity-50 text-danger mb-4 fade show">
-                                <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                                🔒 You need to login first to explore our courses.
-                            </Alert>
-                        )}
-                        <div className="d-flex gap-3 justify-content-center justify-content-lg-start">
-                            <button onClick={handleExploreClick} className="btn-premium fs-5 px-5 border-0">Explore our Courses</button>
-                            <button onClick={() => navigate('/about')} className="btn btn-outline-light fs-5 px-4" style={{ borderRadius: '8px' }}>Our Mission</button>
-                        </div>
-                    </Col>
-                    <Col lg={6} className="text-center position-relative z-3">
-                        <div className="glow-effect"></div>
-                        <img
-                            src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80"
-                            alt="LMS Interface"
-                            className="img-fluid floating rounded-4 shadow-lg border border-secondary border-opacity-25 position-relative z-1"
-                        />
-                    </Col>
-                </Row>
+  return (
+    <div>
+      {/* Hero */}
+      <section className="border-b border-[#E2E8F0] bg-white">
+        <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 lg:grid-cols-12 lg:py-20 lg:px-8">
+          <div className="lg:col-span-6">
+            <h1 className="font-display text-4xl font-bold tracking-[-0.025em] text-[#0F172A] sm:text-5xl lg:leading-[1.08]">
+              Structured technical courses built for uninterrupted study.
+            </h1>
+            <p className="mt-5 max-w-[54ch] text-base leading-relaxed text-[#475569] sm:text-lg">
+              Foundry organizes lessons into clear modules, tracks every completed step, and gives instructors direct authoring tools without visual clutter.
+            </p>
 
-                <Row className="mt-5 pt-5 text-center g-4 position-relative z-3">
-                    <Col md={4}>
-                        <div className="glass-card p-5 h-100">
-                            <i className="bi bi-rocket-takeoff-fill display-4 text-primary mb-3 d-block"></i>
-                            <h4 className="fw-bold mb-3">Fast Tracking</h4>
-                            <p className="text-light opacity-75 mb-0 fs-5">Our new progressive tracking engine guarantees you hit every milestone effortlessly.</p>
-                        </div>
-                    </Col>
-                    <Col md={4}>
-                        <div className="glass-card p-5 h-100">
-                            <i className="bi bi-shield-lock-fill display-4 text-danger mb-3 d-block"></i>
-                            <h4 className="fw-bold mb-3">True Ownership</h4>
-                            <p className="text-light opacity-75 mb-0 fs-5">Built-in authentic RBAC ensures your courses and progress are completely untouchable.</p>
-                        </div>
-                    </Col>
-                    <Col md={4}>
-                        <div className="glass-card p-5 h-100">
-                            <i className="bi bi-gem display-4 text-info mb-3 d-block"></i>
-                            <h4 className="fw-bold mb-3">Premium UI</h4>
-                            <p className="text-light opacity-75 mb-0 fs-5">Fluid glassmorphism and animated interfaces create a stunning uninterrupted study environment.</p>
-                        </div>
-                    </Col>
-                </Row>
-            </Container>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link
+                to="/courses"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#1D4ED8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-2"
+              >
+                Browse courses
+                <ArrowRight size={16} weight="bold" aria-hidden="true" />
+              </Link>
+              <Link
+                to={userToken ? '/profile' : '/register'}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#CBD5E1] bg-white px-5 py-3 text-sm font-semibold text-[#0F172A] transition-colors hover:bg-[#F7F8FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+              >
+                {userToken ? 'View my account' : 'Create student account'}
+              </Link>
+            </div>
+
+            <dl className="mt-10 grid grid-cols-3 gap-4 border-t border-[#E2E8F0] pt-6">
+              <div>
+                <dt className="flex items-center gap-1.5 text-xs font-medium text-[#64748B]">
+                  <BookOpen size={14} aria-hidden="true" className="text-[#1D4ED8]" />
+                  Structure
+                </dt>
+                <dd className="mt-1 text-sm font-semibold text-[#0F172A]">
+                  Modules &amp; lessons
+                </dd>
+              </div>
+              <div>
+                <dt className="flex items-center gap-1.5 text-xs font-medium text-[#64748B]">
+                  <CheckSquareOffset size={14} aria-hidden="true" className="text-[#059669]" />
+                  Progress
+                </dt>
+                <dd className="mt-1 text-sm font-semibold text-[#0F172A]">
+                  Lesson-level sync
+                </dd>
+              </div>
+              <div>
+                <dt className="flex items-center gap-1.5 text-xs font-medium text-[#64748B]">
+                  <ShieldCheck size={14} aria-hidden="true" className="text-[#1D4ED8]" />
+                  Permissions
+                </dt>
+                <dd className="mt-1 text-sm font-semibold text-[#0F172A]">
+                  Role-verified RBAC
+                </dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="lg:col-span-6">
+            <HeroWorkspacePreview />
+          </div>
         </div>
-    );
+      </section>
+
+      {/* Featured Catalog Strip */}
+      <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[#E2E8F0] pb-5">
+          <div>
+            <h2 className="font-display text-2xl font-bold tracking-tight text-[#0F172A]">
+              Published courses
+            </h2>
+            <p className="mt-1 text-sm text-[#475569]">
+              Open any syllabus to inspect its overview or enroll as a student.
+            </p>
+          </div>
+          <Link
+            to="/courses"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1D4ED8] hover:text-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+          >
+            View full catalog
+            <ArrowRight size={15} weight="bold" aria-hidden="true" />
+          </Link>
+        </div>
+
+        {loadingCourses ? (
+          <div className="mt-6 grid gap-5 md:grid-cols-3">
+            {[1, 2, 3].map((item) => (
+              <div
+                key={item}
+                className="h-44 animate-pulse rounded-xl border border-[#E2E8F0] bg-white p-6"
+              />
+            ))}
+          </div>
+        ) : featuredCourses.length > 0 ? (
+          <div className="mt-6 grid gap-5 md:grid-cols-3">
+            {featuredCourses.map((course) => {
+              const id = course._id || course.id;
+              const moduleCount = Array.isArray(course.modules) ? course.modules.length : 0;
+              return (
+                <article
+                  key={id}
+                  className="flex flex-col justify-between rounded-xl border border-[#E2E8F0] bg-white p-6 transition-colors hover:border-[#CBD5E1]"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-mono-tabular text-xs font-medium text-[#1D4ED8]">
+                        {moduleCount} {moduleCount === 1 ? 'module' : 'modules'}
+                      </span>
+                    </div>
+                    <h3 className="mt-3 font-display text-lg font-semibold leading-snug text-[#0F172A]">
+                      {course.title}
+                    </h3>
+                    <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-[#475569]">
+                      {course.description}
+                    </p>
+                  </div>
+
+                  <div className="mt-5 border-t border-[#E2E8F0] pt-4">
+                    <Link
+                      to={`/course/${id}`}
+                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#1D4ED8] hover:text-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+                    >
+                      {userToken ? 'Open course' : 'Sign in to view'}
+                      <ArrowRight size={14} weight="bold" aria-hidden="true" />
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-6 rounded-xl border border-[#E2E8F0] bg-white p-8 text-center">
+            <p className="text-sm text-[#475569]">
+              Browse the course catalog to view available courses once the API server is running.
+            </p>
+            <Link
+              to="/courses"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg border border-[#CBD5E1] bg-[#F7F8FA] px-4 py-2 text-sm font-medium text-[#0F172A] hover:bg-[#EEF1F6]"
+            >
+              Open catalog
+            </Link>
+          </div>
+        )}
+      </section>
+
+      {/* Sequential 01 / 02 / 03 Workflow */}
+      <section className="border-t border-[#E2E8F0] bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+          <div className="max-w-xl">
+            <h2 className="font-display text-2xl font-bold tracking-tight text-[#0F172A]">
+              How Foundry works
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-[#475569]">
+              Every course follows a clear hierarchy from enrollment to verified lesson completion.
+            </p>
+          </div>
+
+          <div className="mt-8 grid divide-y divide-[#E2E8F0] rounded-xl border border-[#E2E8F0] md:grid-cols-3 md:divide-x md:divide-y-0">
+            {WORKFLOW_STEPS.map((item) => (
+              <div key={item.step} className="p-6 sm:p-7">
+                <span className="font-mono-tabular text-xs font-semibold text-[#1D4ED8]">
+                  {item.step}
+                </span>
+                <h3 className="mt-3 font-display text-lg font-semibold text-[#0F172A]">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-[#475569]">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
 };

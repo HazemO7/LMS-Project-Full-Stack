@@ -1,160 +1,246 @@
-import React, { useState, useContext, useEffect } from 'react';
-import { AuthContext } from '../context/AuthContext';
-import { authAPI } from '../services/api';
-import { useNavigate, Link } from 'react-router-dom';
-import { Container, Card, Form, Button, Alert, Row, Col } from 'react-bootstrap';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { Eye, EyeSlash, SignIn } from '@phosphor-icons/react';
+import { useAuth } from '../context/AuthContext';
+import { authAPI } from '../services/api';
+import { AuthShell } from '../components/AuthShell';
+import { AlertBanner } from '../components/ui/AlertBanner';
 
 export const Login = () => {
-    const { loginUser } = useContext(AuthContext);
-    const navigate = useNavigate();
-    const { register, handleSubmit, formState: { errors } } = useForm();
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [remainingAttempts, setRemainingAttempts] = useState(null);
-    const [lockedUntil, setLockedUntil] = useState(null);
-    const [countdown, setCountdown] = useState('');
+  const { loginUser } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm();
 
-    useEffect(() => {
-        if (!lockedUntil) {
-            setCountdown('');
-            return;
-        }
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [remainingAttempts, setRemainingAttempts] = useState(null);
+  const [lockedUntil, setLockedUntil] = useState(null);
+  const [countdown, setCountdown] = useState('');
 
-        const calculateTimeLeft = () => {
-            const difference = new Date(lockedUntil).getTime() - new Date().getTime();
-            if (difference <= 0) {
-                setLockedUntil(null);
-                setCountdown('');
-                setError('');
-                return null;
-            }
-            
-            const minutes = Math.floor((difference / 1000 / 60) % 60);
-            const seconds = Math.floor((difference / 1000) % 60);
-            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        };
+  const fromPath = location.state?.from?.pathname || '/courses';
+  const redirectedFromProtected = Boolean(location.state?.from);
+  const justRegistered = Boolean(location.state?.registered);
 
-        let timeString = calculateTimeLeft();
-        if (!timeString) return;
-        setCountdown(timeString);
+  useEffect(() => {
+    if (!lockedUntil) {
+      setCountdown('');
+      return;
+    }
 
-        const interval = setInterval(() => {
-            timeString = calculateTimeLeft();
-            if (timeString) setCountdown(timeString);
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [lockedUntil]);
-
-    useEffect(() => {
-        if (error && !lockedUntil) {
-            const timer = setTimeout(() => setError(''), 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [error, lockedUntil]);
-
-    const onSubmit = async (data) => {
+    const calculateTimeLeft = () => {
+      const difference = new Date(lockedUntil).getTime() - Date.now();
+      if (difference <= 0) {
+        setLockedUntil(null);
+        setCountdown('');
         setError('');
-        setRemainingAttempts(null);
-        setLoading(true);
-        try {
-            const res = await authAPI.login(data);
-            loginUser(res.token);
-            navigate('/courses');
-        } catch (err) {
-            setError(err.message || 'Login failed');
-            if (err.status === 401 && err.remainingAttempts !== undefined) {
-                setRemainingAttempts(err.remainingAttempts);
-            }
-            if (err.status === 423 && err.lockedUntil) {
-                setLockedUntil(err.lockedUntil);
-            }
-        } finally {
-            setLoading(false);
-        }
+        return null;
+      }
+
+      const minutes = Math.floor((difference / 1000 / 60) % 60);
+      const seconds = Math.floor((difference / 1000) % 60);
+      return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    return (
-        <div className="premium-dark-section bg-mesh hero-min-height d-flex align-items-center justify-content-center py-5">
-            <Container>
-                <div className="glow-effect"></div>
-                <Row className="justify-content-center position-relative z-1 w-100 mx-0">
-                    <Col md={8} lg={6} xl={5}>
-                        <div className="text-center mb-4">
-                            <i className="bi bi-person-bounding-box display-4 text-primary mb-3 d-inline-block"></i>
-                            <h2 className="fw-bold text-white">Welcome Back</h2>
-                            <p className="text-light opacity-75">Sign in to access your secure learning environment.</p>
-                        </div>
-                        <div className="glass-card p-4 p-md-5">
-                            {error && !lockedUntil && remainingAttempts === null && (
-                                <Alert variant="danger" className="mb-4 shadow-sm border-0">{error}</Alert>
-                            )}
-                            {error && !lockedUntil && remainingAttempts !== null && (
-                                <Alert variant="danger" className="mb-4 shadow-sm border-0">
-                                    {error}. {remainingAttempts} attempts remaining.
-                                </Alert>
-                            )}
-                            {lockedUntil && (
-                                <Alert variant="danger" className="mb-4 shadow-sm border-0">
-                                    Your account has been locked due to multiple failed login attempts.<br/>
-                                    Try again in {countdown}.
-                                </Alert>
-                            )}
-                            <Form onSubmit={handleSubmit(onSubmit)}>
-                                <Form.Group className="mb-4">
-                                    <Form.Label className="text-light opacity-75 fw-bold">Email Address</Form.Label>
-                                    <Form.Control
-                                        {...register("email", {
-                                            required: "Email is required",
-                                            pattern: {
-                                                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                                message: "Invalid email address"
-                                            }
-                                        })}
-                                        type="email"
-                                        className={`bg-dark text-light border-secondary py-3 placeholder-white ${errors.email ? 'is-invalid' : ''}`}
-                                        placeholder="Enter your registered email"
-                                    />
-                                    {errors.email && (
-                                        <div className="invalid-feedback text-danger mt-1">
-                                            {errors.email.message}
-                                        </div>
-                                    )}
-                                </Form.Group>
-                                <Form.Group className="mb-5">
-                                    <div className="d-flex justify-content-between">
-                                        <Form.Label className="text-light opacity-75 fw-bold">Secure Password</Form.Label>
-                                        <Link to="/forgot-password" className="text-primary text-decoration-none small">Forgot password?</Link>
-                                    </div>
-                                    <Form.Control
-                                        {...register("password", {
-                                            required: "Password is required",
-                                            minLength: { value: 6, message: "Password must be at least 6 characters" }
-                                        })}
-                                        type="password"
-                                        className={`bg-dark text-light border-secondary py-3 placeholder-white ${errors.password ? 'is-invalid' : ''}`}
-                                        placeholder="Enter your password"
-                                    />
-                                    {errors.password && (
-                                        <div className="invalid-feedback text-danger mt-1">
-                                            {errors.password.message}
-                                        </div>
-                                    )}
-                                </Form.Group>
-                                <Button type="submit" className="btn-premium w-100 fs-5 mb-4 py-3" disabled={loading}>
-                                    {loading ? 'Authenticating...' : 'Secure Login'} <i className="bi bi-arrow-right-circle-fill ms-2"></i>
-                                </Button>
-                                <div className="text-center">
-                                    <span className="text-light opacity-50">Don't have an account? </span>
-                                    <Link to="/register" className="text-info text-decoration-none fw-bold ms-1">Create one now</Link>
-                                </div>
-                            </Form>
-                        </div>
-                    </Col>
-                </Row>
-            </Container>
-            <style>{`.placeholder-white::placeholder { color: rgba(255,255,255,0.3) !important; }`}</style>
+    const initial = calculateTimeLeft();
+    if (!initial) return;
+    setCountdown(initial);
+
+    const interval = setInterval(() => {
+      const next = calculateTimeLeft();
+      if (next) setCountdown(next);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [lockedUntil]);
+
+  useEffect(() => {
+    if (error && !lockedUntil) {
+      const timer = setTimeout(() => setError(''), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [error, lockedUntil]);
+
+  const onSubmit = async (data) => {
+    setError('');
+    setRemainingAttempts(null);
+    setLoading(true);
+    try {
+      const res = await authAPI.login(data);
+      loginUser(res.token);
+      navigate(fromPath, { replace: true });
+    } catch (err) {
+      setError(err.message || 'Login failed');
+      if (err.status === 401 && err.remainingAttempts !== undefined) {
+        setRemainingAttempts(err.remainingAttempts);
+      }
+      if (err.status === 423 && err.lockedUntil) {
+        setLockedUntil(err.lockedUntil);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <AuthShell
+      title="Sign in"
+      subtitle="Access your enrolled courses, modules, and progress."
+      asideTitle="Pick up right where you stopped."
+      asideBody="Your active course enrollments, completed lessons, and role permissions stay synced across sessions."
+      asidePoints={[
+        'Role-based dashboards for students, instructors, and admins',
+        'Protected enrollment and lesson progress persistence',
+        'Brute-force lockout protection on repeated failed attempts',
+      ]}
+    >
+      <div className="space-y-4">
+        {justRegistered && (
+          <AlertBanner variant="success">
+            Account created successfully. Sign in with your email and password.
+          </AlertBanner>
+        )}
+
+        {redirectedFromProtected && !justRegistered && (
+          <AlertBanner variant="info">
+            Please sign in to access this page.
+          </AlertBanner>
+        )}
+
+        {error && !lockedUntil && (
+          <AlertBanner variant="error" onDismiss={() => setError('')}>
+            <span>{error}</span>
+            {remainingAttempts !== null && (
+              <span className="mt-1 block font-mono-tabular text-xs font-medium">
+                {remainingAttempts} {remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining before temporary lockout.
+              </span>
+            )}
+          </AlertBanner>
+        )}
+
+        {lockedUntil && (
+          <AlertBanner variant="warning">
+            <p className="font-semibold">Account temporarily locked</p>
+            <p className="mt-0.5">
+              Multiple failed login attempts detected. Try again in{' '}
+              <span className="font-mono-tabular font-semibold">{countdown}</span>.
+            </p>
+          </AlertBanner>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-5 space-y-5">
+        <div>
+          <label
+            htmlFor="login-email"
+            className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+          >
+            Email address
+          </label>
+          <input
+            id="login-email"
+            type="email"
+            autoComplete="email"
+            placeholder="you@example.com"
+            disabled={loading}
+            aria-invalid={Boolean(errors.email)}
+            {...register('email', {
+              required: 'Email address is required',
+              pattern: {
+                value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                message: 'Please enter a valid email address',
+              },
+            })}
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 ${
+              errors.email
+                ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                : 'border-[#CBD5E1] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20'
+            }`}
+          />
+          {errors.email && (
+            <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
+              {errors.email.message}
+            </p>
+          )}
         </div>
-    );
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <label
+              htmlFor="login-password"
+              className="block text-sm font-medium text-[#0F172A]"
+            >
+              Password
+            </label>
+            <Link
+              to="/forgot-password"
+              className="text-xs font-medium text-[#1D4ED8] hover:text-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+            >
+              Forgot password?
+            </Link>
+          </div>
+          <div className="relative">
+            <input
+              id="login-password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              placeholder="Enter your password"
+              disabled={loading}
+              aria-invalid={Boolean(errors.password)}
+              {...register('password', {
+                required: 'Password is required',
+              })}
+              className={`w-full rounded-lg border px-3.5 py-2.5 pr-11 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 ${
+                errors.password
+                  ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                  : 'border-[#CBD5E1] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20'
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-[#64748B] hover:text-[#0F172A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+            >
+              {showPassword ? (
+                <EyeSlash size={18} aria-hidden="true" />
+              ) : (
+                <Eye size={18} aria-hidden="true" />
+              )}
+            </button>
+          </div>
+          {errors.password && (
+            <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
+              {errors.password.message}
+            </p>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading || Boolean(lockedUntil)}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1D4ED8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-2 disabled:opacity-60"
+        >
+          <SignIn size={17} weight="bold" aria-hidden="true" />
+          {loading ? 'Signing in...' : 'Sign in'}
+        </button>
+
+        <p className="text-center text-sm text-[#475569]">
+          New to Foundry?{' '}
+          <Link
+            to="/register"
+            className="font-semibold text-[#1D4ED8] hover:text-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+          >
+            Create an account
+          </Link>
+        </p>
+      </form>
+    </AuthShell>
+  );
 };
