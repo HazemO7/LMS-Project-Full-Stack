@@ -481,7 +481,7 @@ export const Courses = () => {
         {/* Pagination */}
         {activeTab === 'all' && totalPages > 1 && (
           <nav
-            aria-label={t('courses.viewsAria')}
+            aria-label={t('courses.paginationAria')}
             className="mt-10 flex items-center justify-center gap-3"
           >
             <button

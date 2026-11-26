@@ -5,13 +5,15 @@ import { useLanguage } from '../../context/LanguageContext';
 export const FormErrorSummary = ({ errors = {}, fieldMap = {}, submitCount = 0 }) => {
   const { t } = useLanguage();
   const containerRef = useRef(null);
+  const prevSubmitCountRef = useRef(0);
 
   const entries = Object.entries(errors).filter(([, err]) => err?.message);
 
   useEffect(() => {
-    if (submitCount > 0 && entries.length > 0) {
+    if (submitCount > prevSubmitCountRef.current && entries.length > 0) {
       containerRef.current?.focus();
     }
+    prevSubmitCountRef.current = submitCount;
   }, [submitCount, entries.length]);
 
   if (submitCount === 0 || entries.length === 0) return null;

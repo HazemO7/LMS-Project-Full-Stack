@@ -39,7 +39,7 @@ export const TRANSLATIONS = {
     'footer.createAccount': 'Create account',
     'footer.resetPassword': 'Reset password',
     'footer.copyright': '© {{year}} Foundry Learning Management System.',
-    'footer.repo': 'Source repository',
+    'footer.builtBy': 'Designed & built by HazemO7',
 
     // Common UI
     'common.cancel': 'Cancel',
@@ -110,20 +110,24 @@ export const TRANSLATIONS = {
       'Instead of burying students inside nested accordions, the platform separates course discovery from a focused lesson player while giving instructors direct curriculum editing tools.',
     'about.browse': 'Browse courses',
     'about.contact': 'Contact the team',
-    'about.archTitle': 'System architecture',
-    'about.archFrontend': 'Frontend client',
-    'about.archApi': 'API runtime',
-    'about.archDb': 'Database',
-    'about.archAuth': 'Authentication',
+    'about.guideTitle': 'How to get started',
+    'about.guide1Title': 'Create your account',
+    'about.guide1Body': 'Register as a student in seconds to save your enrollments and lesson history.',
+    'about.guide2Title': 'Pick a structured course',
+    'about.guide2Body': 'Browse the catalog and preview course modules before enrolling.',
+    'about.guide3Title': 'Learn without distractions',
+    'about.guide3Body': 'Watch video lessons alongside clean reading notes in a focused player.',
+    'about.guide4Title': 'Keep track of every step',
+    'about.guide4Body': 'Mark lessons complete and automatically pick up where you left off.',
     'about.f1Title': 'Hierarchical curriculum',
     'about.f1Body':
       'Instructors organize courses into ordered modules and individual lessons with reading notes and embedded video lectures.',
-    'about.f2Title': 'Role-verified access control',
+    'about.f2Title': 'Dedicated roles & permissions',
     'about.f2Body':
-      'Every endpoint enforces JWT authentication and role checks across students, instructors, and administrators.',
+      'Clear account separation ensures students, instructors, and admins only see the tools made for them.',
     'about.f3Title': 'Persistent progress tracking',
     'about.f3Body':
-      'Completed lessons are recorded per enrollment so students always resume from where they left off.',
+      'Completed lessons are saved to your account so you always resume right where you left off.',
 
     // Contact
     'contact.title': 'Get in touch',
@@ -252,6 +256,7 @@ export const TRANSLATIONS = {
 
     // Courses Page
     'courses.viewsAria': 'Course views',
+    'courses.paginationAria': 'Courses pagination',
     'courses.catalogTitle': 'Course catalog',
     'courses.enrolledTitle': 'My enrolled courses',
     'courses.catalogSubtitle':
@@ -446,7 +451,7 @@ export const TRANSLATIONS = {
     'footer.createAccount': 'إنشاء حساب جديد',
     'footer.resetPassword': 'استعادة كلمة المرور',
     'footer.copyright': '© {{year}} منصة Foundry التعليمية. جميع الحقوق محفوظة.',
-    'footer.repo': 'مستودع المشروع',
+    'footer.builtBy': 'تصميم وتطوير HazemO7',
 
     // Common UI
     'common.cancel': 'إلغاء',
@@ -515,20 +520,24 @@ export const TRANSLATIONS = {
       'بدلاً من تكديس الدروس داخل قوائم متداخلة مربكة، تفصل المنصة بين تصفح الكورسات ومشغل الدروس الهادئ، مع إتاحة تحرير الوحدات والدروس للمدربين مباشرة.',
     'about.browse': 'تصفح الكورسات',
     'about.contact': 'تواصل معنا',
-    'about.archTitle': 'البنية التقنية',
-    'about.archFrontend': 'الواجهة الأمامية',
-    'about.archApi': 'خادم الـ API',
-    'about.archDb': 'قاعدة البيانات',
-    'about.archAuth': 'المصادقة والأمان',
+    'about.guideTitle': 'كيف تبدأ التعلّم؟',
+    'about.guide1Title': 'أنشئ حسابك بسهولة',
+    'about.guide1Body': 'سجّل كطالب خلال ثوانٍ لحفظ اشتراكاتك وسجل دروسك.',
+    'about.guide2Title': 'اختر الكورس المناسب',
+    'about.guide2Body': 'تصفّح الكورسات واطّلع على الوحدات المتاحة قبل الاشتراك.',
+    'about.guide3Title': 'ادرس بتركيز وهدوء',
+    'about.guide3Body': 'تابع فيديو الدرس مع الشرح المكتوب داخل شاشة منظمة.',
+    'about.guide4Title': 'تابع تقدّمك خطوة بخطوة',
+    'about.guide4Body': 'علّم الدروس المكتملة لتستكمل دائماً من آخر نقطة توقفت عندها.',
     'about.f1Title': 'منهج متدرج وواضح',
     'about.f1Body':
       'يرتب المدربون الكورس إلى وحدات متسلسلة ودروس تضم محتوى مكتوباً وفيديوهات تعليمية.',
-    'about.f2Title': 'صلاحيات محمية حسب الدور',
+    'about.f2Title': 'صلاحيات مخصصة لكل دور',
     'about.f2Body':
-      'كل مسار يتحقق من الهوية والصلاحية للفصل الدقيق بين الطالب والمدرب والمدير.',
+      'فصل واضح بين تجربة الطالب ومساحة عمل المدرب وإدارة المنصة لحماية بيانات الجميع.',
     'about.f3Title': 'حفظ مستمر للتقدّم',
     'about.f3Body':
-      'يُسجَّل إتمام كل درس في قاعدة البيانات لتعود دائماً إلى آخر نقطة توقفت عندها.',
+      'يُحفظ إتمام كل درس في حسابك لتعود دائماً إلى آخر نقطة توقفت عندها.',
 
     // Contact
     'contact.title': 'تواصل معنا',
@@ -657,6 +666,7 @@ export const TRANSLATIONS = {
 
     // Courses Page
     'courses.viewsAria': 'تبويبات عرض الكورسات',
+    'courses.paginationAria': 'التنقل بين صفحات الكورسات',
     'courses.catalogTitle': 'كتالوج الكورسات',
     'courses.enrolledTitle': 'كورساتي المسجلة',
     'courses.catalogSubtitle':
@@ -670,7 +680,7 @@ export const TRANSLATIONS = {
     'courses.tabEnrolled': 'كورساتي المسجلة',
     'courses.loadingCount': 'جاري تحميل الكورسات...',
     'courses.enrolledCount': '{{count}} مسجّل',
-    'courses.catalogCountMatching': '{{label}} مطابقة لـ "{{query}}"',
+    'courses.catalogCountMatching': 'نتائج "{{query}}" ({{label}})',
     'courses.emptyEnrolledTitle': 'لم تسجّل في أي كورس بعد',
     'courses.emptyEnrolledBody':
       'انتقل إلى كل الكورسات لاستكشاف المتاح والاشتراك في أول كورس لك.',

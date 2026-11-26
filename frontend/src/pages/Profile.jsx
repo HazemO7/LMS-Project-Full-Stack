@@ -33,7 +33,7 @@ export const Profile = () => {
     watch,
     reset: resetPasswordForm,
     formState: { errors, submitCount },
-  } = useForm();
+  } = useForm({ shouldFocusError: false });
 
   const watchedNewPassword = watch('newPassword', '');
 

@@ -18,7 +18,7 @@ export const Login = () => {
     register,
     handleSubmit,
     formState: { errors, submitCount },
-  } = useForm();
+  } = useForm({ shouldFocusError: false });
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);

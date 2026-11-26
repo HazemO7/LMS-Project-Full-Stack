@@ -64,34 +64,25 @@ export const About = () => {
 
           <div className="rounded-2xl border border-[#1E6466] bg-[#114B4D] p-6 sm:p-8 lg:col-span-5">
             <h2 className="font-display text-lg font-semibold text-[#FBBF24]">
-              {t('about.archTitle')}
+              {t('about.guideTitle')}
             </h2>
-            <dl className="mt-5 divide-y divide-[#1E6466]">
-              <div className="flex items-center justify-between py-3 text-sm">
-                <dt className="text-[#99F6E4]">{t('about.archFrontend')}</dt>
-                <dd dir="ltr" className="font-mono-tabular font-medium text-white">
-                  React 19 + Vite
-                </dd>
-              </div>
-              <div className="flex items-center justify-between py-3 text-sm">
-                <dt className="text-[#99F6E4]">{t('about.archApi')}</dt>
-                <dd dir="ltr" className="font-mono-tabular font-medium text-white">
-                  Node.js + Express
-                </dd>
-              </div>
-              <div className="flex items-center justify-between py-3 text-sm">
-                <dt className="text-[#99F6E4]">{t('about.archDb')}</dt>
-                <dd dir="ltr" className="font-mono-tabular font-medium text-white">
-                  MongoDB + Mongoose
-                </dd>
-              </div>
-              <div className="flex items-center justify-between py-3 text-sm">
-                <dt className="text-[#99F6E4]">{t('about.archAuth')}</dt>
-                <dd dir="ltr" className="font-mono-tabular font-medium text-white">
-                  JWT + Bcrypt + Joi
-                </dd>
-              </div>
-            </dl>
+            <ol className="mt-5 space-y-4">
+              {[1, 2, 3, 4].map((step) => (
+                <li key={step} className="flex items-start gap-3">
+                  <span className="font-mono-tabular mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[#0D9488] text-xs font-bold text-white">
+                    {step}
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      {t(`about.guide${step}Title`)}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-[#CCFBF1]/80">
+                      {t(`about.guide${step}Body`)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
           </div>
         </div>
       </section>

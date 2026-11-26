@@ -20,7 +20,7 @@ export const ResetPassword = () => {
     watch,
     reset,
     formState: { errors, submitCount },
-  } = useForm();
+  } = useForm({ shouldFocusError: false });
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');

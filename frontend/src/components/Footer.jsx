@@ -89,13 +89,13 @@ export const Footer = () => {
             {t('footer.copyright', { year: new Date().getFullYear() })}
           </p>
           <a
-            href="https://github.com/HazemO7/LMS-Project-Full-Stack"
+            href="https://github.com/HazemO7"
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-medium text-[#CCFBF1] transition-colors hover:text-[#FBBF24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
           >
             <GithubLogo size={16} aria-hidden="true" />
-            {t('footer.repo')}
+            {t('footer.builtBy')}
           </a>
         </div>
       </div>
