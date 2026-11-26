@@ -96,6 +96,8 @@ export const AdminDashboard = () => {
   const staffPoolReqIdRef = useRef(0);
   const settingsReqIdRef = useRef(0);
   const auditReqIdRef = useRef(0);
+  const loadedSettingsRef = useRef(null);
+  const [usersRefreshTick, setUsersRefreshTick] = useState(0);
 
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
@@ -168,15 +170,19 @@ export const AdminDashboard = () => {
 
     const fetchAllActiveByRole = async (role) => {
       const all = [];
-      let page = 1;
-      let totalPages = 1;
+      let cursor = '';
       do {
-        const res = await adminAPI.getUsers({ page, limit: 100, role, status: 'active' });
+        const res = await adminAPI.getUsers({
+          limit: 100,
+          role,
+          status: 'active',
+          cursor,
+          cursorMode: true,
+        });
         if (reqId !== staffPoolReqIdRef.current) return [];
         all.push(...(res.data || []));
-        totalPages = Math.max(1, res.totalPages || 1);
-        page += 1;
-      } while (page <= totalPages);
+        cursor = res.nextCursor || '';
+      } while (cursor);
       return all;
     };
 
@@ -216,12 +222,14 @@ export const AdminDashboard = () => {
       const res = await adminAPI.getSettings();
       if (reqId !== settingsReqIdRef.current) return;
       if (res.data) {
-        setSettingsForm({
+        const normalized = {
           allowPublicRegistration: Boolean(res.data.allowPublicRegistration),
           maxVideoSizeMB: res.data.maxVideoSizeMB ?? 250,
           maxDocumentSizeMB: res.data.maxDocumentSizeMB ?? 25,
           maxImageSizeMB: res.data.maxImageSizeMB ?? 10,
-        });
+        };
+        loadedSettingsRef.current = normalized;
+        setSettingsForm(normalized);
         setSettingsLoaded(true);
       } else {
         setSettingsLoaded(false);
@@ -266,8 +274,8 @@ export const AdminDashboard = () => {
   }, [fetchStats]);
 
   useEffect(() => {
-    if (activeTab === 'users') fetchUsers();
-  }, [activeTab, fetchUsers]);
+    if (activeTab === 'users' && usersRefreshTick >= 0) fetchUsers();
+  }, [activeTab, fetchUsers, usersRefreshTick]);
 
   useEffect(() => {
     if (activeTab === 'courses') {
@@ -291,7 +299,7 @@ export const AdminDashboard = () => {
     try {
       await adminAPI.updateUserRole(targetUser._id, nextRole);
       setSuccessMsg(t('admin.roleUpdatedMsg', { name: targetUser.name, role: t(`role.${nextRole}`) }));
-      await fetchUsers();
+      setUsersRefreshTick((n) => n + 1);
       fetchStats();
       if (isSuperAdmin) fetchStaffPool();
     } catch (err) {
@@ -310,7 +318,7 @@ export const AdminDashboard = () => {
           ? t('admin.userActivatedMsg', { name: targetUser.name })
           : t('admin.userSuspendedMsg', { name: targetUser.name })
       );
-      await fetchUsers();
+      setUsersRefreshTick((n) => n + 1);
       fetchStats();
       if (isSuperAdmin) fetchStaffPool();
     } catch (err) {
@@ -324,7 +332,7 @@ export const AdminDashboard = () => {
     try {
       await adminAPI.updateUserStatus(targetUser._id, { unlock: true });
       setSuccessMsg(t('admin.userUnlockedMsg', { name: targetUser.name }));
-      await fetchUsers();
+      setUsersRefreshTick((n) => n + 1);
     } catch (err) {
       setError(err.message || 'Failed to unlock user');
     }
@@ -339,7 +347,7 @@ export const AdminDashboard = () => {
       await adminAPI.deleteUser(deleteUserTarget._id);
       setSuccessMsg(t('admin.userDeletedMsg', { name: deleteUserTarget.name }));
       setDeleteUserTarget(null);
-      await fetchUsers();
+      setUsersRefreshTick((n) => n + 1);
       fetchStats();
       if (isSuperAdmin) fetchStaffPool();
     } catch (err) {
@@ -353,23 +361,50 @@ export const AdminDashboard = () => {
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     if (!settingsLoaded || settingsSaving) return;
+
+    const baseline = loadedSettingsRef.current;
+    const nextValues = {
+      allowPublicRegistration: Boolean(settingsForm.allowPublicRegistration),
+      maxVideoSizeMB: Number(settingsForm.maxVideoSizeMB),
+      maxDocumentSizeMB: Number(settingsForm.maxDocumentSizeMB),
+      maxImageSizeMB: Number(settingsForm.maxImageSizeMB),
+    };
+
+    const patch = {};
+    if (!baseline || nextValues.allowPublicRegistration !== baseline.allowPublicRegistration) {
+      patch.allowPublicRegistration = nextValues.allowPublicRegistration;
+    }
+    if (!baseline || nextValues.maxVideoSizeMB !== baseline.maxVideoSizeMB) {
+      patch.maxVideoSizeMB = nextValues.maxVideoSizeMB;
+    }
+    if (!baseline || nextValues.maxDocumentSizeMB !== baseline.maxDocumentSizeMB) {
+      patch.maxDocumentSizeMB = nextValues.maxDocumentSizeMB;
+    }
+    if (!baseline || nextValues.maxImageSizeMB !== baseline.maxImageSizeMB) {
+      patch.maxImageSizeMB = nextValues.maxImageSizeMB;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      setSuccessMsg(t('admin.settingsSavedMsg'));
+      return;
+    }
+
     setSettingsSaving(true);
     setError('');
     setSuccessMsg('');
     try {
-      const res = await adminAPI.updateSettings({
-        allowPublicRegistration: settingsForm.allowPublicRegistration,
-        maxVideoSizeMB: Number(settingsForm.maxVideoSizeMB),
-        maxDocumentSizeMB: Number(settingsForm.maxDocumentSizeMB),
-        maxImageSizeMB: Number(settingsForm.maxImageSizeMB),
-      });
+      const res = await adminAPI.updateSettings(patch);
+      settingsReqIdRef.current += 1;
+      setSettingsLoading(false);
       if (res?.data) {
-        setSettingsForm({
+        const normalized = {
           allowPublicRegistration: Boolean(res.data.allowPublicRegistration),
           maxVideoSizeMB: res.data.maxVideoSizeMB ?? 250,
           maxDocumentSizeMB: res.data.maxDocumentSizeMB ?? 25,
           maxImageSizeMB: res.data.maxImageSizeMB ?? 10,
-        });
+        };
+        loadedSettingsRef.current = normalized;
+        setSettingsForm(normalized);
       }
       setSuccessMsg(t('admin.settingsSavedMsg'));
     } catch (err) {

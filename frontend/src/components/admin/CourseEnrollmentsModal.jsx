@@ -60,10 +60,10 @@ export const CourseEnrollmentsModal = ({ open, onClose, course, onChanged }) => 
     setError('');
     try {
       const res = await adminAPI.enrollUser(targetCourseId, { email: email.trim() });
+      onChanged?.(targetCourseId);
       if (sessionRef.current !== sessionId) return;
       setEnrollments((prev) => [res.data, ...prev]);
       setEmail('');
-      onChanged?.();
     } catch (err) {
       if (sessionRef.current !== sessionId) return;
       setError(err.message || 'Failed to enroll user');
@@ -88,9 +88,9 @@ export const CourseEnrollmentsModal = ({ open, onClose, course, onChanged }) => 
 
     try {
       await adminAPI.unenrollUser(targetCourseId, userId);
+      onChanged?.(targetCourseId);
       if (sessionRef.current !== sessionId) return;
       setEnrollments((prev) => prev.filter((item) => (item.user?._id || item.user) !== userId));
-      onChanged?.();
     } catch (err) {
       if (sessionRef.current !== sessionId) return;
       setError(err.message || 'Failed to remove enrollment');

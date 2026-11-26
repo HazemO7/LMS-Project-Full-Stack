@@ -103,7 +103,7 @@ const getStats = async (req, res) => {
 const getUsers = async (req, res) => {
     try {
         const { page, limit, skip } = parsePagination(req.query, 10);
-        const { role = "all", status = "all", search = "" } = req.query;
+        const { role = "all", status = "all", search = "", cursor = "" } = req.query;
 
         const filter = {};
         if (role && role !== "all") {
@@ -122,11 +122,51 @@ const getUsers = async (req, res) => {
             filter.$or = [{ name: regex }, { email: regex }];
         }
 
+        if (cursor) {
+            if (!isValidObjectId(String(cursor))) {
+                return res.status(400).json({ status: "fail", message: "Invalid cursor ID" });
+            }
+            const cursorFilter = { ...filter, _id: { $lt: String(cursor) } };
+            const rows = await User.find(cursorFilter)
+                .select("-password -resetPasswordToken -resetPasswordExpire -resetPasswordTokenCreatedAt")
+                .sort({ _id: -1 })
+                .limit(limit + 1);
+
+            const hasMore = rows.length > limit;
+            const data = hasMore ? rows.slice(0, limit) : rows;
+            const nextCursor = hasMore && data.length > 0 ? data[data.length - 1]._id.toString() : null;
+
+            return res.status(200).json({
+                status: "success",
+                limit,
+                nextCursor,
+                data,
+            });
+        }
+
+        if (req.query.cursorMode === "true") {
+            const rows = await User.find(filter)
+                .select("-password -resetPasswordToken -resetPasswordExpire -resetPasswordTokenCreatedAt")
+                .sort({ _id: -1 })
+                .limit(limit + 1);
+
+            const hasMore = rows.length > limit;
+            const data = hasMore ? rows.slice(0, limit) : rows;
+            const nextCursor = hasMore && data.length > 0 ? data[data.length - 1]._id.toString() : null;
+
+            return res.status(200).json({
+                status: "success",
+                limit,
+                nextCursor,
+                data,
+            });
+        }
+
         const [totalUsers, users] = await Promise.all([
             User.countDocuments(filter),
             User.find(filter)
                 .select("-password -resetPasswordToken -resetPasswordExpire -resetPasswordTokenCreatedAt")
-                .sort({ createdAt: -1 })
+                .sort({ createdAt: -1, _id: -1 })
                 .skip(skip)
                 .limit(limit),
         ]);
@@ -222,6 +262,26 @@ const createStaffUser = async (req, res) => {
     }
 };
 
+const resolveActiveActor = async (req) => {
+    const actor = await User.findById(req.user._id).select("role isActive");
+    if (!actor) {
+        return { error: { status: 401, body: { status: "fail", message: "User no longer exists" } } };
+    }
+    if (actor.isActive === false) {
+        return {
+            error: {
+                status: 403,
+                body: {
+                    status: "fail",
+                    message: "Your account has been suspended. Please contact administration.",
+                    code: "ACCOUNT_SUSPENDED",
+                },
+            },
+        };
+    }
+    return { actor };
+};
+
 const updateUserRole = async (req, res) => {
     try {
         if (!isValidObjectId(req.params.id)) {
@@ -229,26 +289,36 @@ const updateUserRole = async (req, res) => {
         }
 
         const { role } = req.body;
-        if (req.user.role === "admin" && (role === "admin" || role === "super_admin")) {
-            return res.status(403).json({
-                status: "fail",
-                message: "Only a Super Admin can assign administrator roles.",
-            });
-        }
 
-        const outcome = await withSuperAdminLock(async () => {
+        const outcome = await withSuperAdminLock(async ({ assertLockActive }) => {
+            const { actor, error: actorError } = await resolveActiveActor(req);
+            if (actorError) return actorError;
+
+            if (actor.role !== "super_admin" && actor.role !== "admin") {
+                return { status: 403, body: { status: "fail", message: "Forbidden: insufficient role privileges" } };
+            }
+
+            if (actor.role === "admin" && (role === "admin" || role === "super_admin")) {
+                return {
+                    status: 403,
+                    body: { status: "fail", message: "Only a Super Admin can assign administrator roles." },
+                };
+            }
+
             const target = await User.findById(req.params.id);
             if (!target) {
                 return { status: 404, body: { status: "fail", message: "User not found" } };
             }
 
-            if (req.user.role === "admin") {
+            if (actor.role === "admin") {
                 if (target.role === "admin" || target.role === "super_admin") {
                     return {
                         status: 403,
                         body: { status: "fail", message: "Only a Super Admin can modify administrator roles." },
                     };
                 }
+
+                await assertLockActive();
 
                 const updated = await User.findOneAndUpdate(
                     { _id: target._id, role: { $nin: ["admin", "super_admin"] } },
@@ -267,10 +337,18 @@ const updateUserRole = async (req, res) => {
                     };
                 }
 
-                return { status: 200, updated, previousRole: target.role };
+                await recordAudit({
+                    req,
+                    action: "ROLE_UPDATED",
+                    targetType: "User",
+                    targetId: updated._id,
+                    metadata: { email: updated.email, previousRole: target.role, newRole: role },
+                });
+
+                return { status: 200, updated };
             }
 
-            if (target.role === "super_admin" && role !== "super_admin") {
+            if (target.role === "super_admin" && target.isActive !== false && role !== "super_admin") {
                 const activeSuperAdmins = await User.countDocuments({
                     role: "super_admin",
                     isActive: { $ne: false },
@@ -283,28 +361,26 @@ const updateUserRole = async (req, res) => {
                 }
             }
 
+            await assertLockActive();
+
             const previousRole = target.role;
             target.role = role;
             await target.save();
 
-            return { status: 200, updated: target, previousRole };
+            await recordAudit({
+                req,
+                action: "ROLE_UPDATED",
+                targetType: "User",
+                targetId: target._id,
+                metadata: { email: target.email, previousRole, newRole: role },
+            });
+
+            return { status: 200, updated: target };
         });
 
         if (outcome.status !== 200) {
             return res.status(outcome.status).json(outcome.body);
         }
-
-        await recordAudit({
-            req,
-            action: "ROLE_UPDATED",
-            targetType: "User",
-            targetId: outcome.updated._id,
-            metadata: {
-                email: outcome.updated.email,
-                previousRole: outcome.previousRole,
-                newRole: role,
-            },
-        });
 
         res.status(200).json({ status: "success", data: sanitizeUser(outcome.updated) });
     } catch (error) {
@@ -320,13 +396,20 @@ const updateUserStatus = async (req, res) => {
 
         const { isActive, unlock } = req.body;
 
-        const outcome = await withSuperAdminLock(async () => {
+        const outcome = await withSuperAdminLock(async ({ assertLockActive }) => {
+            const { actor, error: actorError } = await resolveActiveActor(req);
+            if (actorError) return actorError;
+
+            if (actor.role !== "super_admin" && actor.role !== "admin") {
+                return { status: 403, body: { status: "fail", message: "Forbidden: insufficient role privileges" } };
+            }
+
             const target = await User.findById(req.params.id);
             if (!target) {
                 return { status: 404, body: { status: "fail", message: "User not found" } };
             }
 
-            if (req.user.role === "admin" && (target.role === "admin" || target.role === "super_admin")) {
+            if (actor.role === "admin" && (target.role === "admin" || target.role === "super_admin")) {
                 return {
                     status: 403,
                     body: { status: "fail", message: "Only a Super Admin can change administrator account status." },
@@ -340,7 +423,7 @@ const updateUserStatus = async (req, res) => {
                         body: { status: "fail", message: "You cannot suspend your own account." },
                     };
                 }
-                if (!isActive && target.role === "super_admin") {
+                if (!isActive && target.role === "super_admin" && target.isActive !== false) {
                     const activeSuperAdmins = await User.countDocuments({
                         role: "super_admin",
                         isActive: { $ne: false },
@@ -364,9 +447,11 @@ const updateUserStatus = async (req, res) => {
             }
 
             const filter =
-                req.user.role === "admin"
+                actor.role === "admin"
                     ? { _id: target._id, role: { $nin: ["admin", "super_admin"] } }
                     : { _id: target._id };
+
+            await assertLockActive();
 
             const updated = await User.findOneAndUpdate(
                 filter,
@@ -385,31 +470,31 @@ const updateUserStatus = async (req, res) => {
                 };
             }
 
+            if (typeof isActive === "boolean") {
+                await recordAudit({
+                    req,
+                    action: "USER_STATUS_CHANGED",
+                    targetType: "User",
+                    targetId: updated._id,
+                    metadata: { email: updated.email, isActive },
+                });
+            }
+
+            if (unlock === true) {
+                await recordAudit({
+                    req,
+                    action: "USER_UNLOCKED",
+                    targetType: "User",
+                    targetId: updated._id,
+                    metadata: { email: updated.email },
+                });
+            }
+
             return { status: 200, updated };
         });
 
         if (outcome.status !== 200) {
             return res.status(outcome.status).json(outcome.body);
-        }
-
-        if (typeof isActive === "boolean") {
-            await recordAudit({
-                req,
-                action: "USER_STATUS_CHANGED",
-                targetType: "User",
-                targetId: outcome.updated._id,
-                metadata: { email: outcome.updated.email, isActive },
-            });
-        }
-
-        if (unlock === true) {
-            await recordAudit({
-                req,
-                action: "USER_UNLOCKED",
-                targetType: "User",
-                targetId: outcome.updated._id,
-                metadata: { email: outcome.updated.email },
-            });
         }
 
         res.status(200).json({ status: "success", data: sanitizeUser(outcome.updated) });
@@ -424,7 +509,14 @@ const deleteUser = async (req, res) => {
             return res.status(400).json({ status: "fail", message: "Invalid user ID" });
         }
 
-        const outcome = await withSuperAdminLock(async () => {
+        const outcome = await withSuperAdminLock(async ({ assertLockActive }) => {
+            const { actor, error: actorError } = await resolveActiveActor(req);
+            if (actorError) return actorError;
+
+            if (actor.role !== "super_admin") {
+                return { status: 403, body: { status: "fail", message: "Forbidden: insufficient role privileges" } };
+            }
+
             const target = await User.findById(req.params.id);
             if (!target) {
                 return { status: 404, body: { status: "fail", message: "User not found" } };
@@ -473,22 +565,23 @@ const deleteUser = async (req, res) => {
             // Delete dependent records before removing the user document so retries remain recoverable
             await Enrollment.deleteMany({ user: target._id });
             await Progress.deleteMany({ user: target._id });
+            await assertLockActive();
             await User.findByIdAndDelete(target._id);
 
-            return { status: 200, target };
+            await recordAudit({
+                req,
+                action: "USER_DELETED",
+                targetType: "User",
+                targetId: target._id,
+                metadata: { email: target.email, role: target.role },
+            });
+
+            return { status: 200 };
         });
 
         if (outcome.status !== 200) {
             return res.status(outcome.status).json(outcome.body);
         }
-
-        await recordAudit({
-            req,
-            action: "USER_DELETED",
-            targetType: "User",
-            targetId: outcome.target._id,
-            metadata: { email: outcome.target.email, role: outcome.target.role },
-        });
 
         res.status(200).json({ status: "success", message: "User deleted successfully" });
     } catch (error) {
@@ -556,51 +649,75 @@ const transferCourseOwnership = async (req, res) => {
         }
 
         const { newInstructorId } = req.body;
-        const [course, newInstructor] = await Promise.all([
-            Course.findById(req.params.id),
-            User.findById(newInstructorId),
-        ]);
 
-        if (!course) {
-            return res.status(404).json({ status: "fail", message: "Course not found" });
-        }
-        if (
-            !newInstructor ||
-            newInstructor.isActive === false ||
-            !["instructor", "admin", "super_admin"].includes(newInstructor.role)
-        ) {
-            return res.status(400).json({
-                status: "fail",
-                message: "Target user must be an active instructor or administrator.",
+        const outcome = await withSuperAdminLock(async ({ assertLockActive }) => {
+            const { actor, error: actorError } = await resolveActiveActor(req);
+            if (actorError) return actorError;
+
+            if (actor.role !== "super_admin") {
+                return { status: 403, body: { status: "fail", message: "Forbidden: insufficient role privileges" } };
+            }
+
+            const [course, newInstructor] = await Promise.all([
+                Course.findById(req.params.id),
+                User.findById(newInstructorId),
+            ]);
+
+            if (!course) {
+                return { status: 404, body: { status: "fail", message: "Course not found" } };
+            }
+            if (
+                !newInstructor ||
+                newInstructor.isActive === false ||
+                !["instructor", "admin", "super_admin"].includes(newInstructor.role)
+            ) {
+                return {
+                    status: 400,
+                    body: {
+                        status: "fail",
+                        message: "Target user must be an active instructor or administrator.",
+                    },
+                };
+            }
+
+            const previousInstructorId = course.instructor ? course.instructor.toString() : null;
+            if (previousInstructorId && previousInstructorId === newInstructor._id.toString()) {
+                return {
+                    status: 400,
+                    body: {
+                        status: "fail",
+                        message: "This user is already the owner of the course.",
+                    },
+                };
+            }
+
+            await assertLockActive();
+
+            course.instructor = newInstructor._id;
+            await course.save();
+            await course.populate("instructor", "name email role specialty");
+
+            await recordAudit({
+                req,
+                action: "COURSE_TRANSFERRED",
+                targetType: "Course",
+                targetId: course._id,
+                metadata: {
+                    courseTitle: course.title,
+                    previousInstructorId,
+                    newInstructorId: newInstructor._id.toString(),
+                    newInstructorEmail: newInstructor.email,
+                },
             });
-        }
 
-        const previousInstructorId = course.instructor ? course.instructor.toString() : null;
-        if (previousInstructorId && previousInstructorId === newInstructor._id.toString()) {
-            return res.status(400).json({
-                status: "fail",
-                message: "This user is already the owner of the course.",
-            });
-        }
-
-        course.instructor = newInstructor._id;
-        await course.save();
-        await course.populate("instructor", "name email role specialty");
-
-        await recordAudit({
-            req,
-            action: "COURSE_TRANSFERRED",
-            targetType: "Course",
-            targetId: course._id,
-            metadata: {
-                courseTitle: course.title,
-                previousInstructorId,
-                newInstructorId: newInstructor._id.toString(),
-                newInstructorEmail: newInstructor.email,
-            },
+            return { status: 200, course };
         });
 
-        res.status(200).json({ status: "success", data: course });
+        if (outcome.status !== 200) {
+            return res.status(outcome.status).json(outcome.body);
+        }
+
+        res.status(200).json({ status: "success", data: outcome.course });
     } catch (error) {
         return handleServerError(req, res, "transferCourseOwnership", error);
     }
@@ -668,6 +785,12 @@ const manualEnrollUser = async (req, res) => {
 
         res.status(201).json({ status: "success", data: enrollment });
     } catch (error) {
+        if (error?.code === 11000) {
+            return res.status(400).json({
+                status: "fail",
+                message: "User is already enrolled in this course",
+            });
+        }
         return handleServerError(req, res, "manualEnrollUser", error);
     }
 };
@@ -727,14 +850,31 @@ const getPlatformSettings = async (req, res) => {
 const updatePlatformSettings = async (req, res) => {
     try {
         const { allowPublicRegistration, maxVideoSizeMB, maxDocumentSizeMB, maxImageSizeMB } = req.body;
+        const updateSet = { updatedBy: req.user._id };
+        const auditMetadata = {};
+
+        if (allowPublicRegistration !== undefined) {
+            updateSet.allowPublicRegistration = allowPublicRegistration;
+            auditMetadata.allowPublicRegistration = allowPublicRegistration;
+        }
+        if (maxVideoSizeMB !== undefined) {
+            updateSet.maxVideoSizeMB = maxVideoSizeMB;
+            auditMetadata.maxVideoSizeMB = maxVideoSizeMB;
+        }
+        if (maxDocumentSizeMB !== undefined) {
+            updateSet.maxDocumentSizeMB = maxDocumentSizeMB;
+            auditMetadata.maxDocumentSizeMB = maxDocumentSizeMB;
+        }
+        if (maxImageSizeMB !== undefined) {
+            updateSet.maxImageSizeMB = maxImageSizeMB;
+            auditMetadata.maxImageSizeMB = maxImageSizeMB;
+        }
+
         const settings = await PlatformSettings.findOneAndUpdate(
             { singletonKey: "default" },
             {
-                allowPublicRegistration,
-                maxVideoSizeMB,
-                maxDocumentSizeMB,
-                maxImageSizeMB,
-                updatedBy: req.user._id,
+                $set: updateSet,
+                $setOnInsert: { singletonKey: "default" },
             },
             { returnDocument: "after", upsert: true }
         );
@@ -744,7 +884,7 @@ const updatePlatformSettings = async (req, res) => {
             action: "SETTINGS_UPDATED",
             targetType: "PlatformSettings",
             targetId: settings._id,
-            metadata: { allowPublicRegistration, maxVideoSizeMB, maxDocumentSizeMB, maxImageSizeMB },
+            metadata: auditMetadata,
         });
 
         res.status(200).json({ status: "success", data: settings });

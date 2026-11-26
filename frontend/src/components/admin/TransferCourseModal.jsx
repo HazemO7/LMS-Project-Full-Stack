@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowsLeftRight } from '@phosphor-icons/react';
 import { Modal } from '../ui/Modal';
 import { AlertBanner } from '../ui/AlertBanner';
@@ -29,9 +29,9 @@ export const TransferCourseModal = ({
     }
   }, [open, course]);
 
-  const requestClose = () => {
+  const requestClose = useCallback(() => {
     if (!saving) onClose();
-  };
+  }, [saving, onClose]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

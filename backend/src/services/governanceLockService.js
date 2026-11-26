@@ -5,6 +5,20 @@ const AppError = require("../utils/AppError");
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
+ * Verifies that the caller still holds an unexpired lease on the given governance lock.
+ */
+const assertLockValid = async (key, ownerToken) => {
+    const active = await GovernanceLock.exists({
+        _id: key,
+        ownerToken,
+        expiresAt: { $gt: new Date() },
+    });
+    if (!active) {
+        throw new AppError("Governance lock expired before commit. Please retry.", 409);
+    }
+};
+
+/**
  * Serializes cross-document governance operations using a leased MongoDB lock document.
  */
 const withGovernanceLock = async (key, fn, { leaseMs = 10000, timeoutMs = 5000 } = {}) => {
@@ -47,8 +61,10 @@ const withGovernanceLock = async (key, fn, { leaseMs = 10000, timeoutMs = 5000 }
         throw new AppError("Another privileged administrative change is in progress. Please retry.", 409);
     }
 
+    const assertLockActive = () => assertLockValid(key, ownerToken);
+
     try {
-        return await fn();
+        return await fn({ assertLockActive });
     } finally {
         await GovernanceLock.updateOne(
             { _id: key, ownerToken },
@@ -58,11 +74,13 @@ const withGovernanceLock = async (key, fn, { leaseMs = 10000, timeoutMs = 5000 }
 };
 
 /**
- * Shared serialization boundary for operations that can demote, suspend, or delete a super_admin.
+ * Shared serialization boundary for operations that can demote, suspend, delete a super_admin,
+ * or transfer course ownership.
  */
 const withSuperAdminLock = (fn, options) => withGovernanceLock("super_admin_mutation", fn, options);
 
 module.exports = {
     withGovernanceLock,
     withSuperAdminLock,
+    assertLockValid,
 };

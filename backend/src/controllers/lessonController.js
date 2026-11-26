@@ -1,6 +1,11 @@
+const mongoose = require('mongoose');
 const Lesson = require('../models/Lesson');
 const Module = require('../models/Module');
+const Progress = require('../models/Progress');
 const logger = require('../utils/logger');
+
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+const isValidObjectId = (id) => typeof id === "string" && OBJECT_ID_REGEX.test(id);
 
 // Create Lesson
 const createLesson = async (req, res) => {
@@ -54,10 +59,19 @@ const updateLesson = async (req, res) => {
 
         const { module, title, description, content, videoUrl, order } = req.body;
         if (module !== undefined) {
-            const currentModuleId = existingLesson.module ? existingLesson.module.toString() : "";
-            const requestedModuleId = module ? String(module) : "";
-            if (requestedModuleId !== currentModuleId) {
-                return res.status(400).json({ message: "Changing a lesson's parent module is not supported" });
+            const currentModuleId = existingLesson.module || null;
+            if (module === null || module === "") {
+                if (currentModuleId !== null) {
+                    return res.status(400).json({ message: "Changing a lesson's parent module is not supported" });
+                }
+            } else {
+                if (!isValidObjectId(module)) {
+                    return res.status(400).json({ message: "Invalid module ID" });
+                }
+                const requestedObjectId = new mongoose.Types.ObjectId(module);
+                if (!currentModuleId || !requestedObjectId.equals(currentModuleId)) {
+                    return res.status(400).json({ message: "Changing a lesson's parent module is not supported" });
+                }
             }
         }
 
@@ -68,7 +82,11 @@ const updateLesson = async (req, res) => {
         if (videoUrl !== undefined) updateFields.videoUrl = videoUrl;
         if (order !== undefined) updateFields.order = order;
 
-        const lesson = await Lesson.findByIdAndUpdate(req.params.id, updateFields, { new: true });
+        const lesson = await Lesson.findByIdAndUpdate(
+            req.params.id,
+            updateFields,
+            { returnDocument: "after" }
+        );
         if (!lesson) {
             return res.status(404).json({ message: 'Lesson not found' });
         }
@@ -85,12 +103,15 @@ const updateLesson = async (req, res) => {
 // Delete Lesson
 const deleteLesson = async (req, res) => {
     try {
-        const lesson = await Lesson.findByIdAndDelete(req.params.id);
+        const lesson = req.lessonDoc || await Lesson.findById(req.params.id);
         if (!lesson) {
             return res.status(404).json({ message: 'Lesson not found' });
         }
 
+        // Remove progress and module references before deleting the lesson so retries remain authorized and clean
+        await Progress.deleteMany({ lesson: lesson._id });
         await Module.updateMany({ lesson: lesson._id }, { $pull: { lesson: lesson._id } });
+        await Lesson.findByIdAndDelete(lesson._id);
 
         logger.info("Lesson deleted successfully", { lessonId: lesson._id, requestId: req.id });
 

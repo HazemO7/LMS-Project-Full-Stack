@@ -40,11 +40,11 @@ const manualEnrollSchema = Joi.object({
 }).or("email", "userId");
 
 const updatePlatformSettingsSchema = Joi.object({
-    allowPublicRegistration: Joi.boolean().required(),
-    maxVideoSizeMB: Joi.number().integer().min(10).max(2048).required(),
-    maxDocumentSizeMB: Joi.number().integer().min(1).max(250).required(),
-    maxImageSizeMB: Joi.number().integer().min(1).max(50).required(),
-});
+    allowPublicRegistration: Joi.boolean().optional(),
+    maxVideoSizeMB: Joi.number().integer().min(10).max(2048).optional(),
+    maxDocumentSizeMB: Joi.number().integer().min(1).max(250).optional(),
+    maxImageSizeMB: Joi.number().integer().min(1).max(50).optional(),
+}).min(1);
 
 module.exports = {
     createStaffUserSchema,

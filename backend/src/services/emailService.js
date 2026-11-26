@@ -23,10 +23,12 @@ const createTransporter = () => {
         return null;
     }
 
+    const portNum = Number(port);
     return nodemailer.createTransport({
         host,
-        port: Number(port),
-        secure: Number(port) === 465, // Use secure=true only when port is 465
+        port: portNum,
+        secure: portNum === 465, // Use implicit TLS on port 465
+        requireTLS: portNum !== 465, // Require STARTTLS on non-465 ports
         auth: {
             user,
             pass

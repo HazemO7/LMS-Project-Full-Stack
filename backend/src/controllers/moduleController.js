@@ -2,11 +2,14 @@ const mongoose = require("mongoose");
 const Module = require('../models/Module');
 const Lesson = require('../models/Lesson');
 const Course = require("../models/Course");
+const Progress = require("../models/Progress");
 const { isAdminRole } = require("../middleware/authmiddleware");
 const { resolveCourseFromModule } = require("../middleware/courseOwnershipGuard");
+const { withGovernanceLock } = require("../services/governanceLockService");
 const logger = require('../utils/logger');
 
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+const isValidObjectId = (id) => typeof id === "string" && OBJECT_ID_REGEX.test(id);
 
 // Create Module
 const createModule = async (req, res) => {
@@ -56,9 +59,8 @@ const getModuleById = async (req, res) => {
 // Update Module
 const updateModule = async (req, res) => {
     try {
-        const existingModule = req.moduleDoc || await Module.findById(req.params.id);
-        if (!existingModule) {
-            return res.status(404).json({ message: 'Module not found' });
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ message: "Invalid module ID" });
         }
 
         const { title, description, content, lesson, order } = req.body;
@@ -77,20 +79,31 @@ const updateModule = async (req, res) => {
             uniqueLessonIds = [];
             const seen = new Set();
             for (const rawId of lesson) {
-                const idStr = String(rawId);
-                if (!isValidObjectId(idStr)) {
+                const idStr = typeof rawId === "string" ? rawId : null;
+                if (!idStr || !isValidObjectId(idStr)) {
                     return res.status(400).json({ message: "Invalid lesson ID provided" });
                 }
-                if (!seen.has(idStr)) {
-                    seen.add(idStr);
-                    uniqueLessonIds.push(idStr);
+                const canonicalId = new mongoose.Types.ObjectId(idStr).toString();
+                if (!seen.has(canonicalId)) {
+                    seen.add(canonicalId);
+                    uniqueLessonIds.push(canonicalId);
                 }
             }
+            updateFields.lesson = uniqueLessonIds;
+        }
 
-            if (uniqueLessonIds.length > 0) {
+        const outcome = await withGovernanceLock("curriculum_mutation", async ({ assertLockActive }) => {
+            const existingModule = await Module.findById(req.params.id);
+            if (!existingModule) {
+                return { status: 404, body: { message: 'Module not found' } };
+            }
+
+            const previousLessonIds = (existingModule.lesson || []).map((id) => id.toString());
+
+            if (uniqueLessonIds !== null && uniqueLessonIds.length > 0) {
                 const requestedLessons = await Lesson.find({ _id: { $in: uniqueLessonIds } }).select("_id module");
                 if (requestedLessons.length !== uniqueLessonIds.length) {
-                    return res.status(404).json({ message: "One or more lessons were not found" });
+                    return { status: 404, body: { message: "One or more lessons were not found" } };
                 }
 
                 const otherModules = await Module.find({
@@ -99,7 +112,7 @@ const updateModule = async (req, res) => {
                 }).select("_id course lesson");
 
                 if (!isAdminRole(req.user.role)) {
-                    const existingLessonSet = new Set((existingModule.lesson || []).map((id) => id.toString()));
+                    const existingLessonSet = new Set(previousLessonIds);
                     const otherModuleMap = new Map();
                     for (const mod of otherModules) {
                         for (const lid of mod.lesson || []) {
@@ -138,57 +151,85 @@ const updateModule = async (req, res) => {
                         }
 
                         if (!pointedModId && otherHolders.length === 0) {
-                            return res.status(403).json({
-                                message: "Not authorized to attach lessons from another instructor's course",
-                            });
+                            return {
+                                status: 403,
+                                body: { message: "Not authorized to attach lessons from another instructor's course" },
+                            };
                         }
 
                         if (pointedModId && pointedModId !== existingModule._id.toString()) {
                             const sourceMod = await Module.findById(pointedModId).select("_id course");
                             if (!(await callerOwnsModuleDoc(sourceMod))) {
-                                return res.status(403).json({
-                                    message: "Not authorized to attach lessons from another instructor's course",
-                                });
+                                return {
+                                    status: 403,
+                                    body: { message: "Not authorized to attach lessons from another instructor's course" },
+                                };
                             }
                         }
 
                         for (const holder of otherHolders) {
                             if (!(await callerOwnsModuleDoc(holder))) {
-                                return res.status(403).json({
-                                    message: "Not authorized to attach lessons from another instructor's course",
-                                });
+                                return {
+                                    status: 403,
+                                    body: { message: "Not authorized to attach lessons from another instructor's course" },
+                                };
                             }
                         }
                     }
                 }
             }
 
-            updateFields.lesson = uniqueLessonIds;
-        }
+            await assertLockActive();
 
-        if (uniqueLessonIds && uniqueLessonIds.length > 0) {
-            await Module.updateMany(
-                { _id: { $ne: existingModule._id }, lesson: { $in: uniqueLessonIds } },
-                { $pull: { lesson: { $in: uniqueLessonIds } } }
+            // Update destination module & lesson backlinks before pulling from prior modules so source links survive on failure
+            const updatedModule = await Module.findByIdAndUpdate(
+                req.params.id,
+                updateFields,
+                { returnDocument: "after" }
             );
+            if (!updatedModule) {
+                return { status: 404, body: { message: 'Module not found' } };
+            }
+
+            if (uniqueLessonIds !== null) {
+                if (uniqueLessonIds.length > 0) {
+                    await Lesson.updateMany(
+                        { _id: { $in: uniqueLessonIds } },
+                        { $set: { module: updatedModule._id } }
+                    );
+                }
+
+                const newLessonSet = new Set(uniqueLessonIds);
+                const removedLessonIds = previousLessonIds.filter((id) => !newLessonSet.has(id));
+                if (removedLessonIds.length > 0) {
+                    await Lesson.updateMany(
+                        { _id: { $in: removedLessonIds }, module: existingModule._id },
+                        { $set: { module: null } }
+                    );
+                }
+
+                if (uniqueLessonIds.length > 0) {
+                    await Module.updateMany(
+                        { _id: { $ne: existingModule._id }, lesson: { $in: uniqueLessonIds } },
+                        { $pull: { lesson: { $in: uniqueLessonIds } } }
+                    );
+                }
+            }
+
+            return { status: 200, module: updatedModule };
+        });
+
+        if (outcome.status !== 200) {
+            return res.status(outcome.status).json(outcome.body);
         }
 
-        const module = await Module.findByIdAndUpdate(req.params.id, updateFields, { new: true });
-        if (!module) {
-            return res.status(404).json({ message: 'Module not found' });
-        }
+        logger.info("Module updated successfully", { moduleId: outcome.module._id, requestId: req.id });
 
-        if (uniqueLessonIds && uniqueLessonIds.length > 0) {
-            await Lesson.updateMany(
-                { _id: { $in: uniqueLessonIds } },
-                { $set: { module: module._id } }
-            );
-        }
-
-        logger.info("Module updated successfully", { moduleId: module._id, requestId: req.id });
-
-        res.status(200).json(module);
+        res.status(200).json(outcome.module);
     } catch (error) {
+        if (error?.statusCode && error.isOperational) {
+            return res.status(error.statusCode).json({ message: error.message });
+        }
         logger.error("Update module error", { error: error.message, moduleId: req.params.id, requestId: req.id });
         res.status(500).json({ message: "Failed to update module" });
     }
@@ -196,26 +237,49 @@ const updateModule = async (req, res) => {
 // Delete Module
 const deleteModule = async (req, res) => {
     try {
-        const module = req.moduleDoc || await Module.findById(req.params.id);
-        if (!module) {
-            return res.status(404).json({ message: 'Module not found' });
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ message: "Invalid module ID" });
         }
 
-        const lessonIds = Array.isArray(module.lesson) ? module.lesson : [];
-        await Lesson.deleteMany({
-            $or: [
-                { module: module._id },
-                ...(lessonIds.length > 0 ? [{ _id: { $in: lessonIds } }] : []),
-            ],
+        const outcome = await withGovernanceLock("curriculum_mutation", async ({ assertLockActive }) => {
+            const module = await Module.findById(req.params.id);
+            if (!module) {
+                return { status: 404, body: { message: 'Module not found' } };
+            }
+
+            const lessonIds = Array.isArray(module.lesson) ? module.lesson : [];
+            const lessonsToDelete = await Lesson.find({
+                $or: [
+                    { module: module._id },
+                    ...(lessonIds.length > 0 ? [{ _id: { $in: lessonIds }, module: null }] : []),
+                ],
+            }).select("_id");
+            const deleteLessonIds = lessonsToDelete.map((l) => l._id);
+
+            await assertLockActive();
+
+            if (deleteLessonIds.length > 0) {
+                await Progress.deleteMany({ lesson: { $in: deleteLessonIds } });
+                await Lesson.deleteMany({ _id: { $in: deleteLessonIds } });
+            }
+
+            await Course.updateMany({ modules: module._id }, { $pull: { modules: module._id } });
+            await Module.findByIdAndDelete(module._id);
+
+            return { status: 200, moduleId: module._id };
         });
 
-        await Course.updateMany({ modules: module._id }, { $pull: { modules: module._id } });
-        await Module.findByIdAndDelete(module._id);
+        if (outcome.status !== 200) {
+            return res.status(outcome.status).json(outcome.body);
+        }
 
-        logger.info("Module deleted successfully", { moduleId: module._id, requestId: req.id });
+        logger.info("Module deleted successfully", { moduleId: outcome.moduleId, requestId: req.id });
 
         res.status(200).json({ message: 'Module deleted successfully' });
     } catch (error) {
+        if (error?.statusCode && error.isOperational) {
+            return res.status(error.statusCode).json({ message: error.message });
+        }
         logger.error("Delete module error", { error: error.message, moduleId: req.params.id, requestId: req.id });
         res.status(500).json({ message: "Failed to delete module" });
     }

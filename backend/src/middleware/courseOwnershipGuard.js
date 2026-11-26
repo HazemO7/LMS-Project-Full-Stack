@@ -6,7 +6,8 @@ const Enrollment = require("../models/Enrollment");
 const { isAdminRole } = require("./authmiddleware");
 const logger = require("../utils/logger");
 
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+const isValidObjectId = (id) => typeof id === "string" && OBJECT_ID_REGEX.test(id);
 
 const isCourseOwner = (course, userId) =>
     Boolean(course && course.instructor && course.instructor.toString() === userId.toString());

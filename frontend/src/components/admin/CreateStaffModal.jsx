@@ -25,9 +25,16 @@ export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState('');
   const sessionRef = useRef(0);
+  const copyAttemptRef = useRef(0);
+  const copyTimerRef = useRef(null);
 
   useEffect(() => {
     sessionRef.current += 1;
+    copyAttemptRef.current += 1;
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
     setForm({
       name: '',
       email: '',
@@ -80,16 +87,29 @@ export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
 
   const handleCopyCredentials = async () => {
     if (!createdResult?.data) return;
+    const sessionId = sessionRef.current;
+    const attemptId = ++copyAttemptRef.current;
+    if (copyTimerRef.current) {
+      clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
     setCopyError('');
+    setCopied(false);
     const text = `Email: ${createdResult.data.email}\nTemporary Password: ${createdResult.temporaryPassword}`;
     try {
       if (!navigator.clipboard?.writeText) {
         throw new Error('Clipboard API unavailable');
       }
       await navigator.clipboard.writeText(text);
+      if (sessionRef.current !== sessionId || copyAttemptRef.current !== attemptId) return;
       setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      copyTimerRef.current = setTimeout(() => {
+        if (sessionRef.current === sessionId && copyAttemptRef.current === attemptId) {
+          setCopied(false);
+        }
+      }, 2500);
     } catch {
+      if (sessionRef.current !== sessionId || copyAttemptRef.current !== attemptId) return;
       setCopied(false);
       setCopyError(t('admin.copyCredentialsFailed'));
     }

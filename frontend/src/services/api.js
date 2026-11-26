@@ -263,7 +263,7 @@ export const adminAPI = {
     if (!res.ok) throw await parseError(res, 'Failed to load platform stats');
     return res.json();
   },
-  getUsers: async ({ page = 1, limit = 10, role = 'all', status = 'all', search = '' } = {}) => {
+  getUsers: async ({ page = 1, limit = 10, role = 'all', status = 'all', search = '', cursor = '', cursorMode = false } = {}) => {
     const params = new URLSearchParams({
       page: String(page),
       limit: String(limit),
@@ -271,6 +271,8 @@ export const adminAPI = {
       status,
       search,
     });
+    if (cursor) params.set('cursor', cursor);
+    if (cursorMode) params.set('cursorMode', 'true');
     const res = await customFetch(`${BASE_URL}/admin/users?${params.toString()}`, {
       headers: getHeaders(),
     });

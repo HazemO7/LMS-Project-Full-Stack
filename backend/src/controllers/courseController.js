@@ -6,18 +6,30 @@ const Enrollment = require("../models/Enrollment");
 const Progress = require("../models/Progress");
 const User = require("../models/User");
 const { isAdminRole } = require("../middleware/authmiddleware");
+const { withGovernanceLock } = require("../services/governanceLockService");
 const logger = require("../utils/logger");
 
 const PUBLIC_INSTRUCTOR_FIELDS = "name specialty bio";
-const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+const isValidObjectId = (id) => typeof id === "string" && OBJECT_ID_REGEX.test(id);
 const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const buildPublicInstructor = (userDoc) => {
+    if (!userDoc) return null;
+    return {
+        _id: userDoc._id,
+        name: userDoc.name,
+        specialty: userDoc.specialty || "",
+        bio: userDoc.bio || "",
+    };
+};
 
 // Create Course
 
 const createCourse = async (req, res) => {
     try {
         const { title, description, instructor: requestedInstructorId } = req.body;
-        let instructorId = req.user._id;
+        let instructorDoc = req.user;
 
         if (requestedInstructorId && isAdminRole(req.user.role)) {
             if (!isValidObjectId(requestedInstructorId)) {
@@ -26,7 +38,7 @@ const createCourse = async (req, res) => {
                     message: "Selected instructor is invalid or inactive",
                 });
             }
-            const targetInstructor = await User.findById(requestedInstructorId);
+            const targetInstructor = await User.findById(requestedInstructorId).select(PUBLIC_INSTRUCTOR_FIELDS + " role isActive");
             if (
                 !targetInstructor ||
                 targetInstructor.isActive === false ||
@@ -37,25 +49,26 @@ const createCourse = async (req, res) => {
                     message: "Selected instructor is invalid or inactive",
                 });
             }
-            instructorId = targetInstructor._id;
+            instructorDoc = targetInstructor;
         }
 
         // create new course instance
         const course = new Course({
             title,
             description,
-            instructor: instructorId
+            instructor: instructorDoc._id
         });
         // save course to database
         const savedCourse = await course.save();
-        await savedCourse.populate("instructor", PUBLIC_INSTRUCTOR_FIELDS);
+        const responseData = savedCourse.toObject();
+        responseData.instructor = buildPublicInstructor(instructorDoc);
 
-        logger.info("Course created successfully", { courseId: savedCourse._id, instructorId, requestId: req.id });
+        logger.info("Course created successfully", { courseId: savedCourse._id, instructorId: instructorDoc._id, requestId: req.id });
 
         // send response
         res.status(201).json({
             status: "success",
-            data: savedCourse
+            data: responseData
         });
 
     } catch (error) {
@@ -197,12 +210,8 @@ const getCourseByIdFull = async (req, res) => {
 
 const updateCourse = async (req, res) => {
     try {
-        let course = req.course || await Course.findById(req.params.id);
-        if (!course) {
-            return res.status(404).json({ status: "fail", message: "Course not found" });
-        }
-        if (course.instructor?.toString() !== req.user._id.toString() && !isAdminRole(req.user.role)) {
-            return res.status(403).json({ status: "fail", message: "Not authorized to update this course" });
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ status: "fail", message: "Invalid course ID" });
         }
 
         const updateFields = {};
@@ -218,20 +227,34 @@ const updateCourse = async (req, res) => {
             uniqueModuleIds = [];
             const seen = new Set();
             for (const rawId of req.body.modules) {
-                const idStr = String(rawId);
-                if (!isValidObjectId(idStr)) {
+                const idStr = typeof rawId === "string" ? rawId : null;
+                if (!idStr || !isValidObjectId(idStr)) {
                     return res.status(400).json({ status: "fail", message: "Invalid module ID provided" });
                 }
-                if (!seen.has(idStr)) {
-                    seen.add(idStr);
-                    uniqueModuleIds.push(idStr);
+                const canonicalId = new mongoose.Types.ObjectId(idStr).toString();
+                if (!seen.has(canonicalId)) {
+                    seen.add(canonicalId);
+                    uniqueModuleIds.push(canonicalId);
                 }
             }
+            updateFields.modules = uniqueModuleIds;
+        }
 
-            if (uniqueModuleIds.length > 0) {
+        const outcome = await withGovernanceLock("curriculum_mutation", async ({ assertLockActive }) => {
+            const course = await Course.findById(req.params.id);
+            if (!course) {
+                return { status: 404, body: { status: "fail", message: "Course not found" } };
+            }
+            if (course.instructor?.toString() !== req.user._id.toString() && !isAdminRole(req.user.role)) {
+                return { status: 403, body: { status: "fail", message: "Not authorized to update this course" } };
+            }
+
+            const previousModuleIds = (course.modules || []).map((id) => id.toString());
+
+            if (uniqueModuleIds !== null && uniqueModuleIds.length > 0) {
                 const requestedModules = await Module.find({ _id: { $in: uniqueModuleIds } }).select("_id course");
                 if (requestedModules.length !== uniqueModuleIds.length) {
-                    return res.status(404).json({ status: "fail", message: "One or more modules were not found" });
+                    return { status: 404, body: { status: "fail", message: "One or more modules were not found" } };
                 }
 
                 const otherCourses = await Course.find({
@@ -240,7 +263,7 @@ const updateCourse = async (req, res) => {
                 }).select("_id");
 
                 if (!isAdminRole(req.user.role)) {
-                    const existingModuleIdSet = new Set((course.modules || []).map((id) => id.toString()));
+                    const existingModuleIdSet = new Set(previousModuleIds);
                     const hasForeignModule =
                         otherCourses.length > 0 ||
                         requestedModules.some((mod) => {
@@ -251,42 +274,69 @@ const updateCourse = async (req, res) => {
                         });
 
                     if (hasForeignModule) {
-                        return res.status(403).json({
-                            status: "fail",
-                            message: "Not authorized to attach modules from another course",
-                        });
+                        return {
+                            status: 403,
+                            body: {
+                                status: "fail",
+                                message: "Not authorized to attach modules from another course",
+                            },
+                        };
                     }
                 }
             }
 
-            updateFields.modules = uniqueModuleIds;
+            await assertLockActive();
+
+            // Update destination course & module backlinks before pulling from prior courses so source links survive on failure
+            const updatedCourse = await Course.findByIdAndUpdate(
+                req.params.id,
+                updateFields,
+                { returnDocument: "after" }
+            ).populate("instructor", PUBLIC_INSTRUCTOR_FIELDS);
+
+            if (uniqueModuleIds !== null) {
+                if (uniqueModuleIds.length > 0) {
+                    await Module.updateMany(
+                        { _id: { $in: uniqueModuleIds } },
+                        { $set: { course: updatedCourse._id } }
+                    );
+                }
+
+                const newModuleSet = new Set(uniqueModuleIds);
+                const removedModuleIds = previousModuleIds.filter((id) => !newModuleSet.has(id));
+                if (removedModuleIds.length > 0) {
+                    await Module.updateMany(
+                        { _id: { $in: removedModuleIds }, course: course._id },
+                        { $set: { course: null } }
+                    );
+                }
+
+                if (uniqueModuleIds.length > 0 && isAdminRole(req.user.role)) {
+                    await Course.updateMany(
+                        { _id: { $ne: updatedCourse._id }, modules: { $in: uniqueModuleIds } },
+                        { $pull: { modules: { $in: uniqueModuleIds } } }
+                    );
+                }
+            }
+
+            return { status: 200, data: updatedCourse };
+        });
+
+        if (outcome.status !== 200) {
+            return res.status(outcome.status).json(outcome.body);
         }
 
-        if (uniqueModuleIds && uniqueModuleIds.length > 0 && isAdminRole(req.user.role)) {
-            await Course.updateMany(
-                { _id: { $ne: course._id }, modules: { $in: uniqueModuleIds } },
-                { $pull: { modules: { $in: uniqueModuleIds } } }
-            );
-        }
-
-        course = await Course.findByIdAndUpdate(req.params.id, updateFields, { new: true })
-            .populate("instructor", PUBLIC_INSTRUCTOR_FIELDS);
-
-        if (uniqueModuleIds && uniqueModuleIds.length > 0) {
-            await Module.updateMany(
-                { _id: { $in: uniqueModuleIds } },
-                { $set: { course: course._id } }
-            );
-        }
-
-        logger.info("Course updated successfully", { courseId: course._id, userId: req.user._id, requestId: req.id });
+        logger.info("Course updated successfully", { courseId: outcome.data._id, userId: req.user._id, requestId: req.id });
 
         res.json({
             status: "success",
-            data: course
+            data: outcome.data
         });
 
     } catch (error) {
+        if (error?.statusCode && error.isOperational) {
+            return res.status(error.statusCode).json({ status: "fail", message: error.message });
+        }
         logger.error("Update course error", { error: error.message, courseId: req.params.id, requestId: req.id });
         res.status(500).json({
             status: "error",
@@ -298,37 +348,57 @@ const updateCourse = async (req, res) => {
 // Delete Course
 const deleteCourse = async (req, res) => {
     try {
-        const course = req.course || await Course.findById(req.params.id);
-        if (!course) {
-            return res.status(404).json({ status: "fail", message: "Course not found" });
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ status: "fail", message: "Invalid course ID" });
         }
 
-        if (course.instructor?.toString() !== req.user._id.toString() && !isAdminRole(req.user.role)) {
-            return res.status(403).json({ status: "fail", message: "Not authorized to delete this course" });
-        }
+        const outcome = await withGovernanceLock("curriculum_mutation", async ({ assertLockActive }) => {
+            const course = await Course.findById(req.params.id);
+            if (!course) {
+                return { status: 404, body: { status: "fail", message: "Course not found" } };
+            }
 
-        const courseModules = await Module.find({
-            $or: [{ course: course._id }, { _id: { $in: course.modules || [] } }],
-        }).select("_id lesson");
+            if (course.instructor?.toString() !== req.user._id.toString() && !isAdminRole(req.user.role)) {
+                return { status: 403, body: { status: "fail", message: "Not authorized to delete this course" } };
+            }
 
-        const moduleIds = courseModules.map((m) => m._id);
-        const lessonIds = courseModules.flatMap((m) => (Array.isArray(m.lesson) ? m.lesson : []));
-
-        if (moduleIds.length > 0 || lessonIds.length > 0) {
-            await Lesson.deleteMany({
+            const courseModules = await Module.find({
                 $or: [
-                    ...(moduleIds.length > 0 ? [{ module: { $in: moduleIds } }] : []),
-                    ...(lessonIds.length > 0 ? [{ _id: { $in: lessonIds } }] : []),
+                    { course: course._id },
+                    { _id: { $in: course.modules || [] }, course: null },
                 ],
-            });
-        }
-        if (moduleIds.length > 0) {
-            await Module.deleteMany({ _id: { $in: moduleIds } });
-        }
+            }).select("_id lesson");
 
-        await Enrollment.deleteMany({ course: course._id });
-        await Progress.deleteMany({ course: course._id });
-        await Course.findByIdAndDelete(course._id);
+            const moduleIds = courseModules.map((m) => m._id);
+            const lessonIds = courseModules.flatMap((m) => (Array.isArray(m.lesson) ? m.lesson : []));
+
+            await assertLockActive();
+
+            if (moduleIds.length > 0 || lessonIds.length > 0) {
+                await Lesson.deleteMany({
+                    $or: [
+                        ...(moduleIds.length > 0 ? [{ module: { $in: moduleIds } }] : []),
+                        ...(lessonIds.length > 0 ? [{ _id: { $in: lessonIds }, module: null }] : []),
+                    ],
+                });
+            }
+            if (moduleIds.length > 0) {
+                await Module.deleteMany({
+                    _id: { $in: moduleIds },
+                    course: { $in: [null, course._id] },
+                });
+            }
+
+            await Enrollment.deleteMany({ course: course._id });
+            await Progress.deleteMany({ course: course._id });
+            await Course.findByIdAndDelete(course._id);
+
+            return { status: 200 };
+        });
+
+        if (outcome.status !== 200) {
+            return res.status(outcome.status).json(outcome.body);
+        }
 
         logger.info("Course deleted successfully", { courseId: req.params.id, userId: req.user._id, requestId: req.id });
 
@@ -338,6 +408,9 @@ const deleteCourse = async (req, res) => {
         });
 
     } catch (error) {
+        if (error?.statusCode && error.isOperational) {
+            return res.status(error.statusCode).json({ status: "fail", message: error.message });
+        }
         logger.error("Delete course error", { error: error.message, courseId: req.params.id, requestId: req.id });
         res.status(500).json({
             status: "error",

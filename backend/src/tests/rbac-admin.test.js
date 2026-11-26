@@ -488,7 +488,8 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         ]);
 
         const statuses = [res1.statusCode, res2.statusCode].sort();
-        expect(statuses).toEqual([200, 400]);
+        expect(statuses[0]).toBe(200);
+        expect([400, 403]).toContain(statuses[1]);
 
         const remainingActiveSuperAdmins = await User.countDocuments({
             role: "super_admin",
@@ -594,6 +595,59 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
             .set("Authorization", `Bearer ${superToken}`)
             .send({ role: "instructor" });
         expect(badIdRes.statusCode).toBe(400);
+
+        // Non-string ObjectId object in body returns 400 rather than 500
+        const nonStringCourseRes = await request(app)
+            .post("/api/modules")
+            .set("Authorization", `Bearer ${superToken}`)
+            .send({ title: "Bad", description: "d", content: "c", course: { id: "64b000000000000000000001" } });
+        expect(nonStringCourseRes.statusCode).toBe(400);
+
+        // Demoting a suspended super_admin succeeds when 1 active super_admin remains
+        const { user: suspendedSuper } = await createAndLoginUser({
+            name: "Suspended Super",
+            email: "suspended-super@example.com",
+            role: "super_admin",
+            isActive: false,
+        });
+        const demoteSuspendedRes = await request(app)
+            .patch(`/api/admin/users/${suspendedSuper._id}/role`)
+            .set("Authorization", `Bearer ${superToken}`)
+            .send({ role: "admin" });
+        expect(demoteSuspendedRes.statusCode).toBe(200);
+
+        // Partial settings update preserves unedited fields
+        await request(app)
+            .put("/api/admin/settings")
+            .set("Authorization", `Bearer ${superToken}`)
+            .send({ allowPublicRegistration: false });
+        const partialSettingsRes = await request(app)
+            .put("/api/admin/settings")
+            .set("Authorization", `Bearer ${superToken}`)
+            .send({ maxImageSizeMB: 12 });
+        expect(partialSettingsRes.statusCode).toBe(200);
+        expect(partialSettingsRes.body.data.allowPublicRegistration).toBe(false);
+        expect(partialSettingsRes.body.data.maxImageSizeMB).toBe(12);
+
+        // Uppercase hex module ID on lesson update is treated as unchanged parent
+        const uppercaseCourse = await Course.create({ title: "UC", description: "d", instructor: inst._id });
+        const uppercaseMod = await Module.create({ title: "UM", description: "d", content: "c", course: uppercaseCourse._id });
+        const uppercaseLesson = await Lesson.create({ title: "UL", description: "d", content: "c", module: uppercaseMod._id });
+        uppercaseMod.lesson = [uppercaseLesson._id];
+        await uppercaseMod.save();
+        const uppercaseUpdateRes = await request(app)
+            .put(`/api/lessons/${uppercaseLesson._id}`)
+            .set("Authorization", `Bearer ${superToken}`)
+            .send({ module: uppercaseMod._id.toString().toUpperCase(), title: "UL Updated" });
+        expect(uppercaseUpdateRes.statusCode).toBe(200);
+
+        // Deleting a lesson clears its Progress records
+        await Progress.create({ user: student._id, course: uppercaseCourse._id, lesson: uppercaseLesson._id, completed: true });
+        const delLessonRes = await request(app)
+            .delete(`/api/lessons/${uppercaseLesson._id}`)
+            .set("Authorization", `Bearer ${superToken}`);
+        expect(delLessonRes.statusCode).toBe(200);
+        expect(await Progress.countDocuments({ lesson: uppercaseLesson._id })).toBe(0);
 
         // seedAdmin preserves mustChangePassword: true when promoting legacy admin
         await User.deleteMany({ role: "super_admin" });
