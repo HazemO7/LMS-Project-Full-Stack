@@ -3,6 +3,14 @@ const User = require("../models/User");
 const { verifyPasswordChanged } = require("../services/authService");
 const logger = require("../utils/logger");
 
+const isAdminRole = (role) => role === "admin" || role === "super_admin";
+
+const PASSWORD_ROTATION_ALLOWLIST = new Set([
+    "GET /api/users/me",
+    "PUT /api/auth/change-password",
+    "POST /api/auth/logout",
+]);
+
 // Protect routes: Check if user is logged in
 const protect = async (req, res, next) => {
     try {
@@ -26,10 +34,29 @@ const protect = async (req, res, next) => {
             return res.status(401).json({ msg: "User no longer exists" });
         }
 
+        if (user.isActive === false) {
+            logger.warn("Suspended account attempted API access", { userId: user.id, requestId: req.id });
+            return res.status(403).json({
+                msg: "Your account has been suspended. Please contact administration.",
+                code: "ACCOUNT_SUSPENDED",
+            });
+        }
+
         // Check if user changed password after the token was issued
         if (verifyPasswordChanged(user.passwordChangedAt, decoded.iat)) {
             logger.warn("Token rejected because password was changed after issuance", { userId: user.id, requestId: req.id });
             return res.status(401).json({ msg: "User recently changed password! Please log in again." });
+        }
+
+        if (user.mustChangePassword === true) {
+            const cleanPath = (req.originalUrl || "").split("?")[0];
+            const signature = `${req.method.toUpperCase()} ${cleanPath}`;
+            if (!PASSWORD_ROTATION_ALLOWLIST.has(signature)) {
+                return res.status(403).json({
+                    msg: "You must change your temporary password before continuing.",
+                    code: "PASSWORD_CHANGE_REQUIRED",
+                });
+            }
         }
 
         req.user = user;
@@ -40,7 +67,7 @@ const protect = async (req, res, next) => {
     }
 };
 
-// Authorize roles: e.g. authorize("admin", "instructor")
+// Authorize roles: e.g. authorize("super_admin", "admin", "instructor")
 const authorize = (...roles) => {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
@@ -53,4 +80,4 @@ const authorize = (...roles) => {
     };
 };
 
-module.exports = { protect, authorize };
+module.exports = { protect, authorize, isAdminRole };

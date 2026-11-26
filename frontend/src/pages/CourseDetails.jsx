@@ -173,7 +173,8 @@ export const CourseDetails = () => {
   const canManage = Boolean(
     currentUser &&
       course &&
-      (currentUser.role === 'admin' ||
+      (currentUser.role === 'super_admin' ||
+        currentUser.role === 'admin' ||
         (course.instructor &&
           (course.instructor._id || course.instructor) === currentUser._id))
   );
@@ -546,6 +547,12 @@ export const CourseDetails = () => {
               <h1 dir="auto" className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
                 {course.title}
               </h1>
+              {course.instructor?.name && (
+                <p className="mt-1.5 text-xs font-semibold text-[#FBBF24]">
+                  {t('courses.byInstructor', { name: course.instructor.name })}
+                  {course.instructor.specialty ? ` · ${course.instructor.specialty}` : ''}
+                </p>
+              )}
               <p dir="auto" className="mt-2 max-w-[68ch] text-sm leading-relaxed text-[#CCFBF1]/90 sm:text-base">
                 {course.description}
               </p>

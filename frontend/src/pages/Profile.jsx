@@ -15,7 +15,12 @@ export const Profile = () => {
   const { t, tServer } = useLanguage();
   const navigate = useNavigate();
 
-  const [profileForm, setProfileForm] = useState({ name: '', email: '' });
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    email: '',
+    specialty: '',
+    bio: '',
+  });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
@@ -42,6 +47,8 @@ export const Profile = () => {
       setProfileForm({
         name: currentUser.name || '',
         email: currentUser.email || '',
+        specialty: currentUser.specialty || '',
+        bio: currentUser.bio || '',
       });
     }
   }, [currentUser]);
@@ -53,10 +60,15 @@ export const Profile = () => {
     setProfileSuccess('');
 
     try {
-      await usersAPI.updateMe({
+      const payload = {
         name: profileForm.name.trim(),
         email: profileForm.email.trim(),
-      });
+      };
+      if (currentUser?.role && currentUser.role !== 'student') {
+        payload.specialty = profileForm.specialty.trim();
+        payload.bio = profileForm.bio.trim();
+      }
+      await usersAPI.updateMe(payload);
       await refreshUser();
       setProfileSuccess(t('profile.updated'));
     } catch (err) {
@@ -102,7 +114,9 @@ export const Profile = () => {
   }
 
   const roleBadgeClass =
-    currentUser?.role === 'admin'
+    currentUser?.role === 'super_admin'
+      ? 'bg-[#EDE9FE] text-[#5B21B6] ring-[#DDD6FE]'
+      : currentUser?.role === 'admin'
       ? 'bg-[#FEF2F2] text-[#991B1B] ring-[#FECACA]'
       : currentUser?.role === 'instructor'
       ? 'bg-[#FEF3C7] text-[#92400E] ring-[#FDE68A]'
@@ -139,6 +153,12 @@ export const Profile = () => {
       </section>
 
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-10 lg:px-8">
+        {currentUser?.mustChangePassword && (
+          <AlertBanner variant="warning" className="mb-6">
+            <strong className="block font-semibold">{t('profile.forcePwBannerTitle')}</strong>
+            <span className="mt-0.5 block text-xs">{t('profile.forcePwBannerBody')}</span>
+          </AlertBanner>
+        )}
         <div className="grid gap-8 lg:grid-cols-12">
           {/* Account identity */}
           <section
@@ -207,6 +227,47 @@ export const Profile = () => {
                     className="w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
                   />
                 </div>
+
+                {currentUser?.role && currentUser.role !== 'student' && (
+                  <>
+                    <div>
+                      <label
+                        htmlFor="profile-specialty"
+                        className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
+                      >
+                        {t('profile.specialtyLabel')}
+                      </label>
+                      <input
+                        id="profile-specialty"
+                        type="text"
+                        value={profileForm.specialty}
+                        onChange={(e) =>
+                          setProfileForm((prev) => ({ ...prev, specialty: e.target.value }))
+                        }
+                        placeholder={t('profile.specialtyPlaceholder')}
+                        className="w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="profile-bio"
+                        className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
+                      >
+                        {t('profile.bioLabel')}
+                      </label>
+                      <textarea
+                        id="profile-bio"
+                        rows={3}
+                        value={profileForm.bio}
+                        onChange={(e) =>
+                          setProfileForm((prev) => ({ ...prev, bio: e.target.value }))
+                        }
+                        placeholder={t('profile.bioPlaceholder')}
+                        className="w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <button
                   type="submit"

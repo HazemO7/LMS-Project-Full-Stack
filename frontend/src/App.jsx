@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Link, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Link, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthProvider';
+import { useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageProvider';
 import { useLanguage } from './context/LanguageContext';
 import { Navbar } from './components/Navbar';
@@ -36,6 +37,9 @@ const CreateCourse = lazy(() =>
 );
 const Profile = lazy(() =>
   import('./pages/Profile').then((m) => ({ default: m.Profile }))
+);
+const AdminDashboard = lazy(() =>
+  import('./pages/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
 );
 
 const RouteFallback = () => {
@@ -76,6 +80,10 @@ const NotFound = () => {
 
 const AppShell = () => {
   const { t } = useLanguage();
+  const { currentUser } = useAuth();
+  const location = useLocation();
+  const mustRotatePw = Boolean(currentUser?.mustChangePassword) && location.pathname !== '/profile';
+
   return (
     <div className="flex min-h-screen flex-col bg-[#F0FDFA] text-[#0D2E2F]">
       <a
@@ -86,6 +94,9 @@ const AppShell = () => {
       </a>
       <Navbar />
       <main id="main-content" tabIndex={-1} className="flex-1 outline-none">
+        {mustRotatePw ? (
+          <Navigate to="/profile" replace state={{ forcedPasswordChange: true }} />
+        ) : (
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             {/* Public Routes */}
@@ -102,8 +113,16 @@ const AppShell = () => {
             <Route
               path="/course/new"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'instructor']}>
+                <ProtectedRoute allowedRoles={['super_admin', 'admin', 'instructor']}>
                   <CreateCourse />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
+                  <AdminDashboard />
                 </ProtectedRoute>
               }
             />
@@ -126,6 +145,7 @@ const AppShell = () => {
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
+        )}
       </main>
       <Footer />
     </div>

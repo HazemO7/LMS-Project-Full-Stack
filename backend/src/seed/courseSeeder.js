@@ -11,8 +11,8 @@ const seedCourses = async () => {
             return;
         }
 
-        // Get an instructor (using the admin, since admin role was seeded previously)
-        const instructor = await User.findOne({ role: "admin" });
+        // Get an instructor/owner account
+        const instructor = await User.findOne({ role: { $in: ["instructor", "super_admin", "admin"] } });
         const instructorId = instructor ? instructor._id : null;
 
         // Demo courses data 
@@ -101,7 +101,16 @@ const seedCourses = async () => {
         coursesData[0].modules = [module1._id, module2._id];
 
         // Insert all courses
-        await Course.insertMany(coursesData);
+        const insertedCourses = await Course.insertMany(coursesData);
+        const firstCourse = insertedCourses[0];
+        if (firstCourse) {
+            await Module.updateMany(
+                { _id: { $in: [module1._id, module2._id] } },
+                { $set: { course: firstCourse._id } }
+            );
+        }
+        await Lesson.updateMany({ _id: { $in: [lesson1._id, lesson2._id] } }, { $set: { module: module1._id } });
+        await Lesson.updateMany({ _id: { $in: [lesson3._id] } }, { $set: { module: module2._id } });
         
         console.log("Demo courses inserted successfully.");
     } catch (error) {

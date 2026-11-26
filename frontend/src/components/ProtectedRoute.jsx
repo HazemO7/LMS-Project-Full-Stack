@@ -24,6 +24,10 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
     );
   }
 
+  if (currentUser?.mustChangePassword && location.pathname !== '/profile') {
+    return <Navigate to="/profile" replace state={{ forcedPasswordChange: true }} />;
+  }
+
   if (allowedRoles && currentUser && !allowedRoles.includes(currentUser.role)) {
     return <Navigate to="/courses" replace />;
   }

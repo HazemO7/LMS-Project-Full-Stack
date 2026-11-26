@@ -17,8 +17,31 @@ const userSchema = new mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ["admin", "instructor", "student"],
+            enum: ["super_admin", "admin", "instructor", "student"],
             default: "student",
+        },
+        isActive: {
+            type: Boolean,
+            default: true,
+        },
+        mustChangePassword: {
+            type: Boolean,
+            default: false,
+        },
+        specialty: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        bio: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        createdBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
         },
         resetPasswordToken: {
             type: String,

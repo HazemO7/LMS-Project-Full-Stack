@@ -12,7 +12,15 @@ const initializeAdmin = async () => {
         const exists = await User.findOne({ email: adminEmail });
 
         if (exists) {
-            console.log('Admin user already exists. Exiting...');
+            if (exists.role === 'admin') {
+                exists.role = 'super_admin';
+                exists.isActive = true;
+                exists.mustChangePassword = false;
+                await exists.save();
+                console.log('Promoted existing admin user to super_admin.');
+                process.exit(0);
+            }
+            console.log('Super Admin user already exists. Exiting...');
             process.exit(0);
         }
 
@@ -22,11 +30,13 @@ const initializeAdmin = async () => {
             name: process.env.ADMIN_NAME,
             email: adminEmail,
             password: hashedPassword,
-            role: 'admin'
+            role: 'super_admin',
+            isActive: true,
+            mustChangePassword: false
         });
 
         await adminUser.save();
-        console.log('Admin user created successfully.');
+        console.log('Super Admin user created successfully.');
         process.exit(0);
     } catch (error) {
         console.error('Error creating admin:', error);

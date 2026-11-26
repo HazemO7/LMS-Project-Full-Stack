@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
 
 const moduleSchema = new mongoose.Schema({
+  course: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Course",
+    default: null
+  },
+  order: {
+    type: Number,
+    default: 0
+  },
   lesson: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: "Lesson"

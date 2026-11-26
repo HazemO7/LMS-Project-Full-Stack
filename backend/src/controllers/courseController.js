@@ -1,4 +1,7 @@
 const Course = require("../models/Course");
+const Module = require("../models/Module");
+const User = require("../models/User");
+const { isAdminRole } = require("../middleware/authmiddleware");
 const logger = require("../utils/logger");
 
 
@@ -6,17 +9,35 @@ const logger = require("../utils/logger");
 
 const createCourse = async (req, res) => {
     try {
-        const { title, description } = req.body;
+        const { title, description, instructor: requestedInstructorId } = req.body;
+        let instructorId = req.user._id;
+
+        if (requestedInstructorId && isAdminRole(req.user.role)) {
+            const targetInstructor = await User.findById(requestedInstructorId);
+            if (
+                !targetInstructor ||
+                targetInstructor.isActive === false ||
+                !["instructor", "admin", "super_admin"].includes(targetInstructor.role)
+            ) {
+                return res.status(400).json({
+                    status: "fail",
+                    message: "Selected instructor is invalid or inactive",
+                });
+            }
+            instructorId = targetInstructor._id;
+        }
+
         // create new course instance
         const course = new Course({
             title,
             description,
-            instructor: req.user._id
+            instructor: instructorId
         });
         // save course to database
         const savedCourse = await course.save();
+        await savedCourse.populate("instructor", "name email role specialty");
         
-        logger.info("Course created successfully", { courseId: savedCourse._id, instructorId: req.user._id, requestId: req.id });
+        logger.info("Course created successfully", { courseId: savedCourse._id, instructorId, requestId: req.id });
         
         // send response
         res.status(201).json({
@@ -59,6 +80,7 @@ const getCourses = async (req, res) => {
         const totalCourses = await Course.countDocuments(query);
 
         const courses = await Course.find(query)
+            .populate("instructor", "name email role specialty")
             .skip(skip)
             .limit(limit);
 
@@ -83,7 +105,8 @@ const getCourses = async (req, res) => {
 // Get Course By ID
 const getCourseById = async (req, res) => {
     try {
-        const course = await Course.findById(req.params.id);
+        const course = await Course.findById(req.params.id)
+            .populate("instructor", "name email role specialty");
 
         if (!course) {
             return res.status(404).json({
@@ -109,6 +132,7 @@ const getCourseById = async (req, res) => {
 const getCourseByIdFull = async (req, res) => {
     try {
         const course = await Course.findById(req.params.id)
+            .populate("instructor", "name email role specialty")
             .populate({
                 path: 'modules',
                 populate: {
@@ -143,11 +167,24 @@ const updateCourse = async (req, res) => {
         if (!course) {
             return res.status(404).json({ status: "fail", message: "Course not found" });
         }
-        if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        if (course.instructor?.toString() !== req.user._id.toString() && !isAdminRole(req.user.role)) {
             return res.status(403).json({ status: "fail", message: "Not authorized to update this course" });
         }
 
-        course = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const updateFields = {};
+        if (req.body.title !== undefined) updateFields.title = req.body.title;
+        if (req.body.description !== undefined) updateFields.description = req.body.description;
+        if (Array.isArray(req.body.modules)) updateFields.modules = req.body.modules;
+
+        course = await Course.findByIdAndUpdate(req.params.id, updateFields, { new: true })
+            .populate("instructor", "name email role specialty");
+
+        if (Array.isArray(req.body.modules) && req.body.modules.length > 0) {
+            await Module.updateMany(
+                { _id: { $in: req.body.modules } },
+                { $set: { course: course._id } }
+            );
+        }
 
         logger.info("Course updated successfully", { courseId: course._id, userId: req.user._id, requestId: req.id });
 
@@ -172,7 +209,7 @@ const deleteCourse = async (req, res) => {
             return res.status(404).json({ status: "fail", message: "Course not found" });
         }
 
-        if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+        if (course.instructor?.toString() !== req.user._id.toString() && !isAdminRole(req.user.role)) {
             return res.status(403).json({ status: "fail", message: "Not authorized to delete this course" });
         }
 

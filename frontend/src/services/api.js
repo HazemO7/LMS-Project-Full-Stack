@@ -23,6 +23,9 @@ const parseError = async (res, fallbackMessage) => {
   const data = await res.json().catch(() => ({}));
   const error = new Error(data.msg || data.message || fallbackMessage);
   error.status = res.status;
+  if (data.code !== undefined) {
+    error.code = data.code;
+  }
   if (data.remainingAttempts !== undefined) {
     error.remainingAttempts = data.remainingAttempts;
   }
@@ -248,6 +251,138 @@ export const usersAPI = {
       body: JSON.stringify(userData),
     });
     if (!res.ok) throw await parseError(res, 'Failed to update profile');
+    return res.json();
+  },
+};
+
+export const adminAPI = {
+  getStats: async () => {
+    const res = await customFetch(`${BASE_URL}/admin/stats`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to load platform stats');
+    return res.json();
+  },
+  getUsers: async ({ page = 1, limit = 10, role = 'all', status = 'all', search = '' } = {}) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      role,
+      status,
+      search,
+    });
+    const res = await customFetch(`${BASE_URL}/admin/users?${params.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to load users');
+    return res.json();
+  },
+  createUser: async (payload) => {
+    const res = await customFetch(`${BASE_URL}/admin/users`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to create user');
+    return res.json();
+  },
+  updateUserRole: async (userId, role) => {
+    const res = await customFetch(`${BASE_URL}/admin/users/${userId}/role`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ role }),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to update user role');
+    return res.json();
+  },
+  updateUserStatus: async (userId, payload) => {
+    const res = await customFetch(`${BASE_URL}/admin/users/${userId}/status`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to update user status');
+    return res.json();
+  },
+  deleteUser: async (userId) => {
+    const res = await customFetch(`${BASE_URL}/admin/users/${userId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to delete user');
+    return res.json();
+  },
+  getCourses: async ({ page = 1, limit = 10, search = '' } = {}) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      search,
+    });
+    const res = await customFetch(`${BASE_URL}/admin/courses?${params.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to load courses');
+    return res.json();
+  },
+  transferCourse: async (courseId, newInstructorId) => {
+    const res = await customFetch(`${BASE_URL}/admin/courses/${courseId}/transfer`, {
+      method: 'PATCH',
+      headers: getHeaders(),
+      body: JSON.stringify({ newInstructorId }),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to transfer course ownership');
+    return res.json();
+  },
+  getCourseEnrollments: async (courseId) => {
+    const res = await customFetch(`${BASE_URL}/admin/courses/${courseId}/enrollments`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to load enrollments');
+    return res.json();
+  },
+  enrollUser: async (courseId, payload) => {
+    const res = await customFetch(`${BASE_URL}/admin/courses/${courseId}/enrollments`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to enroll user');
+    return res.json();
+  },
+  unenrollUser: async (courseId, userId) => {
+    const res = await customFetch(`${BASE_URL}/admin/courses/${courseId}/enrollments/${userId}`, {
+      method: 'DELETE',
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to remove enrollment');
+    return res.json();
+  },
+  getSettings: async () => {
+    const res = await customFetch(`${BASE_URL}/admin/settings`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to load platform settings');
+    return res.json();
+  },
+  updateSettings: async (payload) => {
+    const res = await customFetch(`${BASE_URL}/admin/settings`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to update platform settings');
+    return res.json();
+  },
+  getAuditLogs: async ({ page = 1, limit = 15, action = 'all' } = {}) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      action,
+    });
+    const res = await customFetch(`${BASE_URL}/admin/audit-logs?${params.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw await parseError(res, 'Failed to load audit logs');
     return res.json();
   },
 };

@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const PlatformSettings = require("../models/PlatformSettings");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
@@ -20,6 +21,11 @@ const LOCK_TIME = 5 * 60 * 1000; // 5 minutes
 
 // POST /api/auth/register
 const register = catchAsync(async (req, res, next) => {
+    const settings = await PlatformSettings.getSingleton();
+    if (!settings.allowPublicRegistration) {
+        return next(new AppError("Public registration is currently closed by the administrator.", 403));
+    }
+
     // get Data (assuming validation middleware passed and attached req.body)
     const { name, email, password } = req.body;
     
@@ -57,6 +63,14 @@ const login = catchAsync(async (req, res, next) => {
     if (!user) {
         // Step 2: Return generic message if user doesn't exist
         return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    if (user.isActive === false) {
+        logger.warn("Suspended user attempted login", { userId: user._id, requestId: req.id, ip: req.ip });
+        return res.status(403).json({
+            message: "Your account has been suspended. Please contact administration.",
+            code: "ACCOUNT_SUSPENDED",
+        });
     }
 
     // Step 3: Check if locked
@@ -123,6 +137,8 @@ const login = catchAsync(async (req, res, next) => {
     res.status(200).json({
         msg: "Success Login",
         token,
+        role: user.role,
+        mustChangePassword: Boolean(user.mustChangePassword),
     });
 });
 
@@ -188,6 +204,7 @@ const resetPassword = catchAsync(async (req, res, next) => {
     const hash = await bcrypt.hash(password, 10);
     user.password = hash;
     user.passwordChangedAt = new Date(Date.now() - 1000); // Backdate 1s to avoid race conditions with JWT iat
+    user.mustChangePassword = false;
     
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
@@ -224,6 +241,7 @@ const changePassword = catchAsync(async (req, res, next) => {
     const hash = await bcrypt.hash(newPassword, 10);
     user.password = hash;
     user.passwordChangedAt = new Date(Date.now() - 1000);
+    user.mustChangePassword = false;
     await user.save();
 
     logger.info("Password changed successfully", { userId: user._id, requestId: req.id });

@@ -51,7 +51,7 @@ export const Courses = () => {
   const limit = 6;
   const isStudent = currentUser?.role === 'student';
   const canCreate =
-    currentUser?.role === 'admin' || currentUser?.role === 'instructor';
+    currentUser && ['super_admin', 'admin', 'instructor'].includes(currentUser.role);
 
   const syncUrlParams = useCallback(
     (nextTab, nextPage, nextQuery) => {
@@ -170,7 +170,7 @@ export const Courses = () => {
 
   const canManageCourse = (course) => {
     if (!currentUser) return false;
-    if (currentUser.role === 'admin') return true;
+    if (currentUser.role === 'super_admin' || currentUser.role === 'admin') return true;
     return (
       currentUser.role === 'instructor' &&
       course.instructor &&
@@ -430,6 +430,11 @@ export const Courses = () => {
                         >
                           {course.title}
                         </h2>
+                        {course.instructor?.name && (
+                          <p className="mt-1 text-xs font-medium text-[#0F766E]">
+                            {t('courses.byInstructor', { name: course.instructor.name })}
+                          </p>
+                        )}
                         <p
                           dir="auto"
                           className="mt-2 line-clamp-3 text-sm leading-relaxed text-[#335C5D]"

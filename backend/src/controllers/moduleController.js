@@ -1,11 +1,13 @@
 const Module = require('../models/Module');
+const Lesson = require('../models/Lesson');
+const Course = require("../models/Course");
 const logger = require('../utils/logger');
 
 // Create Module
 const createModule = async (req, res) => {
     try {
-        const { title, description, content } = req.body;
-        const module = new Module({ title, description, content });
+        const { title, description, content, course, order } = req.body;
+        const module = new Module({ title, description, content, course: course || null, order: order ?? 0 });
         await module.save();
         
         logger.info("Module created successfully", { moduleId: module._id, requestId: req.id });
@@ -36,15 +38,28 @@ const getModuleById = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
-const Course = require("../models/Course");
-
 
 // Update Module
 const updateModule = async (req, res) => {
     try {
-        const module = await Module.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const { title, description, content, lesson, order } = req.body;
+        const updateFields = {};
+        if (title !== undefined) updateFields.title = title;
+        if (description !== undefined) updateFields.description = description;
+        if (content !== undefined) updateFields.content = content;
+        if (Array.isArray(lesson)) updateFields.lesson = lesson;
+        if (order !== undefined) updateFields.order = order;
+
+        const module = await Module.findByIdAndUpdate(req.params.id, updateFields, { new: true });
         if (!module) {
             return res.status(404).json({ message: 'Module not found' });
+        }
+
+        if (Array.isArray(lesson) && lesson.length > 0) {
+            await Lesson.updateMany(
+                { _id: { $in: lesson } },
+                { $set: { module: module._id } }
+            );
         }
         
         logger.info("Module updated successfully", { moduleId: module._id, requestId: req.id });
@@ -61,6 +76,8 @@ const deleteModule = async (req, res) => {
         if (!module) {
             return res.status(404).json({ message: 'Module not found' });
         }
+
+        await Course.updateMany({ modules: module._id }, { $pull: { modules: module._id } });
 
         logger.info("Module deleted successfully", { moduleId: module._id, requestId: req.id });
 

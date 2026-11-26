@@ -1,12 +1,13 @@
 const Lesson = require('../models/Lesson');
+const Module = require('../models/Module');
 const logger = require('../utils/logger');
 
 // Create Lesson
 const createLesson = async (req, res) => {
     try {
-        const { module, title, description, content, videoUrl } = req.body;
+        const { module, title, description, content, videoUrl, order } = req.body;
 
-        const lesson = new Lesson({ module, title, description, content, videoUrl });
+        const lesson = new Lesson({ module: module || null, title, description, content, videoUrl, order: order ?? 0 });
         await lesson.save();
         
         logger.info("Lesson created successfully", { lessonId: lesson._id, moduleId: module, requestId: req.id });
@@ -40,8 +41,16 @@ const getLessonById = async (req, res) => {
 // Update Lesson
 const updateLesson = async (req, res) => {
     try {
-        const { module, title, description, content, videoUrl } = req.body;
-        const lesson = await Lesson.findByIdAndUpdate(req.params.id, { module, title, description, content, videoUrl }, { new: true });
+        const { module, title, description, content, videoUrl, order } = req.body;
+        const updateFields = {};
+        if (module !== undefined) updateFields.module = module;
+        if (title !== undefined) updateFields.title = title;
+        if (description !== undefined) updateFields.description = description;
+        if (content !== undefined) updateFields.content = content;
+        if (videoUrl !== undefined) updateFields.videoUrl = videoUrl;
+        if (order !== undefined) updateFields.order = order;
+
+        const lesson = await Lesson.findByIdAndUpdate(req.params.id, updateFields, { new: true });
         if (!lesson) {
             return res.status(404).json({ message: 'Lesson not found' });
         }
@@ -61,6 +70,8 @@ const deleteLesson = async (req, res) => {
         if (!lesson) {
             return res.status(404).json({ message: 'Lesson not found' });
         }
+
+        await Module.updateMany({ lesson: lesson._id }, { $pull: { lesson: lesson._id } });
         
         logger.info("Lesson deleted successfully", { lessonId: lesson._id, requestId: req.id });
 

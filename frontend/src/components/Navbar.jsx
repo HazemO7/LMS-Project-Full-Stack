@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { Globe, List, Plus, SignOut, UserCircle, X } from '@phosphor-icons/react';
+import { Globe, List, Plus, ShieldCheck, SignOut, UserCircle, X } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { BrandMark } from './BrandMark';
@@ -18,8 +18,15 @@ export const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
 
+  const mustRotatePw = Boolean(currentUser?.mustChangePassword);
   const canCreateCourse =
-    currentUser && (currentUser.role === 'admin' || currentUser.role === 'instructor');
+    !mustRotatePw &&
+    currentUser &&
+    ['super_admin', 'admin', 'instructor'].includes(currentUser.role);
+  const canAccessAdmin =
+    !mustRotatePw &&
+    currentUser &&
+    ['super_admin', 'admin'].includes(currentUser.role);
 
   const handleLogout = () => {
     setMobileOpen(false);
@@ -59,6 +66,12 @@ export const Navbar = () => {
               <NavLink to="/course/new" className={navLinkClass}>
                 <Plus size={15} weight="bold" aria-hidden="true" />
                 {t('nav.createCourse')}
+              </NavLink>
+            )}
+            {userToken && canAccessAdmin && (
+              <NavLink to="/admin" className={navLinkClass}>
+                <ShieldCheck size={15} weight="duotone" aria-hidden="true" />
+                {t('nav.adminConsole')}
               </NavLink>
             )}
           </nav>
@@ -162,6 +175,16 @@ export const Navbar = () => {
               >
                 <Plus size={15} weight="bold" aria-hidden="true" />
                 {t('nav.createCourse')}
+              </NavLink>
+            )}
+            {userToken && canAccessAdmin && (
+              <NavLink
+                to="/admin"
+                className={navLinkClass}
+                onClick={() => setMobileOpen(false)}
+              >
+                <ShieldCheck size={15} weight="duotone" aria-hidden="true" />
+                {t('nav.adminConsole')}
               </NavLink>
             )}
           </nav>

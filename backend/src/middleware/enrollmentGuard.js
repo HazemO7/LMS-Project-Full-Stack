@@ -1,12 +1,13 @@
 const Enrollment = require('../models/Enrollment');
 const Course = require('../models/Course');
+const { isAdminRole } = require('./authmiddleware');
 
 const enrollmentGuard = async (req, res, next) => {
     try {
         const courseId = req.params.id;
 
-        // If they are admin allow access immediately
-        if (req.user.role === 'admin') return next();
+        // Super admins and admins have immediate access
+        if (isAdminRole(req.user.role)) return next();
 
         const course = await Course.findById(courseId);
         if (!course) return res.status(404).json({ message: "Course not found" });

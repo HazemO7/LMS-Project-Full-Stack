@@ -60,6 +60,46 @@ const sendPasswordResetEmail = async (email, resetUrl) => {
     }
 };
 
+/**
+ * Sends a staff onboarding welcome email with temporary credentials.
+ */
+const sendStaffOnboardingEmail = async ({ email, name, role, temporaryPassword, loginUrl }) => {
+    const transporter = createTransporter();
+
+    if (!transporter) {
+        logger.info(
+            `MOCK STAFF ONBOARDING EMAIL (No SMTP credentials found) | To: ${email} | Role: ${role} | Login: ${loginUrl}`
+        );
+        return { mocked: true };
+    }
+
+    const roleLabel = role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Administrator' : 'Instructor';
+
+    const mailOptions = {
+        from: process.env.SMTP_FROM || '"Foundry LMS" <noreply@example.com>',
+        to: email,
+        subject: `Your Foundry LMS ${roleLabel} Account`,
+        html: `
+            <h1>Welcome to Foundry LMS, ${name}</h1>
+            <p>An account has been created for you with the role: <strong>${roleLabel}</strong>.</p>
+            <p><strong>Sign-in Email:</strong> ${email}</p>
+            <p><strong>Temporary Password:</strong> <code>${temporaryPassword}</code></p>
+            <p>For security, you will be required to change this temporary password immediately after your first sign-in.</p>
+            <p><a href="${loginUrl}">Sign in to Foundry LMS</a></p>
+        `
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        logger.info(`Staff onboarding email successfully sent via SMTP to: ${email}`);
+        return { mocked: false };
+    } catch (error) {
+        logger.error(`Failed to send staff onboarding email to ${email}`, { error: error.message });
+        throw new AppError("Email service temporarily unavailable", 503);
+    }
+};
+
 module.exports = {
-    sendPasswordResetEmail
+    sendPasswordResetEmail,
+    sendStaffOnboardingEmail
 };

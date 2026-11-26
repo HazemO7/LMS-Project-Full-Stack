@@ -41,6 +41,7 @@ const lessonRoutes = require("./src/routes/lessonRoutes");
 const progressRoutes = require("./src/routes/progressRoutes");
 const authRoutes = require("./src/routes/authRouters");
 const userRoutes = require("./src/routes/userRoutes");
+const adminRoutes = require("./src/routes/adminRoutes");
 
 // import error middleware
 const globalErrorHandler = require("./src/middleware/errorMiddleware");
@@ -49,6 +50,7 @@ const globalErrorHandler = require("./src/middleware/errorMiddleware");
 app.use("/api/courses", courseRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use("/api/modules", moduleRoutes);
 app.use("/api/lessons", lessonRoutes);
