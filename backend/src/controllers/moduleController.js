@@ -92,7 +92,7 @@ const updateModule = async (req, res) => {
             updateFields.lesson = uniqueLessonIds;
         }
 
-        const outcome = await withGovernanceLock("curriculum_mutation", async ({ assertLockActive }) => {
+        const outcome = await withGovernanceLock("curriculum_mutation", async () => {
             const existingModule = await Module.findById(req.params.id);
             if (!existingModule) {
                 return { status: 404, body: { message: 'Module not found' } };
@@ -179,9 +179,6 @@ const updateModule = async (req, res) => {
                 }
             }
 
-            await assertLockActive();
-
-            // Update destination module & lesson backlinks before pulling from prior modules so source links survive on failure
             const updatedModule = await Module.findByIdAndUpdate(
                 req.params.id,
                 updateFields,
@@ -241,26 +238,25 @@ const deleteModule = async (req, res) => {
             return res.status(400).json({ message: "Invalid module ID" });
         }
 
-        const outcome = await withGovernanceLock("curriculum_mutation", async ({ assertLockActive }) => {
+        const outcome = await withGovernanceLock("curriculum_mutation", async () => {
             const module = await Module.findById(req.params.id);
             if (!module) {
                 return { status: 404, body: { message: 'Module not found' } };
             }
 
             const lessonIds = Array.isArray(module.lesson) ? module.lesson : [];
-            const lessonsToDelete = await Lesson.find({
+            const membership = {
                 $or: [
                     { module: module._id },
                     ...(lessonIds.length > 0 ? [{ _id: { $in: lessonIds }, module: null }] : []),
                 ],
-            }).select("_id");
+            };
+            const lessonsToDelete = await Lesson.find(membership).select("_id");
             const deleteLessonIds = lessonsToDelete.map((l) => l._id);
-
-            await assertLockActive();
 
             if (deleteLessonIds.length > 0) {
                 await Progress.deleteMany({ lesson: { $in: deleteLessonIds } });
-                await Lesson.deleteMany({ _id: { $in: deleteLessonIds } });
+                await Lesson.deleteMany(membership);
             }
 
             await Course.updateMany({ modules: module._id }, { $pull: { modules: module._id } });

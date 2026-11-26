@@ -240,7 +240,7 @@ const updateCourse = async (req, res) => {
             updateFields.modules = uniqueModuleIds;
         }
 
-        const outcome = await withGovernanceLock("curriculum_mutation", async ({ assertLockActive }) => {
+        const outcome = await withGovernanceLock("curriculum_mutation", async () => {
             const course = await Course.findById(req.params.id);
             if (!course) {
                 return { status: 404, body: { status: "fail", message: "Course not found" } };
@@ -285,9 +285,6 @@ const updateCourse = async (req, res) => {
                 }
             }
 
-            await assertLockActive();
-
-            // Update destination course & module backlinks before pulling from prior courses so source links survive on failure
             const updatedCourse = await Course.findByIdAndUpdate(
                 req.params.id,
                 updateFields,
@@ -352,7 +349,7 @@ const deleteCourse = async (req, res) => {
             return res.status(400).json({ status: "fail", message: "Invalid course ID" });
         }
 
-        const outcome = await withGovernanceLock("curriculum_mutation", async ({ assertLockActive }) => {
+        const outcome = await withGovernanceLock("curriculum_mutation", async () => {
             const course = await Course.findById(req.params.id);
             if (!course) {
                 return { status: 404, body: { status: "fail", message: "Course not found" } };
@@ -371,8 +368,6 @@ const deleteCourse = async (req, res) => {
 
             const moduleIds = courseModules.map((m) => m._id);
             const lessonIds = courseModules.flatMap((m) => (Array.isArray(m.lesson) ? m.lesson : []));
-
-            await assertLockActive();
 
             if (moduleIds.length > 0 || lessonIds.length > 0) {
                 await Lesson.deleteMany({

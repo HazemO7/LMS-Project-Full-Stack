@@ -4,7 +4,7 @@ const request = require("supertest");
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { MongoMemoryServer } = require("mongodb-memory-server");
+const { MongoMemoryReplSet } = require("mongodb-memory-server");
 const app = require("../../app");
 const User = require("../models/User");
 const Course = require("../models/Course");
@@ -15,6 +15,7 @@ const Progress = require("../models/Progress");
 const PlatformSettings = require("../models/PlatformSettings");
 const AuditLog = require("../models/AuditLog");
 const GovernanceLock = require("../models/GovernanceLock");
+const { withGovernanceLock } = require("../services/governanceLockService");
 const seedAdmin = require("../seed/adminSeeder");
 const { escapeHtml } = require("../services/emailService");
 
@@ -35,7 +36,7 @@ const createAndLoginUser = async ({ name, email, password = "Password123!", role
 };
 
 beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
+    mongoServer = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
     await mongoose.connect(mongoServer.getUri());
 });
 
@@ -59,6 +60,40 @@ beforeEach(async () => {
 });
 
 describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", () => {
+    it("rolls back writes when the lease expires during the callback", async () => {
+        const { user } = await createAndLoginUser({ name: "Owner", email: "lease@example.com", role: "super_admin" });
+        await expect(withGovernanceLock("expiry-test", async () => {
+            await User.updateOne({ _id: user._id }, { $set: { role: "student" } });
+            await new Promise((resolve) => setTimeout(resolve, 60));
+        }, { leaseMs: 40 })).rejects.toMatchObject({ statusCode: 409 });
+        expect((await User.findById(user._id)).role).toBe("super_admin");
+    });
+
+    it.each([
+        [Course, Module, "courses", "modules", "course"],
+        [Module, Lesson, "modules", "lesson", "module"],
+    ])("rolls back a failed move between %s documents", async (Parent, Child, route, list, backlink) => {
+        const { token } = await createAndLoginUser({ name: "Admin", email: "move@example.com", role: "admin" });
+        const fields = { title: "Fixture", description: "Desc", content: "Text" };
+        const destination = await Parent.create(fields);
+        const source = await Parent.create(fields);
+        const child = await Child.create({ ...fields, [backlink]: source._id });
+        await Parent.updateOne({ _id: source._id }, { $push: { [list]: child._id } });
+
+        const failure = jest.spyOn(Parent, "updateMany").mockRejectedValueOnce(new Error("source pull failed"));
+        try {
+            const response = await request(app).put(`/api/${route}/${destination._id}`)
+                .set("Authorization", `Bearer ${token}`).send({ [list]: [child._id] });
+            expect(response.statusCode).toBe(500);
+            expect(failure).toHaveBeenCalled();
+        } finally {
+            failure.mockRestore();
+        }
+        expect((await Parent.findById(destination._id))[list]).toHaveLength(0);
+        expect((await Parent.findById(source._id))[list].map(String)).toEqual([String(child._id)]);
+        expect(String((await Child.findById(child._id))[backlink])).toBe(String(source._id));
+    });
+
     it("seeds super_admin and idempotently promotes legacy owner admin", async () => {
         process.env.ADMIN_NAME = "Owner";
         process.env.ADMIN_EMAIL = "owner@example.com";

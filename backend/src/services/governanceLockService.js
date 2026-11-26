@@ -1,22 +1,12 @@
+const mongoose = require("mongoose");
 const crypto = require("crypto");
 const GovernanceLock = require("../models/GovernanceLock");
 const AppError = require("../utils/AppError");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/**
- * Verifies that the caller still holds an unexpired lease on the given governance lock.
- */
-const assertLockValid = async (key, ownerToken) => {
-    const active = await GovernanceLock.exists({
-        _id: key,
-        ownerToken,
-        expiresAt: { $gt: new Date() },
-    });
-    if (!active) {
-        throw new AppError("Governance lock expired before commit. Please retry.", 409);
-    }
-};
+// Include all Mongoose operations in the callback (including helper queries) in the transaction.
+mongoose.set("transactionAsyncLocalStorage", true);
 
 /**
  * Serializes cross-document governance operations using a leased MongoDB lock document.
@@ -61,15 +51,27 @@ const withGovernanceLock = async (key, fn, { leaseMs = 10000, timeoutMs = 5000 }
         throw new AppError("Another privileged administrative change is in progress. Please retry.", 409);
     }
 
-    const assertLockActive = () => assertLockValid(key, ownerToken);
+    const released = { ownerToken: null, expiresAt: new Date(0) };
 
     try {
-        return await fn({ assertLockActive });
-    } finally {
+        return await mongoose.connection.transaction(async () => {
+            const result = await fn();
+            // Fence the commit: a takeover conflicts with this write and an expired lease aborts all work.
+            const fence = await GovernanceLock.updateOne(
+                { _id: key, ownerToken, expiresAt: { $gt: new Date() } },
+                { $set: released }
+            );
+            if (!fence.matchedCount) {
+                throw new AppError("Governance lock expired before commit. Please retry.", 409);
+            }
+            return result;
+        });
+    } catch (error) {
         await GovernanceLock.updateOne(
             { _id: key, ownerToken },
-            { $set: { ownerToken: null, expiresAt: new Date(0) } }
+            { $set: released }
         ).catch(() => {});
+        throw error;
     }
 };
 
@@ -82,5 +84,4 @@ const withSuperAdminLock = (fn, options) => withGovernanceLock("super_admin_muta
 module.exports = {
     withGovernanceLock,
     withSuperAdminLock,
-    assertLockValid,
 };

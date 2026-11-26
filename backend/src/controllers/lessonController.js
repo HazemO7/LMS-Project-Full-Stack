@@ -2,6 +2,9 @@ const mongoose = require('mongoose');
 const Lesson = require('../models/Lesson');
 const Module = require('../models/Module');
 const Progress = require('../models/Progress');
+const { withGovernanceLock } = require("../services/governanceLockService");
+const { resolveCourseFromLesson } = require("../middleware/courseOwnershipGuard");
+const { isAdminRole } = require("../middleware/authmiddleware");
 const logger = require('../utils/logger');
 
 const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
@@ -103,20 +106,27 @@ const updateLesson = async (req, res) => {
 // Delete Lesson
 const deleteLesson = async (req, res) => {
     try {
-        const lesson = req.lessonDoc || await Lesson.findById(req.params.id);
-        if (!lesson) {
-            return res.status(404).json({ message: 'Lesson not found' });
-        }
+        const outcome = await withGovernanceLock("curriculum_mutation", async () => {
+            const lesson = await Lesson.findById(req.params.id);
+            if (!lesson) return { status: 404, message: 'Lesson not found' };
+            if (!isAdminRole(req.user.role)) {
+                const course = await resolveCourseFromLesson(lesson);
+                if (!course?.instructor?.equals(req.user._id)) {
+                    return { status: 403, message: "Not authorized to modify this course curriculum" };
+                }
+            }
+            await Progress.deleteMany({ lesson: lesson._id });
+            await Module.updateMany({ lesson: lesson._id }, { $pull: { lesson: lesson._id } });
+            await Lesson.findByIdAndDelete(lesson._id);
+            return { status: 200 };
+        });
+        if (outcome.status !== 200) return res.status(outcome.status).json({ message: outcome.message });
 
-        // Remove progress and module references before deleting the lesson so retries remain authorized and clean
-        await Progress.deleteMany({ lesson: lesson._id });
-        await Module.updateMany({ lesson: lesson._id }, { $pull: { lesson: lesson._id } });
-        await Lesson.findByIdAndDelete(lesson._id);
-
-        logger.info("Lesson deleted successfully", { lessonId: lesson._id, requestId: req.id });
+        logger.info("Lesson deleted successfully", { lessonId: req.params.id, requestId: req.id });
 
         res.status(200).json({ message: 'Lesson deleted successfully' });
     } catch (error) {
+        if (error.isOperational) return res.status(error.statusCode).json({ message: error.message });
         logger.error("Delete lesson error", { error: error.message, lessonId: req.params.id, requestId: req.id });
         res.status(500).json({ message: "Failed to delete lesson" });
     }

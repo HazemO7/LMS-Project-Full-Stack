@@ -290,7 +290,7 @@ const updateUserRole = async (req, res) => {
 
         const { role } = req.body;
 
-        const outcome = await withSuperAdminLock(async ({ assertLockActive }) => {
+        const outcome = await withSuperAdminLock(async () => {
             const { actor, error: actorError } = await resolveActiveActor(req);
             if (actorError) return actorError;
 
@@ -317,8 +317,6 @@ const updateUserRole = async (req, res) => {
                         body: { status: "fail", message: "Only a Super Admin can modify administrator roles." },
                     };
                 }
-
-                await assertLockActive();
 
                 const updated = await User.findOneAndUpdate(
                     { _id: target._id, role: { $nin: ["admin", "super_admin"] } },
@@ -361,8 +359,6 @@ const updateUserRole = async (req, res) => {
                 }
             }
 
-            await assertLockActive();
-
             const previousRole = target.role;
             target.role = role;
             await target.save();
@@ -396,7 +392,7 @@ const updateUserStatus = async (req, res) => {
 
         const { isActive, unlock } = req.body;
 
-        const outcome = await withSuperAdminLock(async ({ assertLockActive }) => {
+        const outcome = await withSuperAdminLock(async () => {
             const { actor, error: actorError } = await resolveActiveActor(req);
             if (actorError) return actorError;
 
@@ -450,8 +446,6 @@ const updateUserStatus = async (req, res) => {
                 actor.role === "admin"
                     ? { _id: target._id, role: { $nin: ["admin", "super_admin"] } }
                     : { _id: target._id };
-
-            await assertLockActive();
 
             const updated = await User.findOneAndUpdate(
                 filter,
@@ -509,7 +503,7 @@ const deleteUser = async (req, res) => {
             return res.status(400).json({ status: "fail", message: "Invalid user ID" });
         }
 
-        const outcome = await withSuperAdminLock(async ({ assertLockActive }) => {
+        const outcome = await withSuperAdminLock(async () => {
             const { actor, error: actorError } = await resolveActiveActor(req);
             if (actorError) return actorError;
 
@@ -565,7 +559,6 @@ const deleteUser = async (req, res) => {
             // Delete dependent records before removing the user document so retries remain recoverable
             await Enrollment.deleteMany({ user: target._id });
             await Progress.deleteMany({ user: target._id });
-            await assertLockActive();
             await User.findByIdAndDelete(target._id);
 
             await recordAudit({
@@ -650,7 +643,7 @@ const transferCourseOwnership = async (req, res) => {
 
         const { newInstructorId } = req.body;
 
-        const outcome = await withSuperAdminLock(async ({ assertLockActive }) => {
+        const outcome = await withSuperAdminLock(async () => {
             const { actor, error: actorError } = await resolveActiveActor(req);
             if (actorError) return actorError;
 
@@ -658,10 +651,8 @@ const transferCourseOwnership = async (req, res) => {
                 return { status: 403, body: { status: "fail", message: "Forbidden: insufficient role privileges" } };
             }
 
-            const [course, newInstructor] = await Promise.all([
-                Course.findById(req.params.id),
-                User.findById(newInstructorId),
-            ]);
+            const course = await Course.findById(req.params.id);
+            const newInstructor = await User.findById(newInstructorId);
 
             if (!course) {
                 return { status: 404, body: { status: "fail", message: "Course not found" } };
@@ -690,8 +681,6 @@ const transferCourseOwnership = async (req, res) => {
                     },
                 };
             }
-
-            await assertLockActive();
 
             course.instructor = newInstructor._id;
             await course.save();

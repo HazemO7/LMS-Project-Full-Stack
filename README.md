@@ -78,7 +78,13 @@ Choose either **Docker** (easiest) or **Local Development**:
 - **For Local Development (without Docker)**:
   - [Node.js](https://nodejs.org/) **v20.19+** or **v22.12+** (v22 LTS recommended; required by Vite 8 and Mongoose 9)
   - `npm` (v10+)
-  - A running [MongoDB](https://www.mongodb.com/try/download/community) instance (local MongoDB service, MongoDB Atlas, or the Docker `database` container)
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:76ae10ba5e49d0637ba5dc141a717d90fe321c04238402f041d7136aff88a498 -->
+
+  - A MongoDB replica set (Atlas, the supplied Docker Compose database, or a local replica set). Governance and curriculum changes require transactions. When connecting from the host to the Compose database, append `?directConnection=true` to the localhost connection string.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ---
 
@@ -150,7 +156,13 @@ Best for active development when you want hot-reloading (`nodemon` + Vite HMR) w
    cp .env.example .env   # PowerShell: Copy-Item .env.example .env
    npm run dev
    ```
-   *(Ensure `DB_URL=mongodb://localhost:27017/lms` and `CLIENT_URL=http://localhost:5173` in `backend/.env`.)*
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:d305bf9faa496873f6a9b4a1ab25a7bd3efe945ecc0393098398660779584976 -->
+
+   *(Ensure `DB_URL=mongodb://localhost:27017/lms?directConnection=true` and `CLIENT_URL=http://localhost:5173` in `backend/.env`.)*
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 3. **Start the frontend locally** (Terminal 2):
    ```bash
