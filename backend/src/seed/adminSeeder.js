@@ -24,7 +24,6 @@ const seedAdmin = async () => {
             if (existingByEmail.role === "admin") {
                 existingByEmail.role = "super_admin";
                 existingByEmail.isActive = true;
-                existingByEmail.mustChangePassword = false;
                 await existingByEmail.save();
                 console.log("Promoted existing owner admin account to super_admin.");
                 return;

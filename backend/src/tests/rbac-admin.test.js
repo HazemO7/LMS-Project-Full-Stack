@@ -3,6 +3,7 @@ process.env.JWT_SECRET = process.env.JWT_SECRET || "test-jwt-secret-key";
 const request = require("supertest");
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const { MongoMemoryServer } = require("mongodb-memory-server");
 const app = require("../../app");
 const User = require("../models/User");
@@ -13,7 +14,9 @@ const Enrollment = require("../models/Enrollment");
 const Progress = require("../models/Progress");
 const PlatformSettings = require("../models/PlatformSettings");
 const AuditLog = require("../models/AuditLog");
+const GovernanceLock = require("../models/GovernanceLock");
 const seedAdmin = require("../seed/adminSeeder");
+const { escapeHtml } = require("../services/emailService");
 
 let mongoServer;
 
@@ -27,8 +30,8 @@ const createAndLoginUser = async ({ name, email, password = "Password123!", role
         mustChangePassword,
         isActive,
     });
-    const loginRes = await request(app).post("/api/auth/login").send({ email, password });
-    return { user, token: loginRes.body.token, loginRes };
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1d" });
+    return { user, token };
 };
 
 beforeAll(async () => {
@@ -51,6 +54,7 @@ beforeEach(async () => {
         Progress.deleteMany({}),
         PlatformSettings.deleteMany({}),
         AuditLog.deleteMany({}),
+        GovernanceLock.deleteMany({}),
     ]);
 });
 
@@ -340,5 +344,272 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
             .set("Authorization", `Bearer ${superToken}`);
         expect(auditRes.statusCode).toBe(200);
         expect(auditRes.body.data.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("blocks cross-instructor module/lesson hijacking, lesson reparenting, and detached mutations", async () => {
+        const { user: instA, token: tokenA } = await createAndLoginUser({
+            name: "Instructor A",
+            email: "hijack-a@example.com",
+            role: "instructor",
+        });
+        const { token: tokenB } = await createAndLoginUser({
+            name: "Instructor B",
+            email: "hijack-b@example.com",
+            role: "instructor",
+        });
+
+        const courseA = await Course.create({ title: "Course A", description: "A", instructor: instA._id });
+        const modA1 = await Module.create({ title: "Mod A1", description: "d", content: "c", course: courseA._id });
+        const modA2 = await Module.create({ title: "Mod A2", description: "d", content: "c", course: courseA._id });
+        courseA.modules = [modA1._id, modA2._id];
+        await courseA.save();
+        const lessonA = await Lesson.create({ title: "Lesson A", description: "d", content: "c", module: modA1._id });
+        modA1.lesson = [lessonA._id];
+        await modA1.save();
+
+        const courseBRes = await request(app)
+            .post("/api/courses")
+            .set("Authorization", `Bearer ${tokenB}`)
+            .send({ title: "Course B", description: "B" });
+        const courseBId = courseBRes.body.data._id;
+
+        const modBRes = await request(app)
+            .post("/api/modules")
+            .set("Authorization", `Bearer ${tokenB}`)
+            .send({ title: "Mod B", description: "d", content: "c", course: courseBId });
+        const modBId = modBRes.body._id;
+
+        // Attacker B cannot attach A's module via PUT /api/courses/:ownId
+        const hijackCourseRes = await request(app)
+            .put(`/api/courses/${courseBId}`)
+            .set("Authorization", `Bearer ${tokenB}`)
+            .send({ modules: [modA1._id.toString()] });
+        expect(hijackCourseRes.statusCode).toBe(403);
+        const modA1After = await Module.findById(modA1._id);
+        expect(modA1After.course.toString()).toBe(courseA._id.toString());
+
+        // Attacker B cannot attach A's lesson via PUT /api/modules/:ownModId
+        const hijackModRes = await request(app)
+            .put(`/api/modules/${modBId}`)
+            .set("Authorization", `Bearer ${tokenB}`)
+            .send({ lesson: [lessonA._id.toString()] });
+        expect(hijackModRes.statusCode).toBe(403);
+        const lessonAAfter = await Lesson.findById(lessonA._id);
+        expect(lessonAAfter.module.toString()).toBe(modA1._id.toString());
+
+        // Disallow reparenting lesson via PUT /api/lessons/:id
+        const reparentRes = await request(app)
+            .put(`/api/lessons/${lessonA._id}`)
+            .set("Authorization", `Bearer ${tokenA}`)
+            .send({ module: modA2._id.toString(), title: "Should Not Move" });
+        expect(reparentRes.statusCode).toBe(400);
+        const lessonAfterReparent = await Lesson.findById(lessonA._id);
+        expect(lessonAfterReparent.module.toString()).toBe(modA1._id.toString());
+
+        // Ownership guard fails closed for detached/orphan modules & creating detached modules by instructor
+        const orphanCreateRes = await request(app)
+            .post("/api/modules")
+            .set("Authorization", `Bearer ${tokenB}`)
+            .send({ title: "Orphan", description: "d", content: "c" });
+        expect(orphanCreateRes.statusCode).toBe(403);
+
+        const orphanMod = await Module.create({ title: "Detached", description: "d", content: "c" });
+        const orphanEditRes = await request(app)
+            .put(`/api/modules/${orphanMod._id}`)
+            .set("Authorization", `Bearer ${tokenB}`)
+            .send({ title: "Tampered" });
+        expect(orphanEditRes.statusCode).toBe(403);
+
+        // Deleting course cascades modules and lessons
+        const delCourseARes = await request(app)
+            .delete(`/api/courses/${courseA._id}`)
+            .set("Authorization", `Bearer ${tokenA}`);
+        expect(delCourseARes.statusCode).toBe(200);
+        expect(await Module.findById(modA1._id)).toBeNull();
+        expect(await Lesson.findById(lessonA._id)).toBeNull();
+    });
+
+    it("redacts instructor email/role on public GET /api/courses and delays suspended status until password matches", async () => {
+        const { user: superUser } = await createAndLoginUser({
+            name: "Owner",
+            email: "owner-public@example.com",
+            role: "super_admin",
+        });
+        await Course.create({ title: "Public Course", description: "Desc", instructor: superUser._id });
+
+        const coursesRes = await request(app).get("/api/courses");
+        expect(coursesRes.statusCode).toBe(200);
+        expect(coursesRes.body.data[0].instructor.name).toBe("Owner");
+        expect(coursesRes.body.data[0].instructor.email).toBeUndefined();
+        expect(coursesRes.body.data[0].instructor.role).toBeUndefined();
+
+        await createAndLoginUser({
+            name: "Suspended Student",
+            email: "suspended@example.com",
+            role: "student",
+            isActive: false,
+        });
+
+        const wrongPwRes = await request(app)
+            .post("/api/auth/login")
+            .send({ email: "suspended@example.com", password: "WrongPassword123!" });
+        expect(wrongPwRes.statusCode).toBe(401);
+        expect(wrongPwRes.body.code).toBeUndefined();
+
+        const rightPwRes = await request(app)
+            .post("/api/auth/login")
+            .send({ email: "suspended@example.com", password: "Password123!" });
+        expect(rightPwRes.statusCode).toBe(403);
+        expect(rightPwRes.body.code).toBe("ACCOUNT_SUSPENDED");
+    });
+
+    it("serializes concurrent last-super-admin demotions/suspensions and routes legacy /api/users/:id/role cleanly", async () => {
+        const { user: super1, token: token1 } = await createAndLoginUser({
+            name: "Super 1",
+            email: "s1@example.com",
+            role: "super_admin",
+        });
+        const { user: super2, token: token2 } = await createAndLoginUser({
+            name: "Super 2",
+            email: "s2@example.com",
+            role: "super_admin",
+        });
+
+        // Concurrent demotion + suspension of the only 2 active super_admins must leave >= 1 active super_admin
+        const [res1, res2] = await Promise.all([
+            request(app)
+                .patch(`/api/admin/users/${super2._id}/role`)
+                .set("Authorization", `Bearer ${token1}`)
+                .send({ role: "admin" }),
+            request(app)
+                .patch(`/api/admin/users/${super1._id}/status`)
+                .set("Authorization", `Bearer ${token2}`)
+                .send({ isActive: false }),
+        ]);
+
+        const statuses = [res1.statusCode, res2.statusCode].sort();
+        expect(statuses).toEqual([200, 400]);
+
+        const remainingActiveSuperAdmins = await User.countDocuments({
+            role: "super_admin",
+            isActive: { $ne: false },
+        });
+        expect(remainingActiveSuperAdmins).toBe(1);
+
+        // Legacy /api/users/:id/role enforces Joi validation and admin hierarchy
+        const { token: adminToken } = await createAndLoginUser({
+            name: "Admin",
+            email: "admin-legacy@example.com",
+            role: "admin",
+        });
+        const { user: studentUser } = await createAndLoginUser({
+            name: "Student",
+            email: "stu-legacy@example.com",
+            role: "student",
+        });
+
+        const invalidRoleRes = await request(app)
+            .patch(`/api/users/${studentUser._id}/role`)
+            .set("Authorization", `Bearer ${adminToken}`)
+            .send({ role: "invalid_role" });
+        expect(invalidRoleRes.statusCode).toBe(400);
+
+        const promoteToAdminByAdmin = await request(app)
+            .patch(`/api/users/${studentUser._id}/role`)
+            .set("Authorization", `Bearer ${adminToken}`)
+            .send({ role: "admin" });
+        expect(promoteToAdminByAdmin.statusCode).toBe(403);
+
+        const promoteToInstructor = await request(app)
+            .patch(`/api/users/${studentUser._id}/role`)
+            .set("Authorization", `Bearer ${adminToken}`)
+            .send({ role: "instructor" });
+        expect(promoteToInstructor.statusCode).toBe(200);
+        expect(promoteToInstructor.body.data.role).toBe("instructor");
+    });
+
+    it("handles mocked onboarding email, HTML escaping, same-owner transfer rejection, retryable unenroll, and seeder rotation preservation", async () => {
+        const { token: superToken } = await createAndLoginUser({
+            name: "Super Gov",
+            email: "supergov@example.com",
+            role: "super_admin",
+        });
+        const { user: inst } = await createAndLoginUser({
+            name: "Inst",
+            email: "instgov@example.com",
+            role: "instructor",
+        });
+        const { user: student } = await createAndLoginUser({
+            name: "Student",
+            email: "stugov@example.com",
+            role: "student",
+        });
+
+        // Mocked SMTP reports emailSent: false while preserving temporaryPassword
+        const oldHost = process.env.SMTP_HOST;
+        delete process.env.SMTP_HOST;
+        const onboardRes = await request(app)
+            .post("/api/admin/users")
+            .set("Authorization", `Bearer ${superToken}`)
+            .send({
+                name: "Mocked Staff",
+                email: "mocked@example.com",
+                role: "instructor",
+                sendEmail: true,
+            });
+        if (oldHost !== undefined) process.env.SMTP_HOST = oldHost;
+        expect(onboardRes.statusCode).toBe(201);
+        expect(onboardRes.body.emailSent).toBe(false);
+        expect(onboardRes.body.temporaryPassword).toBeTruthy();
+
+        // HTML escaping preserves semicolon-less entities and markup characters
+        expect(escapeHtml("a&gtb&amp<script>'\"")).toBe("a&amp;gtb&amp;amp&lt;script&gt;&#39;&quot;");
+
+        // Same-owner transfer is rejected with 400 and writes no COURSE_TRANSFERRED audit entry
+        const course = await Course.create({ title: "Owned Course", description: "d", instructor: inst._id });
+        const sameOwnerRes = await request(app)
+            .patch(`/api/admin/courses/${course._id}/transfer`)
+            .set("Authorization", `Bearer ${superToken}`)
+            .send({ newInstructorId: inst._id.toString() });
+        expect(sameOwnerRes.statusCode).toBe(400);
+        expect(await AuditLog.countDocuments({ action: "COURSE_TRANSFERRED" })).toBe(0);
+
+        // Retryable unenrollment cleans orphaned Progress when Enrollment is absent
+        const lesson = await Lesson.create({ title: "L1", description: "d", content: "c" });
+        await Progress.create({ user: student._id, course: course._id, lesson: lesson._id, completed: true });
+        const retryUnenrollRes = await request(app)
+            .delete(`/api/admin/courses/${course._id}/enrollments/${student._id}`)
+            .set("Authorization", `Bearer ${superToken}`);
+        expect(retryUnenrollRes.statusCode).toBe(200);
+        expect(await Progress.countDocuments({ user: student._id, course: course._id })).toBe(0);
+
+        const missingUnenrollRes = await request(app)
+            .delete(`/api/admin/courses/${course._id}/enrollments/${student._id}`)
+            .set("Authorization", `Bearer ${superToken}`);
+        expect(missingUnenrollRes.statusCode).toBe(404);
+
+        // Invalid ObjectId returns 400 rather than leaking internal CastError 500
+        const badIdRes = await request(app)
+            .patch("/api/admin/users/not-an-object-id/role")
+            .set("Authorization", `Bearer ${superToken}`)
+            .send({ role: "instructor" });
+        expect(badIdRes.statusCode).toBe(400);
+
+        // seedAdmin preserves mustChangePassword: true when promoting legacy admin
+        await User.deleteMany({ role: "super_admin" });
+        process.env.ADMIN_NAME = "Temp Admin";
+        process.env.ADMIN_EMAIL = "temp-owner@example.com";
+        process.env.ADMIN_PASSWORD = "TempOwnerPass123!";
+        await User.create({
+            name: "Temp Admin",
+            email: "temp-owner@example.com",
+            password: await bcrypt.hash("TempOwnerPass123!", 10),
+            role: "admin",
+            mustChangePassword: true,
+        });
+        await seedAdmin();
+        const promotedAdmin = await User.findOne({ email: "temp-owner@example.com" });
+        expect(promotedAdmin.role).toBe("super_admin");
+        expect(promotedAdmin.mustChangePassword).toBe(true);
     });
 });

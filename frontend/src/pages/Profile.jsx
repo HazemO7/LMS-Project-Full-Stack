@@ -53,8 +53,11 @@ export const Profile = () => {
     }
   }, [currentUser]);
 
+  const mustRotatePw = Boolean(currentUser?.mustChangePassword);
+
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
+    if (mustRotatePw) return;
     setProfileSaving(true);
     setProfileError('');
     setProfileSuccess('');
@@ -176,6 +179,11 @@ export const Profile = () => {
               <p className="mt-1 text-xs text-[#335C5D]">{t('profile.detailsNote')}</p>
 
               <div className="mt-4 space-y-3">
+                {mustRotatePw && (
+                  <AlertBanner variant="info">
+                    {t('profile.detailsLockedUntilPwChange')}
+                  </AlertBanner>
+                )}
                 {profileError && (
                   <AlertBanner variant="error" onDismiss={() => setProfileError('')}>
                     {tServer(profileError)}
@@ -188,7 +196,11 @@ export const Profile = () => {
                 )}
               </div>
 
-              <form onSubmit={handleProfileSubmit} className="mt-5 space-y-4">
+              <form onSubmit={handleProfileSubmit} className="mt-5">
+                <fieldset
+                  disabled={mustRotatePw || profileSaving}
+                  className="space-y-4 disabled:opacity-60"
+                >
                 <div>
                   <label
                     htmlFor="profile-name"
@@ -271,12 +283,13 @@ export const Profile = () => {
 
                 <button
                   type="submit"
-                  disabled={profileSaving}
+                  disabled={mustRotatePw || profileSaving}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
                 >
                   <Check size={16} weight="bold" aria-hidden="true" />
                   {profileSaving ? t('common.saving') : t('profile.saveBtn')}
                 </button>
+                </fieldset>
               </form>
             </div>
           </section>

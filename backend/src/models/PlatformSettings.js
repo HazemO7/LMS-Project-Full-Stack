@@ -42,11 +42,18 @@ const platformSettingsSchema = new mongoose.Schema(
  * Returns the singleton platform settings document, creating it on first access.
  */
 platformSettingsSchema.statics.getSingleton = async function () {
-    return this.findOneAndUpdate(
-        { singletonKey: "default" },
-        { $setOnInsert: { singletonKey: "default" } },
-        { returnDocument: "after", upsert: true }
-    );
+    try {
+        return await this.findOneAndUpdate(
+            { singletonKey: "default" },
+            { $setOnInsert: { singletonKey: "default" } },
+            { returnDocument: "after", upsert: true }
+        );
+    } catch (err) {
+        if (err?.code === 11000) {
+            return this.findOne({ singletonKey: "default" });
+        }
+        throw err;
+    }
 };
 
 const PlatformSettings = mongoose.model("PlatformSettings", platformSettingsSchema);

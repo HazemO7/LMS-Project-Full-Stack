@@ -1,13 +1,15 @@
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
 const { validatePasswordPolicy } = require('../utils/passwordUtils');
-const { recordAudit } = require('../services/auditService');
+const { updateUserRole } = require('./adminController');
+const logger = require('../utils/logger');
 
 const getMe = async (req, res) => {
     try {
         res.status(200).json({ status: "success", data: req.user });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        logger.error("Failed to fetch profile", { error: error.message, userId: req.user?._id, requestId: req.id });
+        res.status(500).json({ message: "Failed to load profile" });
     }
 };
 
@@ -44,60 +46,13 @@ const updateMe = async (req, res) => {
             updateData.passwordChangedAt = new Date(Date.now() - 1000);
         }
 
-        const updatedUser = await User.findByIdAndUpdate(req.user._id, updateData, { new: true }).select("-password");
+        const updatedUser = await User.findByIdAndUpdate(req.user._id, updateData, { returnDocument: "after" }).select("-password");
 
         res.status(200).json({ status: "success", data: updatedUser });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        logger.error("Failed to update profile", { error: error.message, userId: req.user?._id, requestId: req.id });
+        res.status(500).json({ message: "Failed to update profile" });
     }
 };
 
-const updateRole = async (req, res) => {
-    try {
-        const { role } = req.body;
-        const allowedRoles = ['student', 'instructor', 'admin', 'super_admin'];
-        if (!allowedRoles.includes(role)) {
-            return res.status(400).json({ message: "Invalid role specified" });
-        }
-
-        const targetUser = await User.findById(req.params.id).select("-password");
-        if (!targetUser) return res.status(404).json({ message: "User not found" });
-
-        const callerRole = req.user.role;
-        const targetCurrentRole = targetUser.role;
-
-        if (callerRole === 'admin') {
-            if (targetCurrentRole === 'admin' || targetCurrentRole === 'super_admin') {
-                return res.status(403).json({ message: "Only a Super Admin can modify administrator roles." });
-            }
-            if (role === 'admin' || role === 'super_admin') {
-                return res.status(403).json({ message: "Only a Super Admin can assign administrator roles." });
-            }
-        }
-
-        if (targetCurrentRole === 'super_admin' && role !== 'super_admin') {
-            const activeSuperAdmins = await User.countDocuments({ role: 'super_admin', isActive: { $ne: false } });
-            if (activeSuperAdmins <= 1) {
-                return res.status(400).json({ message: "Cannot demote the last active Super Admin." });
-            }
-        }
-
-        const previousRole = targetUser.role;
-        targetUser.role = role;
-        await targetUser.save();
-
-        await recordAudit({
-            req,
-            action: "ROLE_UPDATED",
-            targetType: "User",
-            targetId: targetUser._id,
-            metadata: { email: targetUser.email, previousRole, newRole: role },
-        });
-
-        res.status(200).json({ status: "success", data: targetUser });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-module.exports = { getMe, updateMe, updateRole };
+module.exports = { getMe, updateMe, updateRole: updateUserRole };

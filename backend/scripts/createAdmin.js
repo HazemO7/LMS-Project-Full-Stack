@@ -15,7 +15,6 @@ const initializeAdmin = async () => {
             if (exists.role === 'admin') {
                 exists.role = 'super_admin';
                 exists.isActive = true;
-                exists.mustChangePassword = false;
                 await exists.save();
                 console.log('Promoted existing admin user to super_admin.');
                 process.exit(0);

@@ -53,6 +53,7 @@ export const TRANSLATIONS = {
     'common.dismiss': 'Dismiss message',
     'common.closeModal': 'Close modal',
     'common.verifyingAccess': 'Verifying access',
+    'common.retry': 'Retry',
     'form.errorSummaryTitle': 'Please review the following fields:',
 
     // 404
@@ -383,6 +384,8 @@ export const TRANSLATIONS = {
     'profile.forcePwBannerTitle': 'Temporary password change required',
     'profile.forcePwBannerBody':
       'Your account was provisioned with a temporary password. Update your password below before accessing other sections.',
+    'profile.detailsLockedUntilPwChange':
+      'Profile identity editing is disabled until you replace your temporary password.',
     'profile.specialtyLabel': 'Specialty / Title',
     'profile.specialtyPlaceholder': 'e.g. Senior Backend Engineer',
     'profile.bioLabel': 'Short bio',
@@ -450,11 +453,13 @@ export const TRANSLATIONS = {
     'admin.staffCreatedDesc': 'Share these temporary credentials securely with the new member.',
     'admin.staffCreatedSuccess': 'Created {{role}} account for {{name}}.',
     'admin.tempPasswordLabel': 'Temporary password',
-    'admin.welcomeEmailSent': 'Welcome email dispatched (or logged in dev mock mode).',
+    'admin.welcomeEmailSent': 'Welcome email sent via SMTP.',
     'admin.welcomeEmailSkipped': 'Email delivery skipped or unavailable; copy credentials below.',
     'admin.mustRotateNotice':
       'The user will be required to change this temporary password immediately upon first sign-in.',
     'admin.copyCredentials': 'Copy credentials',
+    'admin.copyCredentialsFailed':
+      'Could not copy to clipboard. Please copy the email and temporary password above manually.',
     'admin.copied': 'Copied',
     'admin.done': 'Done',
     'admin.colCourse': 'Course',
@@ -467,6 +472,10 @@ export const TRANSLATIONS = {
     'admin.transferCourseTitle': 'Transfer course ownership',
     'admin.selectNewOwner': 'Select new instructor or admin owner',
     'admin.chooseOwnerPlaceholder': 'Choose an active instructor...',
+    'admin.currentOwnerTag': 'current owner',
+    'admin.sameOwnerError': 'Select a different instructor or administrator to transfer ownership.',
+    'admin.ownerLookupFailed': 'Could not load eligible owners. Please retry.',
+    'admin.noOtherOwners': 'No other active instructors or administrators are available.',
     'admin.confirmTransfer': 'Transfer ownership',
     'admin.courseTransferredMsg': 'Transferred ownership of "{{title}}".',
     'admin.manageEnrollmentsTitle': 'Manage course enrollments',
@@ -475,13 +484,14 @@ export const TRANSLATIONS = {
     'admin.noEnrollments': 'No students enrolled in this course yet.',
     'admin.unenrollAria': 'Remove enrollment',
     'admin.settingsTitle': 'Platform Settings (Super Admin)',
-    'admin.settingsDesc': 'Control public registration and media upload limits across Foundry.',
+    'admin.settingsDesc':
+      'Control public registration and store reserved upload limits for future file upload support (not yet enforced).',
     'admin.allowPublicRegLabel': 'Allow public student self-registration',
     'admin.allowPublicRegHint':
       'When disabled, only Super Admins or Admins can provision new accounts from the console.',
-    'admin.maxVideoSizeLabel': 'Max video upload (MB)',
-    'admin.maxDocSizeLabel': 'Max document / PDF upload (MB)',
-    'admin.maxImgSizeLabel': 'Max image upload (MB)',
+    'admin.maxVideoSizeLabel': 'Reserved video upload limit (MB, future)',
+    'admin.maxDocSizeLabel': 'Reserved document / PDF limit (MB, future)',
+    'admin.maxImgSizeLabel': 'Reserved image upload limit (MB, future)',
     'admin.saveSettingsBtn': 'Save platform settings',
     'admin.settingsSavedMsg': 'Platform settings updated.',
     'admin.auditDesc': 'Chronological record of privileged administrative actions.',
@@ -491,6 +501,10 @@ export const TRANSLATIONS = {
     'admin.colActor': 'Actor',
     'admin.colAction': 'Action',
     'admin.colDetails': 'Details',
+    'admin.viewAuditDetails': 'View full details',
+    'admin.viewDetails': 'Full details',
+    'admin.hideDetails': 'Hide',
+    'admin.toggleDetailsAria': 'Toggle full audit metadata for {{action}}',
     'admin.noAuditLogs': 'No audit events recorded yet.',
 
     // Authoring Modals
@@ -580,6 +594,7 @@ export const TRANSLATIONS = {
     'common.dismiss': 'إغلاق التنبيه',
     'common.closeModal': 'إغلاق النافذة',
     'common.verifyingAccess': 'جاري التحقق من الصلاحيات',
+    'common.retry': 'إعادة المحاولة',
     'form.errorSummaryTitle': 'يرجى مراجعة الحقول التالية قبل المتابعة:',
 
     // 404
@@ -905,6 +920,8 @@ export const TRANSLATIONS = {
     'profile.forcePwBannerTitle': 'مطلوب تغيير كلمة المرور المؤقتة',
     'profile.forcePwBannerBody':
       'تم إنشاء حسابك بكلمة مرور مؤقتة. يرجى تعيين كلمة مرورك الدائمة أدناه قبل استخدام بقية أقسام المنصة.',
+    'profile.detailsLockedUntilPwChange':
+      'تم تعطيل تعديل البيانات الشخصية حتى تقوم بتغيير كلمة المرور المؤقتة أولاً.',
     'profile.specialtyLabel': 'التخصص / المسمى الوظيفي',
     'profile.specialtyPlaceholder': 'مثال: مهندس أنظمة خلفية أول',
     'profile.bioLabel': 'نبذة مختصرة',
@@ -972,11 +989,13 @@ export const TRANSLATIONS = {
     'admin.staffCreatedDesc': 'شارك بيانات الدخول المؤقتة بأمان مع العضو الجديد.',
     'admin.staffCreatedSuccess': 'تم إنشاء حساب {{role}} للمستخدم {{name}}.',
     'admin.tempPasswordLabel': 'كلمة المرور المؤقتة',
-    'admin.welcomeEmailSent': 'تم إرسال البريد الترحيبي (أو تسجيله في وضع التطوير).',
+    'admin.welcomeEmailSent': 'تم إرسال البريد الترحيبي عبر خادم البريد.',
     'admin.welcomeEmailSkipped': 'تم تخطي إرسال البريد؛ يمكنك نسخ البيانات أدناه.',
     'admin.mustRotateNotice':
       'سيُطلب من المستخدم تغيير كلمة المرور المؤقتة فوراً عند أول تسجيل دخول.',
     'admin.copyCredentials': 'نسخ البيانات',
+    'admin.copyCredentialsFailed':
+      'تعذر النسخ إلى الحافظة تلقائياً. يرجى نسخ البريد الإلكتروني وكلمة المرور المؤقتة يدوياً.',
     'admin.copied': 'تم النسخ',
     'admin.done': 'تم',
     'admin.colCourse': 'الكورس',
@@ -989,6 +1008,10 @@ export const TRANSLATIONS = {
     'admin.transferCourseTitle': 'نقل ملكية الكورس',
     'admin.selectNewOwner': 'اختر المدرب أو المدير الجديد',
     'admin.chooseOwnerPlaceholder': 'اختر مدرباً نشطاً...',
+    'admin.currentOwnerTag': 'المالك الحالي',
+    'admin.sameOwnerError': 'اختر مدرباً أو مديراً مختلفاً لنقل ملكية الكورس.',
+    'admin.ownerLookupFailed': 'تعذّر تحميل قائمة المدربين المؤهلين. يرجى إعادة المحاولة.',
+    'admin.noOtherOwners': 'لا يوجد مدربون أو مديرون نشطون آخرون متاحون حالياً.',
     'admin.confirmTransfer': 'تأكيد النقل',
     'admin.courseTransferredMsg': 'تم نقل ملكية كورس "{{title}}".',
     'admin.manageEnrollmentsTitle': 'إدارة تسجيلات الكورس',
@@ -997,13 +1020,14 @@ export const TRANSLATIONS = {
     'admin.noEnrollments': 'لا يوجد طلاب مسجلون في هذا الكورس بعد.',
     'admin.unenrollAria': 'إزالة التسجيل',
     'admin.settingsTitle': 'إعدادات المنصة (المدير العام)',
-    'admin.settingsDesc': 'التحكم في التسجيل العام وحدود رفع الملفات على مستوى المنصة.',
+    'admin.settingsDesc':
+      'التحكم في التسجيل العام وحفظ حدود رفع الملفات المحجوزة لدعم رفع الملفات مستقبلاً (غير مفعّلة حالياً).',
     'admin.allowPublicRegLabel': 'السماح بتسجيل الطلاب الجدد ذاتياً',
     'admin.allowPublicRegHint':
       'عند الإيقاف، يمكن فقط للمدير العام أو المدير إنشاء حسابات جديدة من لوحة الإدارة.',
-    'admin.maxVideoSizeLabel': 'أقصى حجم للفيديو (MB)',
-    'admin.maxDocSizeLabel': 'أقصى حجم للمستندات / PDF (MB)',
-    'admin.maxImgSizeLabel': 'أقصى حجم للصور (MB)',
+    'admin.maxVideoSizeLabel': 'الحد المحجوز لحجم الفيديو (MB، مستقبلاً)',
+    'admin.maxDocSizeLabel': 'الحد المحجوز للمستندات / PDF (MB، مستقبلاً)',
+    'admin.maxImgSizeLabel': 'الحد المحجوز للصور (MB، مستقبلاً)',
     'admin.saveSettingsBtn': 'حفظ إعدادات المنصة',
     'admin.settingsSavedMsg': 'تم حفظ إعدادات المنصة.',
     'admin.auditDesc': 'سجل زمني موثق لجميع العمليات الإدارية الحساسة.',
@@ -1013,6 +1037,10 @@ export const TRANSLATIONS = {
     'admin.colActor': 'المنفّذ',
     'admin.colAction': 'الإجراء',
     'admin.colDetails': 'التفاصيل',
+    'admin.viewAuditDetails': 'عرض التفاصيل الكاملة',
+    'admin.viewDetails': 'التفاصيل',
+    'admin.hideDetails': 'إخفاء',
+    'admin.toggleDetailsAria': 'تبديل عرض تفاصيل سجل العملية {{action}}',
     'admin.noAuditLogs': 'لا توجد عمليات مسجلة حتى الآن.',
 
     // Authoring Modals
@@ -1137,6 +1165,11 @@ const SERVER_MESSAGE_AR = {
     'غير مصرح لك بتعديل منهج هذا الكورس.',
   'User not found': 'المستخدم غير موجود.',
   'User is already enrolled in this course': 'المستخدم مسجّل بالفعل في هذا الكورس.',
+  'This user is already the owner of the course.': 'هذا المستخدم هو المالك الحالي لهذا الكورس بالفعل.',
+  'Another privileged administrative change is in progress. Please retry.':
+    'هناك عملية إدارية أخرى قيد التنفيذ حالياً. يرجى المحاولة مجدداً.',
+  'An unexpected server error occurred. Please try again later.':
+    'حدث خطأ غير متوقع في الخادم. يرجى المحاولة لاحقاً.',
 };
 
 export const translateServerError = (message, lang, fallbackKey) => {

@@ -2,6 +2,17 @@ const nodemailer = require('nodemailer');
 const AppError = require('../utils/AppError');
 const logger = require('../utils/logger');
 
+const HTML_ESCAPE_MAP = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+};
+
+const escapeHtml = (value) =>
+    String(value ?? '').replace(/[&<>"']/g, (ch) => HTML_ESCAPE_MAP[ch]);
+
 const createTransporter = () => {
     const host = process.env.SMTP_HOST;
     const port = process.env.SMTP_PORT;
@@ -37,6 +48,8 @@ const sendPasswordResetEmail = async (email, resetUrl) => {
         return;
     }
 
+    const safeResetUrl = escapeHtml(resetUrl);
+
     const mailOptions = {
         from: process.env.SMTP_FROM || '"LMS Support" <noreply@example.com>',
         to: email,
@@ -45,7 +58,7 @@ const sendPasswordResetEmail = async (email, resetUrl) => {
             <h1>Password Reset Request</h1>
             <p>You are receiving this email because you (or someone else) requested a password reset for your account.</p>
             <p>Please click on the following link, or paste it into your browser to complete the process:</p>
-            <a href="${resetUrl}">${resetUrl}</a>
+            <a href="${safeResetUrl}">${safeResetUrl}</a>
             <p>This reset link will expire in 15 minutes.</p>
             <p>If you did not request this, please ignore this email and your password will remain unchanged.</p>
         `
@@ -73,19 +86,32 @@ const sendStaffOnboardingEmail = async ({ email, name, role, temporaryPassword, 
         return { mocked: true };
     }
 
-    const roleLabel = role === 'super_admin' ? 'Super Admin' : role === 'admin' ? 'Administrator' : 'Instructor';
+    const roleLabel =
+        role === 'super_admin'
+            ? 'Super Admin'
+            : role === 'admin'
+            ? 'Administrator'
+            : role === 'instructor'
+            ? 'Instructor'
+            : 'Student';
+
+    const safeName = escapeHtml(name);
+    const safeRoleLabel = escapeHtml(roleLabel);
+    const safeEmail = escapeHtml(email);
+    const safeTempPassword = escapeHtml(temporaryPassword);
+    const safeLoginUrl = escapeHtml(loginUrl);
 
     const mailOptions = {
         from: process.env.SMTP_FROM || '"Foundry LMS" <noreply@example.com>',
         to: email,
         subject: `Your Foundry LMS ${roleLabel} Account`,
         html: `
-            <h1>Welcome to Foundry LMS, ${name}</h1>
-            <p>An account has been created for you with the role: <strong>${roleLabel}</strong>.</p>
-            <p><strong>Sign-in Email:</strong> ${email}</p>
-            <p><strong>Temporary Password:</strong> <code>${temporaryPassword}</code></p>
+            <h1>Welcome to Foundry LMS, ${safeName}</h1>
+            <p>An account has been created for you with the role: <strong>${safeRoleLabel}</strong>.</p>
+            <p><strong>Sign-in Email:</strong> ${safeEmail}</p>
+            <p><strong>Temporary Password:</strong> <code>${safeTempPassword}</code></p>
             <p>For security, you will be required to change this temporary password immediately after your first sign-in.</p>
-            <p><a href="${loginUrl}">Sign in to Foundry LMS</a></p>
+            <p><a href="${safeLoginUrl}">Sign in to Foundry LMS</a></p>
         `
     };
 
@@ -100,6 +126,7 @@ const sendStaffOnboardingEmail = async ({ email, name, role, temporaryPassword, 
 };
 
 module.exports = {
+    escapeHtml,
     sendPasswordResetEmail,
     sendStaffOnboardingEmail
 };

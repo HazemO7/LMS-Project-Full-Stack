@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Trash, UserPlus } from '@phosphor-icons/react';
 import { Modal } from '../ui/Modal';
 import { AlertBanner } from '../ui/AlertBanner';
@@ -11,55 +11,97 @@ export const CourseEnrollmentsModal = ({ open, onClose, course, onChanged }) => 
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [adding, setAdding] = useState(false);
+  const [removingUserIds, setRemovingUserIds] = useState(() => new Set());
   const [error, setError] = useState('');
+  const sessionRef = useRef(0);
 
-  const fetchEnrollments = useCallback(async () => {
-    if (!course?._id) return;
+  const loadEnrollments = useCallback(async (targetCourseId, sessionId) => {
     setLoading(true);
     setError('');
     try {
-      const res = await adminAPI.getCourseEnrollments(course._id);
+      const res = await adminAPI.getCourseEnrollments(targetCourseId);
+      if (sessionRef.current !== sessionId) return;
       setEnrollments(res.data || []);
     } catch (err) {
+      if (sessionRef.current !== sessionId) return;
       setError(err.message || 'Failed to load enrollments');
     } finally {
-      setLoading(false);
+      if (sessionRef.current === sessionId) {
+        setLoading(false);
+      }
     }
-  }, [course?._id]);
+  }, []);
 
   useEffect(() => {
-    if (open && course?._id) {
-      fetchEnrollments();
-      setEmail('');
+    sessionRef.current += 1;
+    const sessionId = sessionRef.current;
+
+    setEnrollments([]);
+    setError('');
+    setEmail('');
+    setAdding(false);
+    setRemovingUserIds(new Set());
+
+    if (!open || !course?._id) {
+      setLoading(false);
+      return;
     }
-  }, [open, course?._id, fetchEnrollments]);
+
+    loadEnrollments(course._id, sessionId);
+  }, [open, course?._id, loadEnrollments]);
 
   const handleEnroll = async (e) => {
     e.preventDefault();
-    if (!email.trim() || !course?._id) return;
+    if (adding || loading || !email.trim() || !course?._id) return;
+    const sessionId = sessionRef.current;
+    const targetCourseId = course._id;
+
     setAdding(true);
     setError('');
     try {
-      const res = await adminAPI.enrollUser(course._id, { email: email.trim() });
+      const res = await adminAPI.enrollUser(targetCourseId, { email: email.trim() });
+      if (sessionRef.current !== sessionId) return;
       setEnrollments((prev) => [res.data, ...prev]);
       setEmail('');
       onChanged?.();
     } catch (err) {
+      if (sessionRef.current !== sessionId) return;
       setError(err.message || 'Failed to enroll user');
     } finally {
-      setAdding(false);
+      if (sessionRef.current === sessionId) {
+        setAdding(false);
+      }
     }
   };
 
   const handleUnenroll = async (userId) => {
-    if (!course?._id) return;
+    if (!course?._id || removingUserIds.has(userId)) return;
+    const sessionId = sessionRef.current;
+    const targetCourseId = course._id;
+
     setError('');
+    setRemovingUserIds((prev) => {
+      const next = new Set(prev);
+      next.add(userId);
+      return next;
+    });
+
     try {
-      await adminAPI.unenrollUser(course._id, userId);
+      await adminAPI.unenrollUser(targetCourseId, userId);
+      if (sessionRef.current !== sessionId) return;
       setEnrollments((prev) => prev.filter((item) => (item.user?._id || item.user) !== userId));
       onChanged?.();
     } catch (err) {
+      if (sessionRef.current !== sessionId) return;
       setError(err.message || 'Failed to remove enrollment');
+    } finally {
+      if (sessionRef.current === sessionId) {
+        setRemovingUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(userId);
+          return next;
+        });
+      }
     }
   };
 
@@ -86,7 +128,7 @@ export const CourseEnrollmentsModal = ({ open, onClose, course, onChanged }) => 
           />
           <button
             type="submit"
-            disabled={adding}
+            disabled={adding || loading}
             className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E] disabled:opacity-60"
           >
             <UserPlus size={15} weight="bold" aria-hidden="true" />
@@ -104,6 +146,7 @@ export const CourseEnrollmentsModal = ({ open, onClose, course, onChanged }) => 
               {enrollments.map((item) => {
                 const student = item.user;
                 const uid = student?._id || item.user;
+                const isRemoving = removingUserIds.has(uid);
                 return (
                   <li key={item._id} className="flex items-center justify-between gap-3 px-4 py-2.5">
                     <div className="min-w-0">
@@ -116,9 +159,10 @@ export const CourseEnrollmentsModal = ({ open, onClose, course, onChanged }) => 
                     </div>
                     <button
                       type="button"
+                      disabled={isRemoving}
                       onClick={() => handleUnenroll(uid)}
                       aria-label={t('admin.unenrollAria')}
-                      className="rounded-lg p-1.5 text-[#52797A] hover:bg-[#FEF2F2] hover:text-[#DC2626]"
+                      className="rounded-lg p-1.5 text-[#52797A] hover:bg-[#FEF2F2] hover:text-[#DC2626] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Trash size={16} aria-hidden="true" />
                     </button>

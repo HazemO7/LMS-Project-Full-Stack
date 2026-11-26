@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowsLeftRight,
@@ -66,6 +66,8 @@ export const AdminDashboard = () => {
   const [courseSearchInput, setCourseSearchInput] = useState('');
   const [courseSearch, setCourseSearch] = useState('');
   const [staffPool, setStaffPool] = useState([]);
+  const [staffPoolLoading, setStaffPoolLoading] = useState(false);
+  const [staffPoolError, setStaffPoolError] = useState('');
   const [transferTarget, setTransferTarget] = useState(null);
   const [enrollmentsTarget, setEnrollmentsTarget] = useState(null);
 
@@ -76,6 +78,8 @@ export const AdminDashboard = () => {
     maxDocumentSizeMB: 25,
     maxImageSizeMB: 10,
   });
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [settingsLoadError, setSettingsLoadError] = useState('');
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
 
@@ -85,6 +89,13 @@ export const AdminDashboard = () => {
   const [auditPage, setAuditPage] = useState(1);
   const [auditTotalPages, setAuditTotalPages] = useState(1);
   const [auditActionFilter, setAuditActionFilter] = useState('all');
+  const [expandedAuditIds, setExpandedAuditIds] = useState(() => new Set());
+
+  const usersReqIdRef = useRef(0);
+  const coursesReqIdRef = useRef(0);
+  const staffPoolReqIdRef = useRef(0);
+  const settingsReqIdRef = useRef(0);
+  const auditReqIdRef = useRef(0);
 
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
@@ -99,6 +110,7 @@ export const AdminDashboard = () => {
   }, []);
 
   const fetchUsers = useCallback(async () => {
+    const reqId = ++usersReqIdRef.current;
     setUsersLoading(true);
     try {
       const res = await adminAPI.getUsers({
@@ -108,16 +120,26 @@ export const AdminDashboard = () => {
         status: statusFilter,
         search: userSearch,
       });
+      if (reqId !== usersReqIdRef.current) return;
+      const totalPages = Math.max(1, res.totalPages || 1);
+      setUsersTotalPages(totalPages);
+      if (usersPage > totalPages) {
+        setUsersPage(totalPages);
+        return;
+      }
       setUsers(res.data || []);
-      setUsersTotalPages(res.totalPages || 1);
     } catch (err) {
+      if (reqId !== usersReqIdRef.current) return;
       setError(err.message || 'Failed to load users');
     } finally {
-      setUsersLoading(false);
+      if (reqId === usersReqIdRef.current) {
+        setUsersLoading(false);
+      }
     }
   }, [usersPage, roleFilter, statusFilter, userSearch]);
 
   const fetchCourses = useCallback(async () => {
+    const reqId = ++coursesReqIdRef.current;
     setCoursesLoading(true);
     try {
       const res = await adminAPI.getCourses({
@@ -125,38 +147,74 @@ export const AdminDashboard = () => {
         limit: 10,
         search: courseSearch,
       });
+      if (reqId !== coursesReqIdRef.current) return;
       setCourses(res.data || []);
       setCoursesTotalPages(res.totalPages || 1);
     } catch (err) {
+      if (reqId !== coursesReqIdRef.current) return;
       setError(err.message || 'Failed to load courses');
     } finally {
-      setCoursesLoading(false);
+      if (reqId === coursesReqIdRef.current) {
+        setCoursesLoading(false);
+      }
     }
   }, [coursesPage, courseSearch]);
 
   const fetchStaffPool = useCallback(async () => {
     if (!isSuperAdmin) return;
+    const reqId = ++staffPoolReqIdRef.current;
+    setStaffPoolLoading(true);
+    setStaffPoolError('');
+
+    const fetchAllActiveByRole = async (role) => {
+      const all = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const res = await adminAPI.getUsers({ page, limit: 100, role, status: 'active' });
+        if (reqId !== staffPoolReqIdRef.current) return [];
+        all.push(...(res.data || []));
+        totalPages = Math.max(1, res.totalPages || 1);
+        page += 1;
+      } while (page <= totalPages);
+      return all;
+    };
+
     try {
-      const [instRes, adminRes, superRes] = await Promise.all([
-        adminAPI.getUsers({ page: 1, limit: 100, role: 'instructor', status: 'active' }),
-        adminAPI.getUsers({ page: 1, limit: 100, role: 'admin', status: 'active' }),
-        adminAPI.getUsers({ page: 1, limit: 100, role: 'super_admin', status: 'active' }),
+      const [instList, adminList, superList] = await Promise.all([
+        fetchAllActiveByRole('instructor'),
+        fetchAllActiveByRole('admin'),
+        fetchAllActiveByRole('super_admin'),
       ]);
-      setStaffPool([
-        ...(instRes.data || []),
-        ...(adminRes.data || []),
-        ...(superRes.data || []),
-      ]);
-    } catch {
-      // Non-blocking
+      if (reqId !== staffPoolReqIdRef.current) return;
+      const merged = [];
+      const seenIds = new Set();
+      for (const user of [...instList, ...adminList, ...superList]) {
+        if (!seenIds.has(user._id)) {
+          seenIds.add(user._id);
+          merged.push(user);
+        }
+      }
+      setStaffPool(merged);
+    } catch (err) {
+      if (reqId !== staffPoolReqIdRef.current) return;
+      setStaffPool([]);
+      setStaffPoolError(err.message || 'Failed to load eligible owners');
+    } finally {
+      if (reqId === staffPoolReqIdRef.current) {
+        setStaffPoolLoading(false);
+      }
     }
   }, [isSuperAdmin]);
 
   const fetchSettings = useCallback(async () => {
     if (!isSuperAdmin) return;
+    const reqId = ++settingsReqIdRef.current;
     setSettingsLoading(true);
+    setSettingsLoadError('');
     try {
       const res = await adminAPI.getSettings();
+      if (reqId !== settingsReqIdRef.current) return;
       if (res.data) {
         setSettingsForm({
           allowPublicRegistration: Boolean(res.data.allowPublicRegistration),
@@ -164,16 +222,25 @@ export const AdminDashboard = () => {
           maxDocumentSizeMB: res.data.maxDocumentSizeMB ?? 25,
           maxImageSizeMB: res.data.maxImageSizeMB ?? 10,
         });
+        setSettingsLoaded(true);
+      } else {
+        setSettingsLoaded(false);
+        setSettingsLoadError('Failed to load platform settings');
       }
     } catch (err) {
-      setError(err.message || 'Failed to load platform settings');
+      if (reqId !== settingsReqIdRef.current) return;
+      setSettingsLoaded(false);
+      setSettingsLoadError(err.message || 'Failed to load platform settings');
     } finally {
-      setSettingsLoading(false);
+      if (reqId === settingsReqIdRef.current) {
+        setSettingsLoading(false);
+      }
     }
   }, [isSuperAdmin]);
 
   const fetchAuditLogs = useCallback(async () => {
     if (!isSuperAdmin) return;
+    const reqId = ++auditReqIdRef.current;
     setAuditLoading(true);
     try {
       const res = await adminAPI.getAuditLogs({
@@ -181,12 +248,16 @@ export const AdminDashboard = () => {
         limit: 15,
         action: auditActionFilter,
       });
+      if (reqId !== auditReqIdRef.current) return;
       setAuditLogs(res.data || []);
       setAuditTotalPages(res.totalPages || 1);
     } catch (err) {
+      if (reqId !== auditReqIdRef.current) return;
       setError(err.message || 'Failed to load audit logs');
     } finally {
-      setAuditLoading(false);
+      if (reqId === auditReqIdRef.current) {
+        setAuditLoading(false);
+      }
     }
   }, [isSuperAdmin, auditPage, auditActionFilter]);
 
@@ -218,10 +289,11 @@ export const AdminDashboard = () => {
     setError('');
     setSuccessMsg('');
     try {
-      const res = await adminAPI.updateUserRole(targetUser._id, nextRole);
-      setUsers((prev) => prev.map((u) => (u._id === targetUser._id ? res.data : u)));
+      await adminAPI.updateUserRole(targetUser._id, nextRole);
       setSuccessMsg(t('admin.roleUpdatedMsg', { name: targetUser.name, role: t(`role.${nextRole}`) }));
+      await fetchUsers();
       fetchStats();
+      if (isSuperAdmin) fetchStaffPool();
     } catch (err) {
       setError(err.message || 'Failed to update user role');
     }
@@ -232,14 +304,15 @@ export const AdminDashboard = () => {
     setSuccessMsg('');
     const nextActive = targetUser.isActive === false;
     try {
-      const res = await adminAPI.updateUserStatus(targetUser._id, { isActive: nextActive });
-      setUsers((prev) => prev.map((u) => (u._id === targetUser._id ? res.data : u)));
+      await adminAPI.updateUserStatus(targetUser._id, { isActive: nextActive });
       setSuccessMsg(
         nextActive
           ? t('admin.userActivatedMsg', { name: targetUser.name })
           : t('admin.userSuspendedMsg', { name: targetUser.name })
       );
+      await fetchUsers();
       fetchStats();
+      if (isSuperAdmin) fetchStaffPool();
     } catch (err) {
       setError(err.message || 'Failed to update user status');
     }
@@ -249,9 +322,9 @@ export const AdminDashboard = () => {
     setError('');
     setSuccessMsg('');
     try {
-      const res = await adminAPI.updateUserStatus(targetUser._id, { unlock: true });
-      setUsers((prev) => prev.map((u) => (u._id === targetUser._id ? res.data : u)));
+      await adminAPI.updateUserStatus(targetUser._id, { unlock: true });
       setSuccessMsg(t('admin.userUnlockedMsg', { name: targetUser.name }));
+      await fetchUsers();
     } catch (err) {
       setError(err.message || 'Failed to unlock user');
     }
@@ -264,10 +337,11 @@ export const AdminDashboard = () => {
     setSuccessMsg('');
     try {
       await adminAPI.deleteUser(deleteUserTarget._id);
-      setUsers((prev) => prev.filter((u) => u._id !== deleteUserTarget._id));
       setSuccessMsg(t('admin.userDeletedMsg', { name: deleteUserTarget.name }));
       setDeleteUserTarget(null);
+      await fetchUsers();
       fetchStats();
+      if (isSuperAdmin) fetchStaffPool();
     } catch (err) {
       setError(err.message || 'Failed to delete user');
       setDeleteUserTarget(null);
@@ -278,22 +352,43 @@ export const AdminDashboard = () => {
 
   const handleSaveSettings = async (e) => {
     e.preventDefault();
+    if (!settingsLoaded || settingsSaving) return;
     setSettingsSaving(true);
     setError('');
     setSuccessMsg('');
     try {
-      await adminAPI.updateSettings({
+      const res = await adminAPI.updateSettings({
         allowPublicRegistration: settingsForm.allowPublicRegistration,
         maxVideoSizeMB: Number(settingsForm.maxVideoSizeMB),
         maxDocumentSizeMB: Number(settingsForm.maxDocumentSizeMB),
         maxImageSizeMB: Number(settingsForm.maxImageSizeMB),
       });
+      if (res?.data) {
+        setSettingsForm({
+          allowPublicRegistration: Boolean(res.data.allowPublicRegistration),
+          maxVideoSizeMB: res.data.maxVideoSizeMB ?? 250,
+          maxDocumentSizeMB: res.data.maxDocumentSizeMB ?? 25,
+          maxImageSizeMB: res.data.maxImageSizeMB ?? 10,
+        });
+      }
       setSuccessMsg(t('admin.settingsSavedMsg'));
     } catch (err) {
       setError(err.message || 'Failed to update settings');
     } finally {
       setSettingsSaving(false);
     }
+  };
+
+  const toggleAuditDetails = (logId) => {
+    setExpandedAuditIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(logId)) {
+        next.delete(logId);
+      } else {
+        next.add(logId);
+      }
+      return next;
+    });
   };
 
   const tabs = [
@@ -898,18 +993,35 @@ export const AdminDashboard = () => {
 
             {settingsLoading ? (
               <p className="mt-6 text-sm text-[#52797A]">{t('common.loading')}</p>
+            ) : !settingsLoaded ? (
+              <div className="mt-6">
+                <AlertBanner variant="error">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span>{tServer(settingsLoadError || 'Failed to load platform settings')}</span>
+                    <button
+                      type="button"
+                      onClick={fetchSettings}
+                      className="rounded-md bg-white px-3 py-1 text-xs font-semibold text-[#991B1B] ring-1 ring-[#FECACA] hover:bg-[#FEF2F2]"
+                    >
+                      {t('common.retry')}
+                    </button>
+                  </div>
+                </AlertBanner>
+              </div>
             ) : (
-              <form onSubmit={handleSaveSettings} className="mt-6 space-y-5">
+              <form onSubmit={handleSaveSettings} className="mt-6">
+                <fieldset disabled={settingsSaving} className="space-y-5 disabled:opacity-75">
                 <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#CCFBF1] bg-[#F0FDFA]/60 p-4">
                   <input
                     type="checkbox"
                     checked={settingsForm.allowPublicRegistration}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      if (successMsg) setSuccessMsg('');
                       setSettingsForm((p) => ({
                         ...p,
                         allowPublicRegistration: e.target.checked,
-                      }))
-                    }
+                      }));
+                    }}
                     className="mt-0.5 h-4 w-4 rounded border-[#5EEAD4] text-[#0D9488]"
                   />
                   <div>
@@ -936,9 +1048,10 @@ export const AdminDashboard = () => {
                       min={10}
                       max={2048}
                       value={settingsForm.maxVideoSizeMB}
-                      onChange={(e) =>
-                        setSettingsForm((p) => ({ ...p, maxVideoSizeMB: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        if (successMsg) setSuccessMsg('');
+                        setSettingsForm((p) => ({ ...p, maxVideoSizeMB: e.target.value }));
+                      }}
                       className="w-full rounded-lg border border-[#99F6E4] px-3 py-2 text-sm text-[#0D2E2F]"
                     />
                   </div>
@@ -955,9 +1068,10 @@ export const AdminDashboard = () => {
                       min={1}
                       max={250}
                       value={settingsForm.maxDocumentSizeMB}
-                      onChange={(e) =>
-                        setSettingsForm((p) => ({ ...p, maxDocumentSizeMB: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        if (successMsg) setSuccessMsg('');
+                        setSettingsForm((p) => ({ ...p, maxDocumentSizeMB: e.target.value }));
+                      }}
                       className="w-full rounded-lg border border-[#99F6E4] px-3 py-2 text-sm text-[#0D2E2F]"
                     />
                   </div>
@@ -974,9 +1088,10 @@ export const AdminDashboard = () => {
                       min={1}
                       max={50}
                       value={settingsForm.maxImageSizeMB}
-                      onChange={(e) =>
-                        setSettingsForm((p) => ({ ...p, maxImageSizeMB: e.target.value }))
-                      }
+                      onChange={(e) => {
+                        if (successMsg) setSuccessMsg('');
+                        setSettingsForm((p) => ({ ...p, maxImageSizeMB: e.target.value }));
+                      }}
                       className="w-full rounded-lg border border-[#99F6E4] px-3 py-2 text-sm text-[#0D2E2F]"
                     />
                   </div>
@@ -989,6 +1104,7 @@ export const AdminDashboard = () => {
                 >
                   {settingsSaving ? t('common.saving') : t('admin.saveSettingsBtn')}
                 </button>
+                </fieldset>
               </form>
             )}
           </div>
@@ -1046,12 +1162,16 @@ export const AdminDashboard = () => {
                         </td>
                       </tr>
                     ) : (
-                      auditLogs.map((log) => (
+                      auditLogs.map((log) => {
+                        const isExpanded = expandedAuditIds.has(log._id);
+                        const panelId = `audit-details-${log._id}`;
+                        const metadataCompact = JSON.stringify(log.metadata || {});
+                        return (
                         <tr key={log._id} className="hover:bg-[#F0FDFA]/50">
-                          <td dir="ltr" className="whitespace-nowrap px-4 py-2.5 font-mono-tabular text-[#52797A]">
+                          <td dir="ltr" className="whitespace-nowrap px-4 py-2.5 align-top font-mono-tabular text-[#52797A]">
                             {new Date(log.createdAt).toLocaleString()}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-4 py-2.5 align-top">
                             <span className="font-semibold text-[#0D2E2F]">
                               {log.actor?.name || 'System'}
                             </span>
@@ -1061,16 +1181,40 @@ export const AdminDashboard = () => {
                               </span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-4 py-2.5 align-top">
                             <span className="rounded bg-[#CCFBF1] px-2 py-0.5 font-mono-tabular font-semibold text-[#0F766E]">
                               {log.action}
                             </span>
                           </td>
-                          <td dir="ltr" className="max-w-xs truncate px-4 py-2.5 font-mono-tabular text-[#335C5D]">
-                            {JSON.stringify(log.metadata || {})}
+                          <td className="px-4 py-2.5 align-top font-mono-tabular text-[#335C5D]">
+                            <div className="flex items-center gap-2">
+                              <span dir="ltr" className="max-w-xs truncate">
+                                {metadataCompact}
+                              </span>
+                              <button
+                                type="button"
+                                aria-expanded={isExpanded}
+                                aria-controls={panelId}
+                                aria-label={t('admin.toggleDetailsAria', { action: log.action })}
+                                onClick={() => toggleAuditDetails(log._id)}
+                                className="shrink-0 rounded border border-[#99F6E4] bg-white px-2 py-0.5 text-[11px] font-sans font-semibold text-[#0F766E] hover:bg-[#F0FDFA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+                              >
+                                {isExpanded ? t('admin.hideDetails') : t('admin.viewDetails')}
+                              </button>
+                            </div>
+                            {isExpanded && (
+                              <pre
+                                id={panelId}
+                                dir="ltr"
+                                className="mt-2 max-w-md overflow-x-auto whitespace-pre-wrap break-all rounded-lg border border-[#CCFBF1] bg-[#F0FDFA] p-2.5 text-[11px] text-[#0D2E2F]"
+                              >
+                                {JSON.stringify(log.metadata || {}, null, 2)}
+                              </pre>
+                            )}
                           </td>
                         </tr>
-                      ))
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -1120,6 +1264,9 @@ export const AdminDashboard = () => {
         onClose={() => setTransferTarget(null)}
         course={transferTarget}
         instructors={staffPool}
+        staffLoading={staffPoolLoading}
+        staffError={staffPoolError}
+        onRetryStaff={fetchStaffPool}
         onTransferred={(updatedCourse) => {
           setCourses((prev) =>
             prev.map((c) => (c._id === updatedCourse._id ? { ...c, ...updatedCourse } : c))

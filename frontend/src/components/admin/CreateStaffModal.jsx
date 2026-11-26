@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check, Copy, EnvelopeSimple, Key, UserPlus } from '@phosphor-icons/react';
 import { Modal } from '../ui/Modal';
 import { AlertBanner } from '../ui/AlertBanner';
@@ -23,27 +23,35 @@ export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
   const [error, setError] = useState('');
   const [createdResult, setCreatedResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
+  const sessionRef = useRef(0);
 
   useEffect(() => {
-    if (!open) {
-      setForm({
-        name: '',
-        email: '',
-        role: 'instructor',
-        specialty: '',
-        bio: '',
-        temporaryPassword: '',
-        sendEmail: true,
-      });
-      setAutoGeneratePassword(true);
-      setError('');
-      setCreatedResult(null);
-      setCopied(false);
-    }
+    sessionRef.current += 1;
+    setForm({
+      name: '',
+      email: '',
+      role: 'instructor',
+      specialty: '',
+      bio: '',
+      temporaryPassword: '',
+      sendEmail: true,
+    });
+    setAutoGeneratePassword(true);
+    setSubmitting(false);
+    setError('');
+    setCreatedResult(null);
+    setCopied(false);
+    setCopyError('');
   }, [open]);
+
+  const requestClose = () => {
+    if (!submitting) onClose();
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const sessionId = sessionRef.current;
     setSubmitting(true);
     setError('');
     try {
@@ -57,31 +65,40 @@ export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
         sendEmail: form.sendEmail,
       };
       const res = await adminAPI.createUser(payload);
-      setCreatedResult(res);
       onCreated?.(res.data);
+      if (sessionRef.current !== sessionId) return;
+      setCreatedResult(res);
     } catch (err) {
+      if (sessionRef.current !== sessionId) return;
       setError(err.message || 'Failed to create user');
     } finally {
-      setSubmitting(false);
+      if (sessionRef.current === sessionId) {
+        setSubmitting(false);
+      }
     }
   };
 
   const handleCopyCredentials = async () => {
     if (!createdResult?.data) return;
+    setCopyError('');
     const text = `Email: ${createdResult.data.email}\nTemporary Password: ${createdResult.temporaryPassword}`;
     try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API unavailable');
+      }
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      // Clipboard API may be unavailable in restricted contexts
+      setCopied(false);
+      setCopyError(t('admin.copyCredentialsFailed'));
     }
   };
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={requestClose}
       title={createdResult ? t('admin.staffCreatedTitle') : t('admin.addStaffTitle')}
       description={createdResult ? t('admin.staffCreatedDesc') : t('admin.addStaffDesc')}
       maxWidthClass="max-w-xl"
@@ -121,6 +138,12 @@ export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
 
           <AlertBanner variant="warning">{t('admin.mustRotateNotice')}</AlertBanner>
 
+          {copyError && (
+            <AlertBanner variant="error" onDismiss={() => setCopyError('')}>
+              {copyError}
+            </AlertBanner>
+          )}
+
           <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[#CCFBF1] pt-4">
             <button
               type="button"
@@ -132,7 +155,7 @@ export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
             </button>
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               className="rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E]"
             >
               {t('admin.done')}
@@ -253,7 +276,7 @@ export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
           <div className="flex justify-end gap-3 border-t border-[#CCFBF1] pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={requestClose}
               disabled={submitting}
               className="rounded-lg border border-[#99F6E4] bg-white px-4 py-2 text-sm font-medium text-[#0D2E2F] hover:bg-[#F0FDFA]"
             >

@@ -32,7 +32,7 @@ export const CreateModuleModal = ({
     setLoading(true);
     setError('');
     try {
-      const newModuleRes = await modulesAPI.create(moduleData);
+      const newModuleRes = await modulesAPI.create({ ...moduleData, course: courseId });
       const newModule = newModuleRes.data || newModuleRes;
       const moduleId = newModule._id || newModule.id || newModule;
 

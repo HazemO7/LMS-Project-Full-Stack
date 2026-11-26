@@ -65,14 +65,6 @@ const login = catchAsync(async (req, res, next) => {
         return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    if (user.isActive === false) {
-        logger.warn("Suspended user attempted login", { userId: user._id, requestId: req.id, ip: req.ip });
-        return res.status(403).json({
-            message: "Your account has been suspended. Please contact administration.",
-            code: "ACCOUNT_SUSPENDED",
-        });
-    }
-
     // Step 3: Check if locked
     if (user.isLocked()) {
         logger.warn("Account locked attempt", { userId: user._id, requestId: req.id, ip: req.ip });
@@ -106,6 +98,14 @@ const login = catchAsync(async (req, res, next) => {
         return res.status(401).json({
             message: "Invalid email or password",
             remainingAttempts
+        });
+    }
+
+    if (user.isActive === false) {
+        logger.warn("Suspended user attempted login", { userId: user._id, requestId: req.id, ip: req.ip });
+        return res.status(403).json({
+            message: "Your account has been suspended. Please contact administration.",
+            code: "ACCOUNT_SUSPENDED",
         });
     }
 
