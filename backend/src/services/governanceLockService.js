@@ -8,69 +8,80 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // Include all Mongoose operations in the callback (including helper queries) in the transaction.
 mongoose.set("transactionAsyncLocalStorage", true);
 
+const createLockDocument = async (key, ownerToken, expiresAt) => {
+    try {
+        await GovernanceLock.create({ _id: key, ownerToken, expiresAt });
+        return true;
+    } catch (err) {
+        if (err && err.code === 11000) return false;
+        throw err;
+    }
+};
+
+const tryAcquireLock = async (key, ownerToken, leaseMs) => {
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + leaseMs);
+    const existing = await GovernanceLock.findOneAndUpdate(
+        {
+            _id: key,
+            $or: [{ ownerToken: null }, { expiresAt: { $lte: now } }],
+        },
+        { $set: { ownerToken, expiresAt } },
+        { returnDocument: "after" }
+    );
+    if (existing) return true;
+    return createLockDocument(key, ownerToken, expiresAt);
+};
+
+const acquireLock = async (key, ownerToken, options) => {
+    const deadline = Date.now() + options.timeoutMs;
+    while (Date.now() < deadline) {
+        const acquired = await tryAcquireLock(key, ownerToken, options.leaseMs);
+        if (acquired) return;
+        await sleep(15 + Math.floor(Math.random() * 25));
+    }
+    throw new AppError("Another privileged administrative change is in progress. Please retry.", 409);
+};
+
+const releaseLock = async (key, ownerToken, released) => {
+    await GovernanceLock.updateOne(
+        { _id: key, ownerToken },
+        { $set: released }
+    ).catch(() => {});
+};
+
+const runFencedTransaction = async (key, ownerToken, fn, released) => {
+    return mongoose.connection.transaction(async () => {
+        const result = await fn();
+        // Fence the commit: a takeover conflicts with this write and an expired lease aborts all work.
+        const fence = await GovernanceLock.updateOne(
+            { _id: key, ownerToken, expiresAt: { $gt: new Date() } },
+            { $set: released }
+        );
+        if (!fence.matchedCount) {
+            throw new AppError("Governance lock expired before commit. Please retry.", 409);
+        }
+        return result;
+    });
+};
+
+const resolveLockOptions = (options) => ({
+    leaseMs: options?.leaseMs ?? 10000,
+    timeoutMs: options?.timeoutMs ?? 5000,
+});
+
 /**
  * Serializes cross-document governance operations using a leased MongoDB lock document.
  */
-const withGovernanceLock = async (key, fn, { leaseMs = 10000, timeoutMs = 5000 } = {}) => {
+const withGovernanceLock = async (key, fn, options = {}) => {
+    const resolved = resolveLockOptions(options);
     const ownerToken = crypto.randomUUID();
-    const deadline = Date.now() + timeoutMs;
-    let acquired = false;
-
-    while (Date.now() < deadline) {
-        const now = new Date();
-        const expiresAt = new Date(now.getTime() + leaseMs);
-
-        const existing = await GovernanceLock.findOneAndUpdate(
-            {
-                _id: key,
-                $or: [{ ownerToken: null }, { expiresAt: { $lte: now } }],
-            },
-            { $set: { ownerToken, expiresAt } },
-            { returnDocument: "after" }
-        );
-
-        if (existing) {
-            acquired = true;
-            break;
-        }
-
-        try {
-            await GovernanceLock.create({ _id: key, ownerToken, expiresAt });
-            acquired = true;
-            break;
-        } catch (err) {
-            if (err?.code !== 11000) {
-                throw err;
-            }
-        }
-
-        await sleep(15 + Math.floor(Math.random() * 25));
-    }
-
-    if (!acquired) {
-        throw new AppError("Another privileged administrative change is in progress. Please retry.", 409);
-    }
-
+    await acquireLock(key, ownerToken, resolved);
     const released = { ownerToken: null, expiresAt: new Date(0) };
-
     try {
-        return await mongoose.connection.transaction(async () => {
-            const result = await fn();
-            // Fence the commit: a takeover conflicts with this write and an expired lease aborts all work.
-            const fence = await GovernanceLock.updateOne(
-                { _id: key, ownerToken, expiresAt: { $gt: new Date() } },
-                { $set: released }
-            );
-            if (!fence.matchedCount) {
-                throw new AppError("Governance lock expired before commit. Please retry.", 409);
-            }
-            return result;
-        });
+        return await runFencedTransaction(key, ownerToken, fn, released);
     } catch (error) {
-        await GovernanceLock.updateOne(
-            { _id: key, ownerToken },
-            { $set: released }
-        ).catch(() => {});
+        await releaseLock(key, ownerToken, released);
         throw error;
     }
 };

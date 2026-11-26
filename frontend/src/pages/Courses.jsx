@@ -13,8 +13,18 @@ import {
 import { coursesAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { canAuthorCourses, canManageCourse } from '../utils/roleUtils';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+
+const InstructorCredit = ({ instructor, t }) => {
+  if (!instructor?.name) return null;
+  return (
+    <p className="mt-1 text-xs font-medium text-[#0F766E]">
+      {t('courses.byInstructor', { name: instructor.name })}
+    </p>
+  );
+};
 
 const CARD_ACCENTS = [
   { topBar: 'bg-[#0D9488]', pill: 'bg-[#CCFBF1] text-[#0F766E]' },
@@ -50,8 +60,7 @@ export const Courses = () => {
 
   const limit = 6;
   const isStudent = currentUser?.role === 'student';
-  const canCreate =
-    currentUser && ['super_admin', 'admin', 'instructor'].includes(currentUser.role);
+  const canCreate = canAuthorCourses(currentUser);
 
   const syncUrlParams = useCallback(
     (nextTab, nextPage, nextQuery) => {
@@ -167,16 +176,6 @@ export const Courses = () => {
   };
 
   const displayedCourses = activeTab === 'enrolled' ? myCourses : courses;
-
-  const canManageCourse = (course) => {
-    if (!currentUser) return false;
-    if (currentUser.role === 'super_admin' || currentUser.role === 'admin') return true;
-    return (
-      currentUser.role === 'instructor' &&
-      course.instructor &&
-      (course.instructor._id || course.instructor) === currentUser._id
-    );
-  };
 
   const catalogCountLabel = formatCount(totalCourses, 'course');
 
@@ -398,7 +397,7 @@ export const Courses = () => {
                 const id = course._id || course.id;
                 const moduleCount = Array.isArray(course.modules) ? course.modules.length : 0;
                 const isEnrolled = enrolledIds.includes(id);
-                const manageable = canManageCourse(course);
+                const manageable = canManageCourse(currentUser, course);
                 const accent = CARD_ACCENTS[idx % CARD_ACCENTS.length];
 
                 return (
@@ -430,11 +429,7 @@ export const Courses = () => {
                         >
                           {course.title}
                         </h2>
-                        {course.instructor?.name && (
-                          <p className="mt-1 text-xs font-medium text-[#0F766E]">
-                            {t('courses.byInstructor', { name: course.instructor.name })}
-                          </p>
-                        )}
+                        <InstructorCredit instructor={course.instructor} t={t} />
                         <p
                           dir="auto"
                           className="mt-2 line-clamp-3 text-sm leading-relaxed text-[#335C5D]"

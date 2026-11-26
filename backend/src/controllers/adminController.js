@@ -1,4 +1,3 @@
-const bcrypt = require("bcrypt");
 const User = require("../models/User");
 const Course = require("../models/Course");
 const Lesson = require("../models/Lesson");
@@ -6,39 +5,30 @@ const Enrollment = require("../models/Enrollment");
 const Progress = require("../models/Progress");
 const PlatformSettings = require("../models/PlatformSettings");
 const AuditLog = require("../models/AuditLog");
-const { generateTemporaryPassword } = require("../utils/passwordUtils");
-const { sendStaffOnboardingEmail } = require("../services/emailService");
 const { recordAudit } = require("../services/auditService");
 const { withSuperAdminLock } = require("../services/governanceLockService");
 const logger = require("../utils/logger");
-
-const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
-const isValidObjectId = (id) => typeof id === "string" && OBJECT_ID_REGEX.test(id);
-const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-const parsePagination = (query, defaultLimit = 10) => {
-    let page = parseInt(query.page, 10);
-    let limit = parseInt(query.limit, 10);
-    if (Number.isNaN(page) || page < 1) page = 1;
-    if (Number.isNaN(limit) || limit < 1 || limit > 100) limit = defaultLimit;
-    return { page, limit, skip: (page - 1) * limit };
-};
-
-const sanitizeUser = (userDoc) => {
-    const obj = userDoc.toObject ? userDoc.toObject() : { ...userDoc };
-    delete obj.password;
-    delete obj.resetPasswordToken;
-    delete obj.resetPasswordExpire;
-    delete obj.resetPasswordTokenCreatedAt;
-    return obj;
-};
+const {
+    USER_SAFE_PROJECTION,
+    isValidObjectId,
+    escapeRegex,
+    parsePagination,
+    sanitizeUser,
+    isPrivilegedRole,
+    buildUserFilterQuery,
+    fetchUsersByCursor,
+    executeUserRoleUpdate,
+    executeUserStatusUpdate,
+    executeUserDeletion,
+    executeCourseTransfer,
+    dispatchOnboardingEmail,
+    createStaffAccountRecord,
+    buildSettingsUpdatePayload,
+} = require("../services/adminGovernanceHelper");
 
 const handleServerError = (req, res, context, error) => {
-    if (error?.statusCode && error.isOperational) {
-        return res.status(error.statusCode).json({
-            status: "fail",
-            message: error.message,
-        });
+    if (error && error.isOperational) {
+        return res.status(error.statusCode).json({ status: "fail", message: error.message });
     }
     logger.error(`Admin controller error (${context})`, {
         error: error?.message,
@@ -52,19 +42,26 @@ const handleServerError = (req, res, context, error) => {
     });
 };
 
+const runLockedGovernanceAction = async (req, res, context, idErrorMsg, executor, formatBody) => {
+    try {
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ status: "fail", message: idErrorMsg });
+        }
+        const outcome = await withSuperAdminLock(() => executor(req));
+        if (outcome.status !== 200) {
+            return res.status(outcome.status).json(outcome.body);
+        }
+        return res.status(200).json(formatBody(outcome));
+    } catch (error) {
+        return handleServerError(req, res, context, error);
+    }
+};
+
 const getStats = async (req, res) => {
     try {
         const [
-            totalUsers,
-            superAdmins,
-            admins,
-            instructors,
-            students,
-            activeUsers,
-            suspendedUsers,
-            totalCourses,
-            totalEnrollments,
-            totalLessons,
+            totalUsers, superAdmins, admins, instructors, students,
+            activeUsers, suspendedUsers, totalCourses, totalEnrollments, totalLessons,
         ] = await Promise.all([
             User.countDocuments(),
             User.countDocuments({ role: "super_admin" }),
@@ -78,18 +75,10 @@ const getStats = async (req, res) => {
             Lesson.countDocuments(),
         ]);
 
-        res.status(200).json({
+        return res.status(200).json({
             status: "success",
             data: {
-                users: {
-                    total: totalUsers,
-                    superAdmins,
-                    admins,
-                    instructors,
-                    students,
-                    active: activeUsers,
-                    suspended: suspendedUsers,
-                },
+                users: { total: totalUsers, superAdmins, admins, instructors, students, active: activeUsers, suspended: suspendedUsers },
                 courses: { total: totalCourses },
                 enrollments: { total: totalEnrollments },
                 lessons: { total: totalLessons },
@@ -100,78 +89,25 @@ const getStats = async (req, res) => {
     }
 };
 
+const isCursorRequest = (query) => Boolean(query.cursor) || query.cursorMode === "true";
+
 const getUsers = async (req, res) => {
     try {
         const { page, limit, skip } = parsePagination(req.query, 10);
-        const { role = "all", status = "all", search = "", cursor = "" } = req.query;
+        const filter = buildUserFilterQuery(req.query);
 
-        const filter = {};
-        if (role && role !== "all") {
-            filter.role = role;
-        }
-        if (status === "active") {
-            filter.isActive = { $ne: false };
-        } else if (status === "suspended") {
-            filter.isActive = false;
-        } else if (status === "locked") {
-            filter.lockUntil = { $gt: new Date() };
-        }
-
-        if (search && String(search).trim()) {
-            const regex = { $regex: escapeRegex(String(search).trim()), $options: "i" };
-            filter.$or = [{ name: regex }, { email: regex }];
-        }
-
-        if (cursor) {
-            if (!isValidObjectId(String(cursor))) {
-                return res.status(400).json({ status: "fail", message: "Invalid cursor ID" });
-            }
-            const cursorFilter = { ...filter, _id: { $lt: String(cursor) } };
-            const rows = await User.find(cursorFilter)
-                .select("-password -resetPasswordToken -resetPasswordExpire -resetPasswordTokenCreatedAt")
-                .sort({ _id: -1 })
-                .limit(limit + 1);
-
-            const hasMore = rows.length > limit;
-            const data = hasMore ? rows.slice(0, limit) : rows;
-            const nextCursor = hasMore && data.length > 0 ? data[data.length - 1]._id.toString() : null;
-
-            return res.status(200).json({
-                status: "success",
-                limit,
-                nextCursor,
-                data,
-            });
-        }
-
-        if (req.query.cursorMode === "true") {
-            const rows = await User.find(filter)
-                .select("-password -resetPasswordToken -resetPasswordExpire -resetPasswordTokenCreatedAt")
-                .sort({ _id: -1 })
-                .limit(limit + 1);
-
-            const hasMore = rows.length > limit;
-            const data = hasMore ? rows.slice(0, limit) : rows;
-            const nextCursor = hasMore && data.length > 0 ? data[data.length - 1]._id.toString() : null;
-
-            return res.status(200).json({
-                status: "success",
-                limit,
-                nextCursor,
-                data,
-            });
+        if (isCursorRequest(req.query)) {
+            const cursorRes = await fetchUsersByCursor(filter, limit, req.query.cursor || "");
+            if (cursorRes.error) return res.status(cursorRes.error.status).json(cursorRes.error.body);
+            return res.status(200).json({ status: "success", ...cursorRes });
         }
 
         const [totalUsers, users] = await Promise.all([
             User.countDocuments(filter),
-            User.find(filter)
-                .select("-password -resetPasswordToken -resetPasswordExpire -resetPasswordTokenCreatedAt")
-                .sort({ createdAt: -1, _id: -1 })
-                .skip(skip)
-                .limit(limit),
+            User.find(filter).select(USER_SAFE_PROJECTION).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),
         ]);
 
-        res.status(200).json({
+        return res.status(200).json({
             status: "success",
             page,
             limit,
@@ -186,43 +122,17 @@ const getUsers = async (req, res) => {
 
 const createStaffUser = async (req, res) => {
     try {
-        const { name, email, role, temporaryPassword, specialty = "", bio = "", sendEmail = true } = req.body;
-        const normalizedEmail = email.trim().toLowerCase();
-
-        if (req.user.role === "admin" && (role === "admin" || role === "super_admin")) {
-            return res.status(403).json({
-                status: "fail",
-                message: "Only a Super Admin can create administrator accounts.",
-            });
+        const { email, role, sendEmail = true } = req.body;
+        if (req.user.role === "admin" && isPrivilegedRole(role)) {
+            return res.status(403).json({ status: "fail", message: "Only a Super Admin can create administrator accounts." });
         }
 
-        const existing = await User.findOne({ email: normalizedEmail });
+        const existing = await User.findOne({ email: email.trim().toLowerCase() });
         if (existing) {
-            return res.status(400).json({
-                status: "fail",
-                message: "Account Already Exist",
-            });
+            return res.status(400).json({ status: "fail", message: "Account Already Exist" });
         }
 
-        const plainTempPassword =
-            temporaryPassword && temporaryPassword.trim()
-                ? temporaryPassword.trim()
-                : generateTemporaryPassword(12);
-
-        const hashedPassword = await bcrypt.hash(plainTempPassword, 10);
-
-        const newUser = await User.create({
-            name: name.trim(),
-            email: normalizedEmail,
-            password: hashedPassword,
-            role,
-            isActive: true,
-            mustChangePassword: true,
-            specialty: specialty.trim(),
-            bio: bio.trim(),
-            createdBy: req.user._id,
-        });
-
+        const { newUser, plainTempPassword } = await createStaffAccountRecord(req);
         await recordAudit({
             req,
             action: "USER_CREATED",
@@ -230,28 +140,9 @@ const createStaffUser = async (req, res) => {
             targetId: newUser._id,
             metadata: { email: newUser.email, role: newUser.role },
         });
+        const emailSent = await dispatchOnboardingEmail(newUser, plainTempPassword, sendEmail);
 
-        let emailSent = false;
-        if (sendEmail !== false) {
-            try {
-                const loginUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/login`;
-                const emailResult = await sendStaffOnboardingEmail({
-                    email: newUser.email,
-                    name: newUser.name,
-                    role: newUser.role,
-                    temporaryPassword: plainTempPassword,
-                    loginUrl,
-                });
-                emailSent = emailResult?.mocked === false;
-            } catch (emailErr) {
-                logger.warn("User created but onboarding email failed to send", {
-                    userId: newUser._id,
-                    error: emailErr.message,
-                });
-            }
-        }
-
-        res.status(201).json({
+        return res.status(201).json({
             status: "success",
             data: sanitizeUser(newUser),
             temporaryPassword: plainTempPassword,
@@ -262,367 +153,86 @@ const createStaffUser = async (req, res) => {
     }
 };
 
-const resolveActiveActor = async (req) => {
-    const actor = await User.findById(req.user._id).select("role isActive");
-    if (!actor) {
-        return { error: { status: 401, body: { status: "fail", message: "User no longer exists" } } };
-    }
-    if (actor.isActive === false) {
-        return {
-            error: {
-                status: 403,
-                body: {
-                    status: "fail",
-                    message: "Your account has been suspended. Please contact administration.",
-                    code: "ACCOUNT_SUSPENDED",
-                },
-            },
-        };
-    }
-    return { actor };
+const updateUserRole = (req, res) =>
+    runLockedGovernanceAction(
+        req,
+        res,
+        "updateUserRole",
+        "Invalid user ID",
+        executeUserRoleUpdate,
+        (outcome) => ({ status: "success", data: sanitizeUser(outcome.updated) })
+    );
+
+const updateUserStatus = (req, res) =>
+    runLockedGovernanceAction(
+        req,
+        res,
+        "updateUserStatus",
+        "Invalid user ID",
+        executeUserStatusUpdate,
+        (outcome) => ({ status: "success", data: sanitizeUser(outcome.updated) })
+    );
+
+const deleteUser = (req, res) =>
+    runLockedGovernanceAction(
+        req,
+        res,
+        "deleteUser",
+        "Invalid user ID",
+        executeUserDeletion,
+        () => ({ status: "success", message: "User deleted successfully" })
+    );
+
+const transferCourseOwnership = (req, res) =>
+    runLockedGovernanceAction(
+        req,
+        res,
+        "transferCourseOwnership",
+        "Invalid course ID",
+        executeCourseTransfer,
+        (outcome) => ({ status: "success", data: outcome.data })
+    );
+
+const enrichCoursesWithCounts = async (courses) => {
+    const courseIds = courses.map((c) => c._id);
+    const enrollmentCounts = await Enrollment.aggregate([
+        { $match: { course: { $in: courseIds } } },
+        { $group: { _id: "$course", count: { $sum: 1 } } },
+    ]);
+    const countMap = new Map(enrollmentCounts.map((item) => [item._id.toString(), item.count]));
+    return courses.map((c) => {
+        const obj = c.toObject();
+        obj.enrollmentCount = countMap.get(c._id.toString()) || 0;
+        obj.moduleCount = Array.isArray(c.modules) ? c.modules.length : 0;
+        return obj;
+    });
 };
 
-const updateUserRole = async (req, res) => {
-    try {
-        if (!isValidObjectId(req.params.id)) {
-            return res.status(400).json({ status: "fail", message: "Invalid user ID" });
-        }
-
-        const { role } = req.body;
-
-        const outcome = await withSuperAdminLock(async () => {
-            const { actor, error: actorError } = await resolveActiveActor(req);
-            if (actorError) return actorError;
-
-            if (actor.role !== "super_admin" && actor.role !== "admin") {
-                return { status: 403, body: { status: "fail", message: "Forbidden: insufficient role privileges" } };
-            }
-
-            if (actor.role === "admin" && (role === "admin" || role === "super_admin")) {
-                return {
-                    status: 403,
-                    body: { status: "fail", message: "Only a Super Admin can assign administrator roles." },
-                };
-            }
-
-            const target = await User.findById(req.params.id);
-            if (!target) {
-                return { status: 404, body: { status: "fail", message: "User not found" } };
-            }
-
-            if (actor.role === "admin") {
-                if (target.role === "admin" || target.role === "super_admin") {
-                    return {
-                        status: 403,
-                        body: { status: "fail", message: "Only a Super Admin can modify administrator roles." },
-                    };
-                }
-
-                const updated = await User.findOneAndUpdate(
-                    { _id: target._id, role: { $nin: ["admin", "super_admin"] } },
-                    { $set: { role } },
-                    { returnDocument: "after" }
-                );
-
-                if (!updated) {
-                    const latest = await User.findById(target._id);
-                    if (!latest) {
-                        return { status: 404, body: { status: "fail", message: "User not found" } };
-                    }
-                    return {
-                        status: 403,
-                        body: { status: "fail", message: "Only a Super Admin can modify administrator roles." },
-                    };
-                }
-
-                await recordAudit({
-                    req,
-                    action: "ROLE_UPDATED",
-                    targetType: "User",
-                    targetId: updated._id,
-                    metadata: { email: updated.email, previousRole: target.role, newRole: role },
-                });
-
-                return { status: 200, updated };
-            }
-
-            if (target.role === "super_admin" && target.isActive !== false && role !== "super_admin") {
-                const activeSuperAdmins = await User.countDocuments({
-                    role: "super_admin",
-                    isActive: { $ne: false },
-                });
-                if (activeSuperAdmins <= 1) {
-                    return {
-                        status: 400,
-                        body: { status: "fail", message: "Cannot demote the last active Super Admin." },
-                    };
-                }
-            }
-
-            const previousRole = target.role;
-            target.role = role;
-            await target.save();
-
-            await recordAudit({
-                req,
-                action: "ROLE_UPDATED",
-                targetType: "User",
-                targetId: target._id,
-                metadata: { email: target.email, previousRole, newRole: role },
-            });
-
-            return { status: 200, updated: target };
-        });
-
-        if (outcome.status !== 200) {
-            return res.status(outcome.status).json(outcome.body);
-        }
-
-        res.status(200).json({ status: "success", data: sanitizeUser(outcome.updated) });
-    } catch (error) {
-        return handleServerError(req, res, "updateUserRole", error);
+const buildAdminCourseFilter = ({ search = "", instructorId = "" }) => {
+    const filter = {};
+    const searchTerm = search ? String(search).trim() : "";
+    if (searchTerm) filter.title = { $regex: escapeRegex(searchTerm), $options: "i" };
+    if (!instructorId) return { filter };
+    if (!isValidObjectId(String(instructorId))) {
+        return { error: { status: 400, body: { status: "fail", message: "Invalid instructor ID" } } };
     }
-};
-
-const updateUserStatus = async (req, res) => {
-    try {
-        if (!isValidObjectId(req.params.id)) {
-            return res.status(400).json({ status: "fail", message: "Invalid user ID" });
-        }
-
-        const { isActive, unlock } = req.body;
-
-        const outcome = await withSuperAdminLock(async () => {
-            const { actor, error: actorError } = await resolveActiveActor(req);
-            if (actorError) return actorError;
-
-            if (actor.role !== "super_admin" && actor.role !== "admin") {
-                return { status: 403, body: { status: "fail", message: "Forbidden: insufficient role privileges" } };
-            }
-
-            const target = await User.findById(req.params.id);
-            if (!target) {
-                return { status: 404, body: { status: "fail", message: "User not found" } };
-            }
-
-            if (actor.role === "admin" && (target.role === "admin" || target.role === "super_admin")) {
-                return {
-                    status: 403,
-                    body: { status: "fail", message: "Only a Super Admin can change administrator account status." },
-                };
-            }
-
-            if (typeof isActive === "boolean") {
-                if (!isActive && target._id.toString() === req.user._id.toString()) {
-                    return {
-                        status: 400,
-                        body: { status: "fail", message: "You cannot suspend your own account." },
-                    };
-                }
-                if (!isActive && target.role === "super_admin" && target.isActive !== false) {
-                    const activeSuperAdmins = await User.countDocuments({
-                        role: "super_admin",
-                        isActive: { $ne: false },
-                    });
-                    if (activeSuperAdmins <= 1) {
-                        return {
-                            status: 400,
-                            body: { status: "fail", message: "Cannot suspend the last active Super Admin." },
-                        };
-                    }
-                }
-            }
-
-            const updateFields = {};
-            if (typeof isActive === "boolean") {
-                updateFields.isActive = isActive;
-            }
-            if (unlock === true) {
-                updateFields.loginAttempts = 0;
-                updateFields.lockUntil = null;
-            }
-
-            const filter =
-                actor.role === "admin"
-                    ? { _id: target._id, role: { $nin: ["admin", "super_admin"] } }
-                    : { _id: target._id };
-
-            const updated = await User.findOneAndUpdate(
-                filter,
-                { $set: updateFields },
-                { returnDocument: "after" }
-            );
-
-            if (!updated) {
-                const latest = await User.findById(target._id);
-                if (!latest) {
-                    return { status: 404, body: { status: "fail", message: "User not found" } };
-                }
-                return {
-                    status: 403,
-                    body: { status: "fail", message: "Only a Super Admin can change administrator account status." },
-                };
-            }
-
-            if (typeof isActive === "boolean") {
-                await recordAudit({
-                    req,
-                    action: "USER_STATUS_CHANGED",
-                    targetType: "User",
-                    targetId: updated._id,
-                    metadata: { email: updated.email, isActive },
-                });
-            }
-
-            if (unlock === true) {
-                await recordAudit({
-                    req,
-                    action: "USER_UNLOCKED",
-                    targetType: "User",
-                    targetId: updated._id,
-                    metadata: { email: updated.email },
-                });
-            }
-
-            return { status: 200, updated };
-        });
-
-        if (outcome.status !== 200) {
-            return res.status(outcome.status).json(outcome.body);
-        }
-
-        res.status(200).json({ status: "success", data: sanitizeUser(outcome.updated) });
-    } catch (error) {
-        return handleServerError(req, res, "updateUserStatus", error);
-    }
-};
-
-const deleteUser = async (req, res) => {
-    try {
-        if (!isValidObjectId(req.params.id)) {
-            return res.status(400).json({ status: "fail", message: "Invalid user ID" });
-        }
-
-        const outcome = await withSuperAdminLock(async () => {
-            const { actor, error: actorError } = await resolveActiveActor(req);
-            if (actorError) return actorError;
-
-            if (actor.role !== "super_admin") {
-                return { status: 403, body: { status: "fail", message: "Forbidden: insufficient role privileges" } };
-            }
-
-            const target = await User.findById(req.params.id);
-            if (!target) {
-                return { status: 404, body: { status: "fail", message: "User not found" } };
-            }
-
-            if (target._id.toString() === req.user._id.toString()) {
-                return {
-                    status: 400,
-                    body: { status: "fail", message: "You cannot delete your own account." },
-                };
-            }
-
-            if (target.role === "super_admin") {
-                const totalSuperAdmins = await User.countDocuments({ role: "super_admin" });
-                if (totalSuperAdmins <= 1) {
-                    return {
-                        status: 400,
-                        body: { status: "fail", message: "Cannot delete the last Super Admin." },
-                    };
-                }
-                if (target.isActive !== false) {
-                    const activeSuperAdmins = await User.countDocuments({
-                        role: "super_admin",
-                        isActive: { $ne: false },
-                    });
-                    if (activeSuperAdmins <= 1) {
-                        return {
-                            status: 400,
-                            body: { status: "fail", message: "Cannot delete the last active Super Admin." },
-                        };
-                    }
-                }
-            }
-
-            const ownedCoursesCount = await Course.countDocuments({ instructor: target._id });
-            if (ownedCoursesCount > 0) {
-                return {
-                    status: 400,
-                    body: {
-                        status: "fail",
-                        message: "This user owns active courses. Please transfer or delete their courses before permanent deletion.",
-                    },
-                };
-            }
-
-            // Delete dependent records before removing the user document so retries remain recoverable
-            await Enrollment.deleteMany({ user: target._id });
-            await Progress.deleteMany({ user: target._id });
-            await User.findByIdAndDelete(target._id);
-
-            await recordAudit({
-                req,
-                action: "USER_DELETED",
-                targetType: "User",
-                targetId: target._id,
-                metadata: { email: target.email, role: target.role },
-            });
-
-            return { status: 200 };
-        });
-
-        if (outcome.status !== 200) {
-            return res.status(outcome.status).json(outcome.body);
-        }
-
-        res.status(200).json({ status: "success", message: "User deleted successfully" });
-    } catch (error) {
-        return handleServerError(req, res, "deleteUser", error);
-    }
+    filter.instructor = instructorId;
+    return { filter };
 };
 
 const getAdminCourses = async (req, res) => {
     try {
         const { page, limit, skip } = parsePagination(req.query, 10);
-        const { search = "", instructorId = "" } = req.query;
-
-        const filter = {};
-        if (search && String(search).trim()) {
-            filter.title = { $regex: escapeRegex(String(search).trim()), $options: "i" };
-        }
-        if (instructorId) {
-            if (!isValidObjectId(String(instructorId))) {
-                return res.status(400).json({ status: "fail", message: "Invalid instructor ID" });
-            }
-            filter.instructor = instructorId;
-        }
+        const { filter, error } = buildAdminCourseFilter(req.query);
+        if (error) return res.status(error.status).json(error.body);
 
         const [totalCourses, courses] = await Promise.all([
             Course.countDocuments(filter),
-            Course.find(filter)
-                .populate("instructor", "name email role specialty isActive")
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit),
+            Course.find(filter).populate("instructor", "name email role specialty isActive").sort({ createdAt: -1 }).skip(skip).limit(limit),
         ]);
 
-        const courseIds = courses.map((c) => c._id);
-        const enrollmentCounts = await Enrollment.aggregate([
-            { $match: { course: { $in: courseIds } } },
-            { $group: { _id: "$course", count: { $sum: 1 } } },
-        ]);
-
-        const countMap = new Map(enrollmentCounts.map((item) => [item._id.toString(), item.count]));
-
-        const enriched = courses.map((c) => {
-            const obj = c.toObject();
-            obj.enrollmentCount = countMap.get(c._id.toString()) || 0;
-            obj.moduleCount = Array.isArray(c.modules) ? c.modules.length : 0;
-            return obj;
-        });
-
-        res.status(200).json({
+        const enriched = await enrichCoursesWithCounts(courses);
+        return res.status(200).json({
             status: "success",
             page,
             limit,
@@ -635,102 +245,38 @@ const getAdminCourses = async (req, res) => {
     }
 };
 
-const transferCourseOwnership = async (req, res) => {
-    try {
-        if (!isValidObjectId(req.params.id)) {
-            return res.status(400).json({ status: "fail", message: "Invalid course ID" });
-        }
-
-        const { newInstructorId } = req.body;
-
-        const outcome = await withSuperAdminLock(async () => {
-            const { actor, error: actorError } = await resolveActiveActor(req);
-            if (actorError) return actorError;
-
-            if (actor.role !== "super_admin") {
-                return { status: 403, body: { status: "fail", message: "Forbidden: insufficient role privileges" } };
-            }
-
-            const course = await Course.findById(req.params.id);
-            const newInstructor = await User.findById(newInstructorId);
-
-            if (!course) {
-                return { status: 404, body: { status: "fail", message: "Course not found" } };
-            }
-            if (
-                !newInstructor ||
-                newInstructor.isActive === false ||
-                !["instructor", "admin", "super_admin"].includes(newInstructor.role)
-            ) {
-                return {
-                    status: 400,
-                    body: {
-                        status: "fail",
-                        message: "Target user must be an active instructor or administrator.",
-                    },
-                };
-            }
-
-            const previousInstructorId = course.instructor ? course.instructor.toString() : null;
-            if (previousInstructorId && previousInstructorId === newInstructor._id.toString()) {
-                return {
-                    status: 400,
-                    body: {
-                        status: "fail",
-                        message: "This user is already the owner of the course.",
-                    },
-                };
-            }
-
-            course.instructor = newInstructor._id;
-            await course.save();
-            await course.populate("instructor", "name email role specialty");
-
-            await recordAudit({
-                req,
-                action: "COURSE_TRANSFERRED",
-                targetType: "Course",
-                targetId: course._id,
-                metadata: {
-                    courseTitle: course.title,
-                    previousInstructorId,
-                    newInstructorId: newInstructor._id.toString(),
-                    newInstructorEmail: newInstructor.email,
-                },
-            });
-
-            return { status: 200, course };
-        });
-
-        if (outcome.status !== 200) {
-            return res.status(outcome.status).json(outcome.body);
-        }
-
-        res.status(200).json({ status: "success", data: outcome.course });
-    } catch (error) {
-        return handleServerError(req, res, "transferCourseOwnership", error);
-    }
-};
-
 const getCourseEnrollments = async (req, res) => {
     try {
         if (!isValidObjectId(req.params.id)) {
             return res.status(400).json({ status: "fail", message: "Invalid course ID" });
         }
-
         const course = await Course.findById(req.params.id);
-        if (!course) {
-            return res.status(404).json({ status: "fail", message: "Course not found" });
-        }
+        if (!course) return res.status(404).json({ status: "fail", message: "Course not found" });
 
         const enrollments = await Enrollment.find({ course: course._id })
             .populate("user", "name email role isActive")
             .sort({ createdAt: -1 });
-
-        res.status(200).json({ status: "success", data: enrollments });
+        return res.status(200).json({ status: "success", data: enrollments });
     } catch (error) {
         return handleServerError(req, res, "getCourseEnrollments", error);
     }
+};
+
+const createManualEnrollment = async (req, course, student) => {
+    const existing = await Enrollment.findOne({ user: student._id, course: course._id });
+    if (existing) return { error: { status: 400, body: { status: "fail", message: "User is already enrolled in this course" } } };
+
+    const enrollment = await Enrollment.create({ user: student._id, course: course._id });
+    await enrollment.populate("user", "name email role isActive");
+
+    await recordAudit({
+        req,
+        action: "ENROLLMENT_ADDED",
+        targetType: "Enrollment",
+        targetId: enrollment._id,
+        metadata: { courseId: course._id.toString(), courseTitle: course.title, studentEmail: student.email },
+    });
+    return { enrollment };
 };
 
 const manualEnrollUser = async (req, res) => {
@@ -738,50 +284,37 @@ const manualEnrollUser = async (req, res) => {
         if (!isValidObjectId(req.params.id)) {
             return res.status(400).json({ status: "fail", message: "Invalid course ID" });
         }
-
         const course = await Course.findById(req.params.id);
-        if (!course) {
-            return res.status(404).json({ status: "fail", message: "Course not found" });
-        }
+        if (!course) return res.status(404).json({ status: "fail", message: "Course not found" });
 
-        const query = req.body.userId
-            ? { _id: req.body.userId }
-            : { email: req.body.email.trim().toLowerCase() };
-
+        const query = req.body.userId ? { _id: req.body.userId } : { email: req.body.email.trim().toLowerCase() };
         const student = await User.findOne(query);
-        if (!student) {
-            return res.status(404).json({ status: "fail", message: "User not found" });
-        }
+        if (!student) return res.status(404).json({ status: "fail", message: "User not found" });
 
-        const existing = await Enrollment.findOne({ user: student._id, course: course._id });
-        if (existing) {
-            return res.status(400).json({
-                status: "fail",
-                message: "User is already enrolled in this course",
-            });
-        }
-
-        const enrollment = await Enrollment.create({ user: student._id, course: course._id });
-        await enrollment.populate("user", "name email role isActive");
-
-        await recordAudit({
-            req,
-            action: "ENROLLMENT_ADDED",
-            targetType: "Enrollment",
-            targetId: enrollment._id,
-            metadata: { courseId: course._id.toString(), courseTitle: course.title, studentEmail: student.email },
-        });
-
-        res.status(201).json({ status: "success", data: enrollment });
+        const result = await createManualEnrollment(req, course, student);
+        if (result.error) return res.status(result.error.status).json(result.error.body);
+        return res.status(201).json({ status: "success", data: result.enrollment });
     } catch (error) {
-        if (error?.code === 11000) {
-            return res.status(400).json({
-                status: "fail",
-                message: "User is already enrolled in this course",
-            });
+        if (error && error.code === 11000) {
+            return res.status(400).json({ status: "fail", message: "User is already enrolled in this course" });
         }
         return handleServerError(req, res, "manualEnrollUser", error);
     }
+};
+
+const handleOrphanProgressCleanup = async (req, courseId, userId) => {
+    const progressCleanup = await Progress.deleteMany({ course: courseId, user: userId });
+    if (progressCleanup.deletedCount === 0) {
+        return { status: 404, body: { status: "fail", message: "Enrollment not found" } };
+    }
+    await recordAudit({
+        req,
+        action: "ENROLLMENT_REMOVED",
+        targetType: "Enrollment",
+        targetId: null,
+        metadata: { courseId, userId, progressCleanupOnly: true },
+    });
+    return { status: 200, body: { status: "success", message: "Enrollment removed successfully" } };
 };
 
 const manualUnenrollUser = async (req, res) => {
@@ -793,26 +326,12 @@ const manualUnenrollUser = async (req, res) => {
 
         const existingEnrollment = await Enrollment.findOne({ course: courseId, user: userId });
         if (!existingEnrollment) {
-            // Allow retrying cleanup if enrollment was already deleted before progress cleanup completed
-            const progressCleanup = await Progress.deleteMany({ course: courseId, user: userId });
-            if (progressCleanup.deletedCount === 0) {
-                return res.status(404).json({ status: "fail", message: "Enrollment not found" });
-            }
-
-            await recordAudit({
-                req,
-                action: "ENROLLMENT_REMOVED",
-                targetType: "Enrollment",
-                targetId: null,
-                metadata: { courseId, userId, progressCleanupOnly: true },
-            });
-
-            return res.status(200).json({ status: "success", message: "Enrollment removed successfully" });
+            const cleanupRes = await handleOrphanProgressCleanup(req, courseId, userId);
+            return res.status(cleanupRes.status).json(cleanupRes.body);
         }
 
         await Progress.deleteMany({ course: courseId, user: userId });
         await Enrollment.deleteOne({ _id: existingEnrollment._id });
-
         await recordAudit({
             req,
             action: "ENROLLMENT_REMOVED",
@@ -820,8 +339,7 @@ const manualUnenrollUser = async (req, res) => {
             targetId: existingEnrollment._id,
             metadata: { courseId, userId },
         });
-
-        res.status(200).json({ status: "success", message: "Enrollment removed successfully" });
+        return res.status(200).json({ status: "success", message: "Enrollment removed successfully" });
     } catch (error) {
         return handleServerError(req, res, "manualUnenrollUser", error);
     }
@@ -830,7 +348,7 @@ const manualUnenrollUser = async (req, res) => {
 const getPlatformSettings = async (req, res) => {
     try {
         const settings = await PlatformSettings.getSingleton();
-        res.status(200).json({ status: "success", data: settings });
+        return res.status(200).json({ status: "success", data: settings });
     } catch (error) {
         return handleServerError(req, res, "getPlatformSettings", error);
     }
@@ -838,45 +356,14 @@ const getPlatformSettings = async (req, res) => {
 
 const updatePlatformSettings = async (req, res) => {
     try {
-        const { allowPublicRegistration, maxVideoSizeMB, maxDocumentSizeMB, maxImageSizeMB } = req.body;
-        const updateSet = { updatedBy: req.user._id };
-        const auditMetadata = {};
-
-        if (allowPublicRegistration !== undefined) {
-            updateSet.allowPublicRegistration = allowPublicRegistration;
-            auditMetadata.allowPublicRegistration = allowPublicRegistration;
-        }
-        if (maxVideoSizeMB !== undefined) {
-            updateSet.maxVideoSizeMB = maxVideoSizeMB;
-            auditMetadata.maxVideoSizeMB = maxVideoSizeMB;
-        }
-        if (maxDocumentSizeMB !== undefined) {
-            updateSet.maxDocumentSizeMB = maxDocumentSizeMB;
-            auditMetadata.maxDocumentSizeMB = maxDocumentSizeMB;
-        }
-        if (maxImageSizeMB !== undefined) {
-            updateSet.maxImageSizeMB = maxImageSizeMB;
-            auditMetadata.maxImageSizeMB = maxImageSizeMB;
-        }
-
+        const { updateSet, auditMetadata } = buildSettingsUpdatePayload(req.body, req.user._id);
         const settings = await PlatformSettings.findOneAndUpdate(
             { singletonKey: "default" },
-            {
-                $set: updateSet,
-                $setOnInsert: { singletonKey: "default" },
-            },
+            { $set: updateSet, $setOnInsert: { singletonKey: "default" } },
             { returnDocument: "after", upsert: true }
         );
-
-        await recordAudit({
-            req,
-            action: "SETTINGS_UPDATED",
-            targetType: "PlatformSettings",
-            targetId: settings._id,
-            metadata: auditMetadata,
-        });
-
-        res.status(200).json({ status: "success", data: settings });
+        await recordAudit({ req, action: "SETTINGS_UPDATED", targetType: "PlatformSettings", targetId: settings._id, metadata: auditMetadata });
+        return res.status(200).json({ status: "success", data: settings });
     } catch (error) {
         return handleServerError(req, res, "updatePlatformSettings", error);
     }
@@ -886,22 +373,14 @@ const getAuditLogs = async (req, res) => {
     try {
         const { page, limit, skip } = parsePagination(req.query, 15);
         const { action = "all" } = req.query;
-
-        const filter = {};
-        if (action && action !== "all") {
-            filter.action = action;
-        }
+        const filter = action && action !== "all" ? { action } : {};
 
         const [totalLogs, logs] = await Promise.all([
             AuditLog.countDocuments(filter),
-            AuditLog.find(filter)
-                .populate("actor", "name email role")
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit),
+            AuditLog.find(filter).populate("actor", "name email role").sort({ createdAt: -1 }).skip(skip).limit(limit),
         ]);
 
-        res.status(200).json({
+        return res.status(200).json({
             status: "success",
             page,
             limit,

@@ -5,6 +5,77 @@ import { AlertBanner } from '../ui/AlertBanner';
 import { adminAPI } from '../../services/api';
 import { useLanguage } from '../../context/LanguageContext';
 
+const isTransferBlocked = ({ saving, staffLoading, staffError }) =>
+  saving || staffLoading || Boolean(staffError);
+
+const isTransferSubmitDisabled = (state) => {
+  if (isTransferBlocked(state)) return true;
+  return !state.selectedId || state.selectedId === state.currentOwnerId;
+};
+
+const StaffErrorBanner = ({ staffError, staffLoading, onRetryStaff, t, tServer }) => {
+  if (!staffError) return null;
+  return (
+    <AlertBanner variant="error">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span>{tServer(staffError)}</span>
+        {onRetryStaff && (
+          <button
+            type="button"
+            onClick={onRetryStaff}
+            disabled={staffLoading}
+            className="rounded-md border border-[#FECACA] bg-white px-2.5 py-1 text-xs font-semibold text-[#991B1B] hover:bg-[#FEF2F2] disabled:opacity-50"
+          >
+            {t('common.retry')}
+          </button>
+        )}
+      </div>
+    </AlertBanner>
+  );
+};
+
+const OwnerSelectField = ({
+  instructors,
+  currentOwnerId,
+  selectedId,
+  disabled,
+  staffLoading,
+  staffError,
+  onSelect,
+  t,
+}) => {
+  const eligibleTargets = instructors.filter((inst) => inst._id !== currentOwnerId);
+  const showEmptyNotice = !staffLoading && !staffError && eligibleTargets.length === 0;
+  return (
+    <div>
+      <label htmlFor="transfer-instructor-select" className="mb-1.5 block text-sm font-medium text-[#0D2E2F]">
+        {t('admin.selectNewOwner')}
+      </label>
+      <select
+        id="transfer-instructor-select"
+        required
+        disabled={disabled}
+        value={selectedId}
+        onChange={(e) => onSelect(e.target.value)}
+        className="w-full rounded-lg border border-[#99F6E4] bg-white px-3.5 py-2 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20 disabled:opacity-60"
+      >
+        <option value="">{t('admin.chooseOwnerPlaceholder')}</option>
+        {instructors.map((inst) => {
+          const isCurrent = inst._id === currentOwnerId;
+          const suffix = isCurrent ? ` (${t('admin.currentOwnerTag')})` : '';
+          return (
+            <option key={inst._id} value={inst._id} disabled={isCurrent}>
+              {inst.name} ({inst.email}) — {t(`role.${inst.role}`)}{suffix}
+            </option>
+          );
+        })}
+      </select>
+      {staffLoading && <p className="mt-1.5 text-xs text-[#52797A]">{t('common.loading')}</p>}
+      {showEmptyNotice && <p className="mt-1.5 text-xs text-[#52797A]">{t('admin.noOtherOwners')}</p>}
+    </div>
+  );
+};
+
 export const TransferCourseModal = ({
   open,
   onClose,
@@ -19,7 +90,6 @@ export const TransferCourseModal = ({
   const [selectedId, setSelectedId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-
   const currentOwnerId = course?.instructor?._id || course?.instructor || '';
 
   useEffect(() => {
@@ -53,8 +123,6 @@ export const TransferCourseModal = ({
     }
   };
 
-  const eligibleTransferTargets = instructors.filter((inst) => inst._id !== currentOwnerId);
-
   return (
     <Modal
       open={open}
@@ -65,62 +133,26 @@ export const TransferCourseModal = ({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <AlertBanner variant="error">{tServer(error)}</AlertBanner>}
-
-        {staffError && (
-          <AlertBanner variant="error">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span>{tServer(staffError)}</span>
-              {onRetryStaff && (
-                <button
-                  type="button"
-                  onClick={onRetryStaff}
-                  disabled={staffLoading}
-                  className="rounded-md border border-[#FECACA] bg-white px-2.5 py-1 text-xs font-semibold text-[#991B1B] hover:bg-[#FEF2F2] disabled:opacity-50"
-                >
-                  {t('common.retry')}
-                </button>
-              )}
-            </div>
-          </AlertBanner>
-        )}
-
-        <div>
-          <label
-            htmlFor="transfer-instructor-select"
-            className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
-          >
-            {t('admin.selectNewOwner')}
-          </label>
-          <select
-            id="transfer-instructor-select"
-            required
-            disabled={saving || staffLoading || Boolean(staffError)}
-            value={selectedId}
-            onChange={(e) => {
-              setSelectedId(e.target.value);
-              setError('');
-            }}
-            className="w-full rounded-lg border border-[#99F6E4] bg-white px-3.5 py-2 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20 disabled:opacity-60"
-          >
-            <option value="">{t('admin.chooseOwnerPlaceholder')}</option>
-            {instructors.map((inst) => {
-              const isCurrent = inst._id === currentOwnerId;
-              return (
-                <option key={inst._id} value={inst._id} disabled={isCurrent}>
-                  {inst.name} ({inst.email}) — {t(`role.${inst.role}`)}
-                  {isCurrent ? ` (${t('admin.currentOwnerTag')})` : ''}
-                </option>
-              );
-            })}
-          </select>
-          {staffLoading && (
-            <p className="mt-1.5 text-xs text-[#52797A]">{t('common.loading')}</p>
-          )}
-          {!staffLoading && !staffError && eligibleTransferTargets.length === 0 && (
-            <p className="mt-1.5 text-xs text-[#52797A]">{t('admin.noOtherOwners')}</p>
-          )}
-        </div>
-
+        <StaffErrorBanner
+          staffError={staffError}
+          staffLoading={staffLoading}
+          onRetryStaff={onRetryStaff}
+          t={t}
+          tServer={tServer}
+        />
+        <OwnerSelectField
+          instructors={instructors}
+          currentOwnerId={currentOwnerId}
+          selectedId={selectedId}
+          disabled={isTransferBlocked({ saving, staffLoading, staffError })}
+          staffLoading={staffLoading}
+          staffError={staffError}
+          onSelect={(val) => {
+            setSelectedId(val);
+            setError('');
+          }}
+          t={t}
+        />
         <div className="flex justify-end gap-3 border-t border-[#CCFBF1] pt-4">
           <button
             type="button"
@@ -132,13 +164,7 @@ export const TransferCourseModal = ({
           </button>
           <button
             type="submit"
-            disabled={
-              saving ||
-              staffLoading ||
-              Boolean(staffError) ||
-              !selectedId ||
-              selectedId === currentOwnerId
-            }
+            disabled={isTransferSubmitDisabled({ saving, staffLoading, staffError, selectedId, currentOwnerId })}
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E] disabled:opacity-60"
           >
             <ArrowsLeftRight size={16} aria-hidden="true" />
