@@ -10,15 +10,15 @@ export const BrandMark = ({ className = '', invert = false, showWordmark = true 
       aria-hidden="true"
       className="shrink-0"
     >
-      <rect width="32" height="32" rx="7" fill={invert ? '#FFFFFF' : '#0F172A'} />
-      <rect x="7" y="7" width="18" height="4" rx="1" fill={invert ? '#0F172A' : '#FFFFFF'} />
-      <rect x="7" y="14" width="12" height="4" rx="1" fill="#3B82F6" />
-      <rect x="7" y="21" width="5" height="4" rx="1" fill="#1D4ED8" />
+      <rect width="32" height="32" rx="7" fill={invert ? '#114B4D' : '#0B3B3C'} />
+      <rect x="7" y="7" width="18" height="4" rx="1" fill="#F59E0B" />
+      <rect x="7" y="14" width="13" height="4" rx="1" fill="#2DD4BF" />
+      <rect x="7" y="21" width="7" height="4" rx="1" fill="#FFFFFF" />
     </svg>
     {showWordmark && (
       <span
         className={`font-display text-lg font-bold tracking-tight ${
-          invert ? 'text-white' : 'text-[#0F172A]'
+          invert ? 'text-white' : 'text-[#0B3B3C]'
         }`}
       >
         Foundry

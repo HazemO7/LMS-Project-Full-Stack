@@ -1,23 +1,23 @@
-export const PASSWORD_RULES = {
-  required: 'Password is required',
-  minLength: { value: 8, message: 'Password must be at least 8 characters' },
+export const getPasswordRules = (t) => ({
+  required: t('auth.passwordRequired'),
+  minLength: { value: 8, message: t('auth.passwordMin8') },
   validate: {
-    hasUpper: (v) => /[A-Z]/.test(v) || 'Must contain at least one uppercase letter',
-    hasLower: (v) => /[a-z]/.test(v) || 'Must contain at least one lowercase letter',
-    hasNumber: (v) => /\d/.test(v) || 'Must contain at least one number',
+    hasUpper: (v) => /[A-Z]/.test(v) || t('auth.passwordUpper'),
+    hasLower: (v) => /[a-z]/.test(v) || t('auth.passwordLower'),
+    hasNumber: (v) => /\d/.test(v) || t('auth.passwordNumber'),
     hasSpecial: (v) =>
-      /[!@#$%^&*(),.?":{}|<>]/.test(v) || 'Must contain at least one special character',
+      /[!@#$%^&*(),.?":{}|<>]/.test(v) || t('auth.passwordSpecial'),
   },
-};
+});
 
-export const getPasswordChecks = (password = '') => [
-  { key: 'length', check: password.length >= 8, label: 'At least 8 characters' },
-  { key: 'upper', check: /[A-Z]/.test(password), label: 'One uppercase letter' },
-  { key: 'lower', check: /[a-z]/.test(password), label: 'One lowercase letter' },
-  { key: 'number', check: /\d/.test(password), label: 'One number' },
+export const getPasswordChecks = (password = '', t) => [
+  { key: 'length', check: password.length >= 8, label: t('pw.reqLength') },
+  { key: 'upper', check: /[A-Z]/.test(password), label: t('pw.reqUpper') },
+  { key: 'lower', check: /[a-z]/.test(password), label: t('pw.reqLower') },
+  { key: 'number', check: /\d/.test(password), label: t('pw.reqNumber') },
   {
     key: 'special',
     check: /[!@#$%^&*(),.?":{}|<>]/.test(password),
-    label: 'One special character (!@#$%^&*...)',
+    label: t('pw.reqSpecial'),
   },
 ];

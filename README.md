@@ -132,6 +132,39 @@ Choose either **Docker** (easiest) or **Local Development**:
 
 ---
 
+## Hybrid Mode (Docker MongoDB + Local Dev Servers)
+
+Best for active development when you want hot-reloading (`nodemon` + Vite HMR) without installing MongoDB locally:
+
+1. **Start only the MongoDB container** (from `LMS-Project-Full-Stack/`):
+   ```bash
+   docker compose stop backend frontend   # only needed if the full Docker stack was running
+   docker compose up -d database
+   ```
+   MongoDB will be available at `localhost:27017` with persistent storage (`mongo_data`).
+
+2. **Configure and start the backend locally** (Terminal 1):
+   ```bash
+   cd backend
+   npm install
+   cp .env.example .env   # PowerShell: Copy-Item .env.example .env
+   npm run dev
+   ```
+   *(Ensure `DB_URL=mongodb://localhost:27017/lms` and `CLIENT_URL=http://localhost:5173` in `backend/.env`.)*
+
+3. **Start the frontend locally** (Terminal 2):
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+4. **Access the application**:
+   - **Frontend App**: [http://localhost:5173](http://localhost:5173)
+   - **Backend API**: [http://localhost:8000/api/courses](http://localhost:8000/api/courses)
+
+---
+
 ## Local Development (Without Docker)
 
 > **Note**: If you previously started the Docker stack, stop the Docker `backend` and `frontend` containers first so ports `8000` and `80` are free (you can keep `database` running if you want to use containerized MongoDB):

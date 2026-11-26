@@ -3,14 +3,17 @@ import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { ArrowLeft, EnvelopeOpen, PaperPlaneTilt } from '@phosphor-icons/react';
 import { authAPI } from '../services/api';
+import { useLanguage } from '../context/LanguageContext';
 import { AuthShell } from '../components/AuthShell';
 import { AlertBanner } from '../components/ui/AlertBanner';
+import { FormErrorSummary } from '../components/ui/FormErrorSummary';
 
 export const ForgotPassword = () => {
+  const { t, tServer } = useLanguage();
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, submitCount },
   } = useForm();
 
   const [loading, setLoading] = useState(false);
@@ -35,22 +38,24 @@ export const ForgotPassword = () => {
 
   return (
     <AuthShell
-      title="Reset your password"
-      subtitle="Enter your registered email and we will send you a time-limited reset link."
-      asideTitle="Account recovery"
-      asideBody="Reset links are cryptographically hashed on the server and expire automatically after 15 minutes."
-      asidePoints={[
-        'For security, responses never reveal whether an email is registered',
-        'Reset links expire after 15 minutes',
-      ]}
+      title={t('forgot.title')}
+      subtitle={t('forgot.subtitle')}
+      asideTitle={t('forgot.asideTitle')}
+      asideBody={t('forgot.asideBody')}
+      asidePoints={[t('forgot.aside1'), t('forgot.aside2')]}
     >
       <div className="space-y-4">
-        {success && <AlertBanner variant="success">{success}</AlertBanner>}
+        {success && <AlertBanner variant="success">{tServer(success)}</AlertBanner>}
         {error && (
           <AlertBanner variant="error" onDismiss={() => setError('')}>
-            {error}
+            {tServer(error)}
           </AlertBanner>
         )}
+        <FormErrorSummary
+          errors={errors}
+          submitCount={submitCount}
+          fieldMap={{ email: 'forgot-email' }}
+        />
       </div>
 
       {!success ? (
@@ -58,28 +63,29 @@ export const ForgotPassword = () => {
           <div>
             <label
               htmlFor="forgot-email"
-              className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+              className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
             >
-              Email address
+              {t('auth.emailLabel')}
             </label>
             <input
               id="forgot-email"
               type="email"
+              dir="ltr"
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
               disabled={loading}
               aria-invalid={Boolean(errors.email)}
               {...register('email', {
-                required: 'Email address is required',
+                required: t('auth.emailRequired'),
                 pattern: {
                   value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: 'Please enter a valid email address',
+                  message: t('auth.emailInvalid'),
                 },
               })}
-              className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 ${
+              className={`w-full rounded-lg border px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
                 errors.email
-                  ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                  : 'border-[#CBD5E1] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20'
+                  ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                  : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
               }`}
             />
             {errors.email && (
@@ -93,42 +99,41 @@ export const ForgotPassword = () => {
             type="submit"
             id="forgot-submit-btn"
             disabled={loading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1D4ED8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-2 disabled:opacity-60"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
           >
-            <PaperPlaneTilt size={16} weight="bold" aria-hidden="true" />
-            {loading ? 'Sending reset link...' : 'Send reset link'}
+            <PaperPlaneTilt size={16} weight="bold" aria-hidden="true" className="rtl:-scale-x-100" />
+            {loading ? t('forgot.submitting') : t('forgot.submit')}
           </button>
 
-          <p className="text-center text-sm text-[#475569]">
-            Remembered your password?{' '}
+          <p className="text-center text-sm text-[#335C5D]">
+            {t('forgot.remembered')}{' '}
             <Link
               to="/login"
-              className="font-semibold text-[#1D4ED8] hover:text-[#1E40AF]"
+              className="font-semibold text-[#0F766E] hover:text-[#D97706]"
             >
-              Back to sign in
+              {t('forgot.backSignIn')}
             </Link>
           </p>
         </form>
       ) : (
-        <div className="mt-6 rounded-xl border border-[#E2E8F0] bg-[#F7F8FA] p-6 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#ECFDF5] text-[#059669]">
+        <div className="mt-6 rounded-xl border border-[#99F6E4] bg-[#F0FDFA] p-6 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#D1FAE5] text-[#059669]">
             <EnvelopeOpen size={24} weight="duotone" aria-hidden="true" />
           </div>
-          <h2 className="mt-4 font-display text-lg font-semibold text-[#0F172A]">
-            Check your inbox
+          <h2 className="mt-4 font-display text-lg font-semibold text-[#0D2E2F]">
+            {t('forgot.inboxTitle')}
           </h2>
-          <p className="mt-2 text-sm text-[#475569]">
-            Open the link in the email within <strong>15 minutes</strong> to choose a new password.
+          <p className="mt-2 text-sm text-[#335C5D]">
+            {t('forgot.inboxBodyPrefix')} <strong>{t('forgot.inboxDuration')}</strong>{' '}
+            {t('forgot.inboxBodySuffix')}
           </p>
-          <p className="mt-2 text-xs text-[#64748B]">
-            Did not receive an email? Check your spam folder or verify the address you entered.
-          </p>
+          <p className="mt-2 text-xs text-[#52797A]">{t('forgot.inboxSpam')}</p>
           <Link
             to="/login"
-            className="mt-6 inline-flex items-center gap-2 rounded-lg border border-[#CBD5E1] bg-white px-4 py-2 text-sm font-medium text-[#0F172A] hover:bg-[#EEF1F6]"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg border border-[#99F6E4] bg-white px-4 py-2 text-sm font-medium text-[#0D2E2F] hover:bg-[#CCFBF1]"
           >
-            <ArrowLeft size={15} aria-hidden="true" />
-            Back to sign in
+            <ArrowLeft size={15} aria-hidden="true" className="rtl:rotate-180" />
+            {t('forgot.backSignIn')}
           </Link>
         </div>
       )}

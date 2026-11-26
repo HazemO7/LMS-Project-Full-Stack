@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { EnvelopeSimple, PaperPlaneTilt } from '@phosphor-icons/react';
+import { useLanguage } from '../context/LanguageContext';
 import { AlertBanner } from '../components/ui/AlertBanner';
 
 export const Contact = () => {
+  const { t } = useLanguage();
   const [formState, setFormState] = useState({ name: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
 
@@ -15,101 +17,105 @@ export const Contact = () => {
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:py-16 lg:px-8">
       <div className="grid gap-10 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <h1 className="font-display text-3xl font-bold tracking-tight text-[#0F172A]">
-            Get in touch
+        <div className="ocean-grid-bg rounded-2xl border border-[#1E6466] p-8 text-white lg:col-span-5">
+          <h1 className="font-display text-3xl font-bold tracking-tight text-white">
+            {t('contact.title')}
           </h1>
-          <p className="mt-3 text-sm leading-relaxed text-[#475569]">
-            Questions about course access, instructor accounts, or deployment configuration? Send a note using the form.
+          <p className="mt-3 text-sm leading-relaxed text-[#CCFBF1]/90">
+            {t('contact.subtitle')}
           </p>
 
-          <div className="mt-8 rounded-xl border border-[#E2E8F0] bg-white p-5">
-            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#0F172A]">
-              <EnvelopeSimple size={18} weight="duotone" aria-hidden="true" className="text-[#1D4ED8]" />
-              Project support
+          <div className="mt-8 rounded-xl border border-[#1E6466] bg-[#114B4D] p-5">
+            <div className="flex items-center gap-2.5 text-sm font-semibold text-[#FBBF24]">
+              <EnvelopeSimple size={18} weight="duotone" aria-hidden="true" />
+              {t('contact.supportTitle')}
             </div>
-            <p className="mt-2 text-xs leading-relaxed text-[#475569]">
-              For bug reports or setup questions, you can also open an issue on the project repository on GitHub.
+            <p className="mt-2 text-xs leading-relaxed text-[#CCFBF1]/85">
+              {t('contact.supportBody')}
             </p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[#E2E8F0] bg-white p-6 sm:p-8 lg:col-span-7">
-          {submitted && (
-            <AlertBanner
-              variant="success"
-              className="mb-6"
-              onDismiss={() => setSubmitted(false)}
-            >
-              Your message has been recorded locally in this preview form. Connect a mail or ticket endpoint when deploying to production.
-            </AlertBanner>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="grid gap-5 sm:grid-cols-2">
-              <div>
-                <label
-                  htmlFor="contact-name"
-                  className="mb-1.5 block text-sm font-medium text-[#0F172A]"
-                >
-                  Full name
-                </label>
-                <input
-                  id="contact-name"
-                  type="text"
-                  required
-                  value={formState.name}
-                  onChange={(e) => setFormState({ ...formState, name: e.target.value })}
-                  placeholder="Alex Rivera"
-                  className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:border-[#1D4ED8] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="contact-email"
-                  className="mb-1.5 block text-sm font-medium text-[#0F172A]"
-                >
-                  Email address
-                </label>
-                <input
-                  id="contact-email"
-                  type="email"
-                  required
-                  value={formState.email}
-                  onChange={(e) => setFormState({ ...formState, email: e.target.value })}
-                  placeholder="alex@example.com"
-                  className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:border-[#1D4ED8] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="contact-message"
-                className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+        <div className="overflow-hidden rounded-2xl border border-[#99F6E4] bg-white shadow-xs lg:col-span-7">
+          <div className="h-1.5 w-full bg-gradient-to-r from-[#0D9488] to-[#F59E0B]" />
+          <div className="p-6 sm:p-8">
+            {submitted && (
+              <AlertBanner
+                variant="success"
+                className="mb-6"
+                onDismiss={() => setSubmitted(false)}
               >
-                Message
-              </label>
-              <textarea
-                id="contact-message"
-                rows={5}
-                required
-                value={formState.message}
-                onChange={(e) => setFormState({ ...formState, message: e.target.value })}
-                placeholder="Share what you need help with..."
-                className="w-full rounded-lg border border-[#CBD5E1] bg-white px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:border-[#1D4ED8] focus:outline-none focus:ring-2 focus:ring-[#1D4ED8]/20"
-              />
-            </div>
+                {t('contact.sentSuccess')}
+              </AlertBanner>
+            )}
 
-            <button
-              type="submit"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1D4ED8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-2"
-            >
-              <PaperPlaneTilt size={16} weight="bold" aria-hidden="true" />
-              Send message
-            </button>
-          </form>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="contact-name"
+                    className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
+                  >
+                    {t('contact.nameLabel')}
+                  </label>
+                  <input
+                    id="contact-name"
+                    type="text"
+                    required
+                    value={formState.name}
+                    onChange={(e) => setFormState({ ...formState, name: e.target.value })}
+                    placeholder={t('contact.namePlaceholder')}
+                    className="w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="contact-email"
+                    className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
+                  >
+                    {t('contact.emailLabel')}
+                  </label>
+                  <input
+                    id="contact-email"
+                    type="email"
+                    dir="ltr"
+                    required
+                    value={formState.email}
+                    onChange={(e) => setFormState({ ...formState, email: e.target.value })}
+                    placeholder={t('contact.emailPlaceholder')}
+                    className="w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="contact-message"
+                  className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
+                >
+                  {t('contact.messageLabel')}
+                </label>
+                <textarea
+                  id="contact-message"
+                  rows={5}
+                  required
+                  value={formState.message}
+                  onChange={(e) => setFormState({ ...formState, message: e.target.value })}
+                  placeholder={t('contact.messagePlaceholder')}
+                  className="w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2"
+              >
+                <PaperPlaneTilt size={16} weight="bold" aria-hidden="true" className="rtl:-scale-x-100" />
+                {t('contact.sendBtn')}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

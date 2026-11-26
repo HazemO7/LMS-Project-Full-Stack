@@ -1,0 +1,891 @@
+export const TRANSLATIONS = {
+  en: {
+    // Nav & Shell
+    'nav.skipToContent': 'Skip to main content',
+    'nav.home': 'Home',
+    'nav.courses': 'Courses',
+    'nav.about': 'About',
+    'nav.contact': 'Contact',
+    'nav.createCourse': 'Create course',
+    'nav.profile': 'Profile',
+    'nav.signOut': 'Sign out',
+    'nav.signIn': 'Sign in',
+    'nav.createAccount': 'Create account',
+    'nav.openMenu': 'Open navigation menu',
+    'nav.closeMenu': 'Close navigation menu',
+    'nav.switchToArabic': 'عربي',
+    'nav.switchToEnglish': 'EN',
+    'nav.switchAria': 'التبديل إلى اللغة العربية',
+    'nav.mainAria': 'Main navigation',
+    'nav.mobileAria': 'Mobile navigation',
+
+    // Roles
+    'role.admin': 'Admin',
+    'role.instructor': 'Instructor',
+    'role.student': 'Student',
+
+    // Footer
+    'footer.tagline':
+      'Structured technical courses, module-based authoring, and verified lesson progress tracking in a vibrant study workspace.',
+    'footer.platform': 'Platform',
+    'footer.catalog': 'Course catalog',
+    'footer.settings': 'Account settings',
+    'footer.publish': 'Publish a course',
+    'footer.academy': 'Academy',
+    'footer.about': 'About Foundry',
+    'footer.contact': 'Contact',
+    'footer.access': 'Access',
+    'footer.signIn': 'Sign in',
+    'footer.createAccount': 'Create account',
+    'footer.resetPassword': 'Reset password',
+    'footer.copyright': '© {{year}} Foundry Learning Management System.',
+    'footer.repo': 'Source repository',
+
+    // Common UI
+    'common.cancel': 'Cancel',
+    'common.delete': 'Delete',
+    'common.working': 'Working...',
+    'common.saving': 'Saving...',
+    'common.loading': 'Loading...',
+    'common.loadingPage': 'Loading page...',
+    'common.dismiss': 'Dismiss message',
+    'common.closeModal': 'Close modal',
+    'common.verifyingAccess': 'Verifying access',
+    'form.errorSummaryTitle': 'Please review the following fields:',
+
+    // 404
+    'notFound.title': 'Page not found',
+    'notFound.body': 'The route you opened does not exist or may have moved.',
+    'notFound.cta': 'Browse courses',
+
+    // Home
+    'home.heroTitle': 'Structured technical courses built for uninterrupted study.',
+    'home.heroBody':
+      'Foundry organizes lessons into clear modules, tracks every completed step, and gives instructors direct authoring tools without visual clutter.',
+    'home.browseCourses': 'Browse courses',
+    'home.viewAccount': 'View my account',
+    'home.createStudent': 'Create student account',
+    'home.specStructureLabel': 'Structure',
+    'home.specStructureValue': 'Modules & lessons',
+    'home.specProgressLabel': 'Progress',
+    'home.specProgressValue': 'Lesson-level sync',
+    'home.specPermissionsLabel': 'Permissions',
+    'home.specPermissionsValue': 'Role-verified RBAC',
+    'home.publishedTitle': 'Published courses',
+    'home.publishedSubtitle': 'Open any syllabus to inspect its overview or enroll as a student.',
+    'home.viewFullCatalog': 'View full catalog',
+    'home.openCourse': 'Open course',
+    'home.signInToView': 'Sign in to view',
+    'home.offlineNote':
+      'Browse the course catalog to view available courses once the API server is running.',
+    'home.openCatalog': 'Open catalog',
+    'home.howTitle': 'How Foundry works',
+    'home.howSubtitle':
+      'Every course follows a clear hierarchy from enrollment to verified lesson completion.',
+    'home.step1Title': 'Explore the catalog and enroll',
+    'home.step1Body':
+      'Browse published engineering curricula openly, inspect course summaries, and enroll in one click once signed in.',
+    'home.step2Title': 'Learn in a focused lesson workspace',
+    'home.step2Body':
+      'Navigate module by module with a persistent syllabus sidebar, dedicated video theater, and clean reading notes.',
+    'home.step3Title': 'Track completion across every module',
+    'home.step3Body':
+      'Mark individual lessons complete and monitor verified course progress percentages tied directly to your account.',
+
+    // Hero Preview
+    'preview.aria': 'Interactive course workspace preview',
+    'preview.courseTitle': 'Complete Web Engineering',
+    'preview.progress': '{{done}}/{{total}} complete ({{pct}}%)',
+    'preview.syllabus': 'Interactive syllabus',
+    'preview.theater': 'Lesson theater',
+    'preview.hint': 'Click lessons or toggle status',
+    'preview.completed': 'Completed',
+    'preview.markComplete': 'Mark complete',
+
+    // About
+    'about.title': 'Built for clear curricula and measurable learning.',
+    'about.p1':
+      'Foundry is a full-stack learning management workspace designed around the actual study flow: discovering courses, enrolling securely, reading lesson notes alongside video lectures, and tracking completion step by step.',
+    'about.p2':
+      'Instead of burying students inside nested accordions, the platform separates course discovery from a focused lesson player while giving instructors direct curriculum editing tools.',
+    'about.browse': 'Browse courses',
+    'about.contact': 'Contact the team',
+    'about.archTitle': 'System architecture',
+    'about.archFrontend': 'Frontend client',
+    'about.archApi': 'API runtime',
+    'about.archDb': 'Database',
+    'about.archAuth': 'Authentication',
+    'about.f1Title': 'Hierarchical curriculum',
+    'about.f1Body':
+      'Instructors organize courses into ordered modules and individual lessons with reading notes and embedded video lectures.',
+    'about.f2Title': 'Role-verified access control',
+    'about.f2Body':
+      'Every endpoint enforces JWT authentication and role checks across students, instructors, and administrators.',
+    'about.f3Title': 'Persistent progress tracking',
+    'about.f3Body':
+      'Completed lessons are recorded per enrollment so students always resume from where they left off.',
+
+    // Contact
+    'contact.title': 'Get in touch',
+    'contact.subtitle':
+      'Questions about course access, instructor accounts, or deployment configuration? Send a note using the form.',
+    'contact.supportTitle': 'Project support',
+    'contact.supportBody':
+      'For bug reports or setup questions, you can also open an issue on the project repository on GitHub.',
+    'contact.sentSuccess':
+      'Your message has been recorded locally in this preview form. Connect a mail or ticket endpoint when deploying to production.',
+    'contact.nameLabel': 'Full name',
+    'contact.namePlaceholder': 'Alex Rivera',
+    'contact.emailLabel': 'Email address',
+    'contact.emailPlaceholder': 'alex@example.com',
+    'contact.messageLabel': 'Message',
+    'contact.messagePlaceholder': 'Share what you need help with...',
+    'contact.sendBtn': 'Send message',
+
+    // Auth Shared & Password
+    'auth.backHome': 'Back to Foundry',
+    'auth.emailLabel': 'Email address',
+    'auth.emailPlaceholder': 'you@example.com',
+    'auth.emailRequired': 'Email address is required',
+    'auth.emailInvalid': 'Please enter a valid email address',
+    'auth.passwordLabel': 'Password',
+    'auth.passwordRequired': 'Password is required',
+    'auth.passwordMin8': 'Password must be at least 8 characters',
+    'auth.passwordUpper': 'Must contain at least one uppercase letter',
+    'auth.passwordLower': 'Must contain at least one lowercase letter',
+    'auth.passwordNumber': 'Must contain at least one number',
+    'auth.passwordSpecial': 'Must contain at least one special character',
+    'auth.showPassword': 'Show password',
+    'auth.hidePassword': 'Hide password',
+    'pw.strength': 'Password strength',
+    'pw.weak': 'Weak',
+    'pw.fair': 'Fair',
+    'pw.good': 'Good',
+    'pw.strong': 'Strong',
+    'pw.reqsTitle': 'Password requirements',
+    'pw.reqLength': 'At least 8 characters',
+    'pw.reqUpper': 'One uppercase letter',
+    'pw.reqLower': 'One lowercase letter',
+    'pw.reqNumber': 'One number',
+    'pw.reqSpecial': 'One special character (!@#$%^&*...)',
+
+    // Login
+    'login.title': 'Sign in',
+    'login.subtitle': 'Access your enrolled courses, modules, and progress.',
+    'login.asideTitle': 'Pick up right where you stopped.',
+    'login.asideBody':
+      'Your active course enrollments, completed lessons, and role permissions stay synced across sessions.',
+    'login.aside1': 'Role-based dashboards for students, instructors, and admins',
+    'login.aside2': 'Protected enrollment and lesson progress persistence',
+    'login.aside3': 'Brute-force lockout protection on repeated failed attempts',
+    'login.justRegistered': 'Account created successfully. Sign in with your email and password.',
+    'login.passwordChanged': 'Password updated. Sign in with your new password to continue.',
+    'login.redirected': 'Please sign in to access this page.',
+    'login.attemptsRemaining': '{{count}} attempts remaining before temporary lockout.',
+    'login.attemptRemainingOne': '1 attempt remaining before temporary lockout.',
+    'login.lockedTitle': 'Account temporarily locked',
+    'login.lockedBody': 'Multiple failed login attempts detected. Try again in',
+    'login.passwordPlaceholder': 'Enter your password',
+    'login.forgot': 'Forgot password?',
+    'login.submit': 'Sign in',
+    'login.submitting': 'Signing in...',
+    'login.newUser': 'New to Foundry?',
+    'login.createOne': 'Create an account',
+
+    // Register
+    'register.title': 'Create account',
+    'register.subtitle': 'Register as a student to enroll in courses and track progress.',
+    'register.asideTitle': 'Start learning with a clear syllabus.',
+    'register.asideBody':
+      'Student accounts get instant access to course enrollment, lesson checklists, and progress tracking.',
+    'register.aside1': 'Enroll in published engineering and design courses',
+    'register.aside2': 'Save completion state across every module and lesson',
+    'register.aside3': 'Strong password policy enforced automatically on signup',
+    'register.nameLabel': 'Full name',
+    'register.namePlaceholder': 'Alex Rivera',
+    'register.nameRequired': 'Full name is required',
+    'register.nameMin': 'Name must be at least 3 characters',
+    'register.nameMax': 'Name cannot exceed 50 characters',
+    'register.passwordPlaceholder': 'Create a strong password',
+    'register.submit': 'Create account',
+    'register.submitting': 'Creating account...',
+    'register.hasAccount': 'Already have an account?',
+    'register.signInLink': 'Sign in',
+
+    // Forgot Password
+    'forgot.title': 'Reset your password',
+    'forgot.subtitle':
+      'Enter your registered email and we will send you a time-limited reset link.',
+    'forgot.asideTitle': 'Account recovery',
+    'forgot.asideBody':
+      'Reset links are cryptographically hashed on the server and expire automatically after 15 minutes.',
+    'forgot.aside1': 'For security, responses never reveal whether an email is registered',
+    'forgot.aside2': 'Reset links expire after 15 minutes',
+    'forgot.submit': 'Send reset link',
+    'forgot.submitting': 'Sending reset link...',
+    'forgot.remembered': 'Remembered your password?',
+    'forgot.backSignIn': 'Back to sign in',
+    'forgot.inboxTitle': 'Check your inbox',
+    'forgot.inboxBodyPrefix': 'Open the link in the email within',
+    'forgot.inboxDuration': '15 minutes',
+    'forgot.inboxBodySuffix': 'to choose a new password.',
+    'forgot.inboxSpam':
+      'Did not receive an email? Check your spam folder or verify the address you entered.',
+
+    // Reset Password
+    'reset.title': 'Set a new password',
+    'reset.subtitle': 'Choose a strong new password for your Foundry account.',
+    'reset.asideTitle': 'Password policy',
+    'reset.asideBody':
+      'Your new password immediately invalidates older sessions and replaces your reset token.',
+    'reset.redirecting': 'Redirecting to sign in...',
+    'reset.requestAnother': 'Request a new reset link',
+    'reset.newLabel': 'New password',
+    'reset.newPlaceholder': 'Enter new password',
+    'reset.confirmLabel': 'Confirm new password',
+    'reset.confirmPlaceholder': 'Re-enter new password',
+    'reset.confirmRequired': 'Please confirm your new password',
+    'reset.mismatch': 'Passwords do not match',
+    'reset.submit': 'Reset password',
+    'reset.submitting': 'Resetting password...',
+    'reset.goSignIn': 'Go to sign in',
+
+    // Courses Page
+    'courses.viewsAria': 'Course views',
+    'courses.catalogTitle': 'Course catalog',
+    'courses.enrolledTitle': 'My enrolled courses',
+    'courses.catalogSubtitle':
+      'Browse published curricula, review modules, and enroll to track progress.',
+    'courses.enrolledSubtitle': 'Resume lessons across courses you are enrolled in.',
+    'courses.searchAria': 'Search courses',
+    'courses.searchPlaceholder': 'Search courses by title...',
+    'courses.clearSearch': 'Clear search',
+    'courses.searchBtn': 'Search',
+    'courses.tabAll': 'All courses',
+    'courses.tabEnrolled': 'My enrolled courses',
+    'courses.loadingCount': 'Loading catalog...',
+    'courses.enrolledCount': '{{count}} enrolled',
+    'courses.catalogCountMatching': '{{label}} matching "{{query}}"',
+    'courses.emptyEnrolledTitle': 'No enrolled courses yet',
+    'courses.emptyEnrolledBody':
+      'Switch to All courses to explore the catalog and enroll in your first course.',
+    'courses.emptySearchTitle': 'No matching courses found',
+    'courses.emptySearchBody': 'Try another search term or clear the active filter.',
+    'courses.emptyAllTitle': 'No courses available',
+    'courses.emptyAllBodyAdmin': 'Publish the first course to make it available for enrollment.',
+    'courses.emptyAllBodyStudent': 'Check back soon for newly published courses.',
+    'courses.browseAll': 'Browse all courses',
+    'courses.enrolledBadge': 'Enrolled',
+    'courses.continueLearning': 'Continue learning',
+    'courses.manageCurriculum': 'Manage curriculum',
+    'courses.openCourse': 'Open course',
+    'courses.deleteLabel': 'Delete {{title}}',
+    'courses.deleteTitle': 'Delete course',
+    'courses.deleteMsg':
+      'Are you sure you want to delete "{{title}}"? This removes the course record from the catalog.',
+    'courses.deleteConfirm': 'Delete course',
+    'courses.prev': 'Previous',
+    'courses.next': 'Next',
+    'courses.pageOf': 'Page {{page}} of {{total}}',
+
+    // Create Course
+    'createCourse.back': 'Back to courses',
+    'createCourse.title': 'Create a new course',
+    'createCourse.subtitle':
+      'Start with the course title and syllabus overview. You can add modules and video lessons right after publishing.',
+    'createCourse.nameLabel': 'Course title',
+    'createCourse.namePlaceholder': 'e.g. Distributed Systems in Practice',
+    'createCourse.descLabel': 'Course overview',
+    'createCourse.descPlaceholder':
+      'Summarize what students will build, prerequisites, and the core topics covered...',
+    'createCourse.submit': 'Publish course',
+    'createCourse.submitting': 'Publishing...',
+
+    // Course Details / Player
+    'player.allCourses': 'All courses',
+    'player.editCourse': 'Edit course',
+    'player.addModule': 'Add module',
+    'player.progressLabel': 'Course progress',
+    'player.allCompleted': 'All lessons completed',
+    'player.enrollGateTitle': 'Enroll to unlock full curriculum',
+    'player.enrollGateBody':
+      'Modules, lesson notes, video lectures, and progress tracking become available as soon as you enroll in this course.',
+    'player.enrollBtn': 'Enroll in course',
+    'player.enrolling': 'Enrolling...',
+    'player.enrollStudentOnly':
+      'Only student accounts or the course instructor can access non-enrolled lessons.',
+    'player.syncWarning':
+      'Module references could not be populated completely for this course.',
+    'player.showCurriculum': 'Course curriculum',
+    'player.hideCurriculum': 'Hide curriculum',
+    'player.curriculum': 'Curriculum',
+    'player.activeLessonAria': 'Active lesson',
+    'player.editModuleAria': 'Edit module {{title}}',
+    'player.deleteModuleAria': 'Delete module {{title}}',
+    'player.noModulesTitle': 'No modules yet',
+    'player.noModulesAdmin': 'Add your first module to begin building lessons.',
+    'player.noModulesStudent':
+      'The instructor has not published modules for this course yet.',
+    'player.moduleLabel': 'Module {{num}}',
+    'player.addLesson': 'Add lesson',
+    'player.videoIncluded': 'Video included',
+    'player.noLessonsInModule': 'No lessons in this module yet.',
+    'player.placeholderTitle': 'Sample course placeholder video',
+    'player.placeholderBody':
+      'This seeded demo lesson points to a placeholder YouTube URL ({{url}}). Attach a live YouTube link via Edit lesson to play embedded video here.',
+    'player.unsupportedVideo': 'Unsupported video link format',
+    'player.unsupportedVideoHint': 'Use a standard YouTube watch or share URL.',
+    'player.editLesson': 'Edit lesson',
+    'player.prevLesson': 'Previous',
+    'player.nextLesson': 'Next',
+    'player.completed': 'Completed',
+    'player.markComplete': 'Mark complete',
+    'player.progressMarkedDone': 'Marked "{{title}}" as complete.',
+    'player.progressMarkedUndone': 'Marked "{{title}}" as incomplete.',
+    'player.noSelectionTitle': 'No lessons selected',
+    'player.noSelectionModulesEmpty': 'Add a module to start building this course curriculum.',
+    'player.noSelectionLessonsEmpty':
+      'Add a lesson to any module in the curriculum sidebar to start teaching.',
+    'player.deleteModuleTitle': 'Delete module',
+    'player.deleteLessonTitle': 'Delete lesson',
+    'player.deleteConfirmMsg': 'Delete "{{title}}"? This action cannot be undone.',
+    'player.returnCatalog': 'Return to catalog',
+
+    // Profile
+    'profile.title': 'Account settings',
+    'profile.subtitle': 'Manage your identity details and account security.',
+    'profile.roleLabel': 'Role',
+    'profile.detailsTitle': 'Profile details',
+    'profile.detailsNote': 'Changes apply immediately across your active session.',
+    'profile.nameLabel': 'Full name',
+    'profile.emailLabel': 'Email address',
+    'profile.saveBtn': 'Save profile',
+    'profile.updated': 'Account details updated.',
+    'profile.securityTitle': 'Password & security',
+    'profile.securityNote':
+      'Changing your password invalidates existing tokens and requires signing in again.',
+    'profile.currentPw': 'Current password',
+    'profile.currentPwRequired': 'Current password is required',
+    'profile.newPw': 'New password',
+    'profile.confirmPw': 'Confirm new password',
+    'profile.updatePwBtn': 'Update password',
+    'profile.updatingPw': 'Updating password...',
+    'profile.pwUpdatedMsg':
+      'Password updated. Signing you out so you can sign in with your new password...',
+
+    // Authoring Modals
+    'modal.addModuleTitle': 'Add module',
+    'modal.addModuleDesc': 'Group related lessons into a structured curriculum section.',
+    'modal.moduleTitleLabel': 'Module title',
+    'modal.moduleTitlePh': 'e.g. Module 1: Core Concepts',
+    'modal.moduleSummaryLabel': 'Summary',
+    'modal.moduleSummaryPh': 'Short objective for this module',
+    'modal.moduleOverviewLabel': 'Overview notes',
+    'modal.moduleOverviewPh': 'What topics are covered in this module?',
+    'modal.saveModule': 'Save module',
+    'modal.editModuleTitle': 'Edit module',
+    'modal.moduleObjectiveLabel': 'Module objective',
+
+    'modal.addLessonTitle': 'Add lesson',
+    'modal.addLessonDesc':
+      'Create a reading lesson with an optional YouTube video lecture.',
+    'modal.lessonTitleLabel': 'Lesson title',
+    'modal.lessonTitlePh': 'e.g. Introduction to HTTP Routing',
+    'modal.lessonDescLabel': 'Short description',
+    'modal.lessonDescPh': 'One-line summary of what this lesson covers',
+    'modal.lessonNotesLabel': 'Lesson notes',
+    'modal.lessonNotesPh': 'Write the lesson reading material or transcript...',
+    'modal.lessonVideoLabel': 'YouTube video URL',
+    'modal.optional': '(optional)',
+    'modal.saveLesson': 'Save lesson',
+    'modal.editLessonTitle': 'Edit lesson',
+
+    'modal.editCourseTitle': 'Edit course details',
+    'modal.courseTitleLabel': 'Course title',
+    'modal.courseDescLabel': 'Description',
+    'modal.saveChanges': 'Save changes',
+  },
+
+  ar: {
+    // Nav & Shell
+    'nav.skipToContent': 'انتقل إلى المحتوى الرئيسي',
+    'nav.home': 'الرئيسية',
+    'nav.courses': 'الكورسات',
+    'nav.about': 'عن المنصة',
+    'nav.contact': 'تواصل معنا',
+    'nav.createCourse': 'إنشاء كورس',
+    'nav.profile': 'حسابي',
+    'nav.signOut': 'تسجيل الخروج',
+    'nav.signIn': 'تسجيل الدخول',
+    'nav.createAccount': 'حساب جديد',
+    'nav.openMenu': 'فتح قائمة التنقل',
+    'nav.closeMenu': 'إغلاق قائمة التنقل',
+    'nav.switchToArabic': 'عربي',
+    'nav.switchToEnglish': 'EN',
+    'nav.switchAria': 'Switch language to English',
+    'nav.mainAria': 'القائمة الرئيسية',
+    'nav.mobileAria': 'قائمة الجوال',
+
+    // Roles
+    'role.admin': 'مدير',
+    'role.instructor': 'مدرب',
+    'role.student': 'طالب',
+
+    // Footer
+    'footer.tagline':
+      'منصة عربية-ثنائية اللغة لمسارات التعلّم التقنية؛ وحدات مرتبة، شروحات واضحة، ومتابعة دقيقة لتقدّمك دون أي تشتيت.',
+    'footer.platform': 'المنصة',
+    'footer.catalog': 'كل الكورسات',
+    'footer.settings': 'إعدادات الحساب',
+    'footer.publish': 'نشر كورس جديد',
+    'footer.academy': 'الأكاديمية',
+    'footer.about': 'عن Foundry',
+    'footer.contact': 'تواصل معنا',
+    'footer.access': 'الحساب',
+    'footer.signIn': 'تسجيل الدخول',
+    'footer.createAccount': 'إنشاء حساب جديد',
+    'footer.resetPassword': 'استعادة كلمة المرور',
+    'footer.copyright': '© {{year}} منصة Foundry التعليمية. جميع الحقوق محفوظة.',
+    'footer.repo': 'مستودع المشروع',
+
+    // Common UI
+    'common.cancel': 'إلغاء',
+    'common.delete': 'حذف',
+    'common.working': 'جاري التنفيذ...',
+    'common.saving': 'جاري الحفظ...',
+    'common.loading': 'جاري التحميل...',
+    'common.loadingPage': 'جاري تحميل الصفحة...',
+    'common.dismiss': 'إغلاق التنبيه',
+    'common.closeModal': 'إغلاق النافذة',
+    'common.verifyingAccess': 'جاري التحقق من الصلاحيات',
+    'form.errorSummaryTitle': 'يرجى مراجعة الحقول التالية قبل المتابعة:',
+
+    // 404
+    'notFound.title': 'الصفحة غير موجودة',
+    'notFound.body': 'الرابط الذي طلبته غير موجود أو ربما تغيّر مساره.',
+    'notFound.cta': 'تصفح الكورسات',
+
+    // Home
+    'home.heroTitle': 'مسارات تعليمية منظمة لتتعلّم بتركيز ودون تشتيت.',
+    'home.heroBody':
+      'تجمع Foundry دروسك في وحدات واضحة ومترابطة، وتحفظ كل خطوة تنجزها، وتمنح المدربين أدوات سريعة لترتيب المناهج وإدارتها.',
+    'home.browseCourses': 'تصفح الكورسات',
+    'home.viewAccount': 'الانتقال لحسابي',
+    'home.createStudent': 'أنشئ حساب طالب',
+    'home.specStructureLabel': 'الهيكل',
+    'home.specStructureValue': 'وحدات ودروس مرتبة',
+    'home.specProgressLabel': 'التقدّم',
+    'home.specProgressValue': 'حفظ تلقائي لكل درس',
+    'home.specPermissionsLabel': 'الصلاحيات',
+    'home.specPermissionsValue': 'تحقق كامل حسب الدور',
+    'home.publishedTitle': 'الكورسات المتاحة حالياً',
+    'home.publishedSubtitle': 'افتح أي كورس لقراءة منهجه أو التسجيل فيه كطالب.',
+    'home.viewFullCatalog': 'عرض كل الكورسات',
+    'home.openCourse': 'افتح الكورس',
+    'home.signInToView': 'سجّل الدخول للعرض',
+    'home.offlineNote': 'يمكنك استعراض الكورسات بمجرد تشغيل خادم الـ API.',
+    'home.openCatalog': 'فتح الكتالوج',
+    'home.howTitle': 'كيف تسير رحلتك التعليمية هنا',
+    'home.howSubtitle': 'خطوات واضحة من لحظة اختيار الكورس وحتى إنهاء آخر درس فيه.',
+    'home.step1Title': 'اختر الكورس وسجّل بضغطة واحدة',
+    'home.step1Body':
+      'استعرض الكورسات المنشورة بحرية، واقرأ تفاصيل المنهج، ثم سجّل فوراً بعد تسجيل الدخول.',
+    'home.step2Title': 'ادرس في مساحة مريحة للتركيز',
+    'home.step2Body':
+      'تنقّل بسلاسة بين الوحدات والدروس من القائمة الجانبية مع شاشة فيديو واضحة وملاحظات القراءة.',
+    'home.step3Title': 'تابع نسبة إنجازك أولاً بأول',
+    'home.step3Body':
+      'علّم على كل درس تنهيه لتتحدّث نسبة إتمامك وتُحفظ مباشرة في حسابك.',
+
+    // Hero Preview
+    'preview.aria': 'معاينة تفاعلية لمساحة الدرس',
+    'preview.courseTitle': 'هندسة الويب الشاملة',
+    'preview.progress': 'أنجزت {{done}} من {{total}} ({{pct}}%)',
+    'preview.syllabus': 'المنهج التفاعلي',
+    'preview.theater': 'شاشة الدرس',
+    'preview.hint': 'جرّب التنقل بين الدروس أو تغيير الحالة',
+    'preview.completed': 'مكتمل',
+    'preview.markComplete': 'تحديد كمكتمل',
+
+    // About
+    'about.title': 'منصة بُنيت لوضوح المناهج وقياس التعلّم الحقيقي.',
+    'about.p1':
+      'Foundry مساحة تعلّم عملية صُممت لتخدم رحلة الطالب الفعلية: استكشاف الكورسات، التسجيل الآمن، قراءة الشرح مع متابعة الفيديو، وحساب نسبة الإنجاز بدقة.',
+    'about.p2':
+      'بدلاً من تكديس الدروس داخل قوائم متداخلة مربكة، تفصل المنصة بين تصفح الكورسات ومشغل الدروس الهادئ، مع إتاحة تحرير الوحدات والدروس للمدربين مباشرة.',
+    'about.browse': 'تصفح الكورسات',
+    'about.contact': 'تواصل معنا',
+    'about.archTitle': 'البنية التقنية',
+    'about.archFrontend': 'الواجهة الأمامية',
+    'about.archApi': 'خادم الـ API',
+    'about.archDb': 'قاعدة البيانات',
+    'about.archAuth': 'المصادقة والأمان',
+    'about.f1Title': 'منهج متدرج وواضح',
+    'about.f1Body':
+      'يرتب المدربون الكورس إلى وحدات متسلسلة ودروس تضم محتوى مكتوباً وفيديوهات تعليمية.',
+    'about.f2Title': 'صلاحيات محمية حسب الدور',
+    'about.f2Body':
+      'كل مسار يتحقق من الهوية والصلاحية للفصل الدقيق بين الطالب والمدرب والمدير.',
+    'about.f3Title': 'حفظ مستمر للتقدّم',
+    'about.f3Body':
+      'يُسجَّل إتمام كل درس في قاعدة البيانات لتعود دائماً إلى آخر نقطة توقفت عندها.',
+
+    // Contact
+    'contact.title': 'تواصل معنا',
+    'contact.subtitle':
+      'عندك استفسار عن الكورسات، حسابات المدربين، أو إعداد التشغيل؟ اكتب رسالتك هنا وسنرد عليك.',
+    'contact.supportTitle': 'دعم المشروع',
+    'contact.supportBody':
+      'للبلاغات التقنية أو أسئلة الإعداد، يمكنك أيضاً فتح Issue على مستودع المشروع في GitHub.',
+    'contact.sentSuccess':
+      'تم حفظ رسالتك محلياً في نموذج المعاينة هذا. اربط النموذج بخدمة بريد أو Endpoint خاص عند النشر الفعلي.',
+    'contact.nameLabel': 'الاسم الكامل',
+    'contact.namePlaceholder': 'أحمد محمود',
+    'contact.emailLabel': 'البريد الإلكتروني',
+    'contact.emailPlaceholder': 'ahmed@example.com',
+    'contact.messageLabel': 'رسالتك',
+    'contact.messagePlaceholder': 'اكتب تفاصيل سؤالك أو ملاحظتك هنا...',
+    'contact.sendBtn': 'إرسال الرسالة',
+
+    // Auth Shared & Password
+    'auth.backHome': 'العودة للرئيسية',
+    'auth.emailLabel': 'البريد الإلكتروني',
+    'auth.emailPlaceholder': 'you@example.com',
+    'auth.emailRequired': 'البريد الإلكتروني مطلوب',
+    'auth.emailInvalid': 'اكتب بريداً إلكترونياً صحيحاً',
+    'auth.passwordLabel': 'كلمة المرور',
+    'auth.passwordRequired': 'كلمة المرور مطلوبة',
+    'auth.passwordMin8': 'كلمة المرور يجب أن تكون 8 أحرف على الأقل',
+    'auth.passwordUpper': 'يجب أن تحتوي على حرف إنجليزي كبير واحد على الأقل (A-Z)',
+    'auth.passwordLower': 'يجب أن تحتوي على حرف إنجليزي صغير واحد على الأقل (a-z)',
+    'auth.passwordNumber': 'يجب أن تحتوي على رقم واحد على الأقل (0-9)',
+    'auth.passwordSpecial': 'يجب أن تحتوي على رمز خاص واحد على الأقل (!@#$...)',
+    'auth.showPassword': 'إظهار كلمة المرور',
+    'auth.hidePassword': 'إخفاء كلمة المرور',
+    'pw.strength': 'قوة كلمة المرور',
+    'pw.weak': 'ضعيفة',
+    'pw.fair': 'مقبولة',
+    'pw.good': 'جيدة',
+    'pw.strong': 'قوية',
+    'pw.reqsTitle': 'شروط كلمة المرور',
+    'pw.reqLength': '8 أحرف على الأقل',
+    'pw.reqUpper': 'حرف إنجليزي كبير (A-Z)',
+    'pw.reqLower': 'حرف إنجليزي صغير (a-z)',
+    'pw.reqNumber': 'رقم واحد (0-9)',
+    'pw.reqSpecial': 'رمز خاص (!@#$%^&*...)',
+
+    // Login
+    'login.title': 'تسجيل الدخول',
+    'login.subtitle': 'ادخل إلى كورساتك المسجلة وتابع تقدمك في الدروس.',
+    'login.asideTitle': 'أكمل من حيث توقفت.',
+    'login.asideBody':
+      'تظل اشتراكاتك في الكورسات، الدروس المكتملة، وصلاحيات حسابك متزامنة في كل جلسة.',
+    'login.aside1': 'تجربة مخصصة لكل دور: طالب، مدرب، ومدير',
+    'login.aside2': 'حفظ التسجيل وتقدم الدروس بأمان',
+    'login.aside3': 'حماية تلقائية وقفل مؤقت عند تكرار المحاولات الخاطئة',
+    'login.justRegistered': 'تم إنشاء حسابك بنجاح. سجّل الدخول ببريدك وكلمة المرور.',
+    'login.passwordChanged': 'تم تحديث كلمة المرور. سجّل الدخول بكلمة المرور الجديدة للمتابعة.',
+    'login.redirected': 'سجّل الدخول أولاً للوصول إلى هذه الصفحة.',
+    'login.attemptsRemaining': 'تبقّت {{count}} محاولات قبل القفل المؤقت للحساب.',
+    'login.attemptRemainingOne': 'تبقّت محاولة واحدة فقط قبل القفل المؤقت للحساب.',
+    'login.lockedTitle': 'تم قفل الحساب مؤقتاً',
+    'login.lockedBody': 'تم رصد عدة محاولات دخول غير صحيحة. يمكنك المحاولة مجدداً بعد',
+    'login.passwordPlaceholder': 'أدخل كلمة المرور',
+    'login.forgot': 'نسيت كلمة المرور؟',
+    'login.submit': 'تسجيل الدخول',
+    'login.submitting': 'جاري تسجيل الدخول...',
+    'login.newUser': 'مستخدم جديد على Foundry؟',
+    'login.createOne': 'أنشئ حساباً جديداً',
+
+    // Register
+    'register.title': 'إنشاء حساب',
+    'register.subtitle': 'سجّل كطالب لتتمكن من الاشتراك في الكورسات وتتبع تقدمك.',
+    'register.asideTitle': 'ابدأ التعلّم بمنهج واضح.',
+    'register.asideBody':
+      'يحصل حساب الطالب فوراً على إمكانية الاشتراك في الكورسات ومتابعة إنجاز الدروس.',
+    'register.aside1': 'الاشتراك في الكورسات التقنية والتصميمية المنشورة',
+    'register.aside2': 'حفظ حالة الإتمام لكل وحدة ولكل درس',
+    'register.aside3': 'تطبيق سياسة كلمة المرور القوية مباشرة عند التسجيل',
+    'register.nameLabel': 'الاسم الكامل',
+    'register.namePlaceholder': 'أحمد محمود',
+    'register.nameRequired': 'الاسم الكامل مطلوب',
+    'register.nameMin': 'الاسم يجب أن يكون 3 أحرف على الأقل',
+    'register.nameMax': 'الاسم لا يجب أن يتجاوز 50 حرفاً',
+    'register.passwordPlaceholder': 'اختر كلمة مرور قوية',
+    'register.submit': 'إنشاء الحساب',
+    'register.submitting': 'جاري إنشاء الحساب...',
+    'register.hasAccount': 'لديك حساب بالفعل؟',
+    'register.signInLink': 'سجّل الدخول',
+
+    // Forgot Password
+    'forgot.title': 'استعادة كلمة المرور',
+    'forgot.subtitle':
+      'أدخل بريدك الإلكتروني المسجّل وسنرسل لك رابطاً مؤقتاً لإعادة التعيين.',
+    'forgot.asideTitle': 'حماية الحساب',
+    'forgot.asideBody':
+      'تُشفَّر روابط إعادة التعيين على الخادم وتنتهي صلاحيتها تلقائياً بعد 15 دقيقة.',
+    'forgot.aside1': 'لحماية الخصوصية، لا تكشف الردود عما إذا كان البريد مسجلاً أم لا',
+    'forgot.aside2': 'صلاحية الرابط 15 دقيقة فقط',
+    'forgot.submit': 'إرسال رابط الاستعادة',
+    'forgot.submitting': 'جاري الإرسال...',
+    'forgot.remembered': 'تذكرت كلمة المرور؟',
+    'forgot.backSignIn': 'العودة لتسجيل الدخول',
+    'forgot.inboxTitle': 'راجع بريدك الإلكتروني',
+    'forgot.inboxBodyPrefix': 'افتح الرابط المرسل في البريد خلال',
+    'forgot.inboxDuration': '15 دقيقة',
+    'forgot.inboxBodySuffix': 'لتعيين كلمة مرور جديدة.',
+    'forgot.inboxSpam':
+      'لم تصلك الرسالة؟ راجع مجلد الرسائل غير المرغوب فيها أو تأكد من صحة البريد.',
+
+    // Reset Password
+    'reset.title': 'تعيين كلمة مرور جديدة',
+    'reset.subtitle': 'اختر كلمة مرور جديدة وقوية لحسابك في Foundry.',
+    'reset.asideTitle': 'سياسة كلمة المرور',
+    'reset.asideBody':
+      'تعيين كلمة المرور الجديدة يُلغي الجلسات القديمة ويفعّل كلمة المرور الجديدة فوراً.',
+    'reset.redirecting': 'جاري تحويلك لتسجيل الدخول...',
+    'reset.requestAnother': 'طلب رابط استعادة جديد',
+    'reset.newLabel': 'كلمة المرور الجديدة',
+    'reset.newPlaceholder': 'أدخل كلمة المرور الجديدة',
+    'reset.confirmLabel': 'تأكيد كلمة المرور الجديدة',
+    'reset.confirmPlaceholder': 'أعد كتابة كلمة المرور الجديدة',
+    'reset.confirmRequired': 'يرجى تأكيد كلمة المرور الجديدة',
+    'reset.mismatch': 'كلمتا المرور غير متطابقتين',
+    'reset.submit': 'حفظ كلمة المرور الجديدة',
+    'reset.submitting': 'جاري التحديث...',
+    'reset.goSignIn': 'الانتقال لتسجيل الدخول',
+
+    // Courses Page
+    'courses.viewsAria': 'تبويبات عرض الكورسات',
+    'courses.catalogTitle': 'كتالوج الكورسات',
+    'courses.enrolledTitle': 'كورساتي المسجلة',
+    'courses.catalogSubtitle':
+      'استعرض المناهج المتاحة، وتصفح الوحدات، وسجّل لمتابعة تقدمك.',
+    'courses.enrolledSubtitle': 'أكمل الدروس في الكورسات التي اشتركت بها.',
+    'courses.searchAria': 'البحث في الكورسات',
+    'courses.searchPlaceholder': 'ابحث باسم الكورس...',
+    'courses.clearSearch': 'مسح البحث',
+    'courses.searchBtn': 'بحث',
+    'courses.tabAll': 'كل الكورسات',
+    'courses.tabEnrolled': 'كورساتي المسجلة',
+    'courses.loadingCount': 'جاري تحميل الكورسات...',
+    'courses.enrolledCount': '{{count}} مسجّل',
+    'courses.catalogCountMatching': '{{label}} مطابقة لـ "{{query}}"',
+    'courses.emptyEnrolledTitle': 'لم تسجّل في أي كورس بعد',
+    'courses.emptyEnrolledBody':
+      'انتقل إلى كل الكورسات لاستكشاف المتاح والاشتراك في أول كورس لك.',
+    'courses.emptySearchTitle': 'لا توجد نتائج مطابقة',
+    'courses.emptySearchBody': 'جرّب كلمة بحث أخرى أو امسح البحث الحالي.',
+    'courses.emptyAllTitle': 'لا توجد كورسات حالياً',
+    'courses.emptyAllBodyAdmin': 'انشر أول كورس ليصبح متاحاً للطلاب.',
+    'courses.emptyAllBodyStudent': 'تابعنا قريباً عند إضافة كورسات جديدة.',
+    'courses.browseAll': 'استعراض كل الكورسات',
+    'courses.enrolledBadge': 'مسجّل',
+    'courses.continueLearning': 'متابعة التعلّم',
+    'courses.manageCurriculum': 'إدارة المنهج',
+    'courses.openCourse': 'فتح الكورس',
+    'courses.deleteLabel': 'حذف {{title}}',
+    'courses.deleteTitle': 'حذف الكورس',
+    'courses.deleteMsg':
+      'هل أنت متأكد من حذف "{{title}}"؟ سيؤدي هذا لإزالة الكورس من الكتالوج.',
+    'courses.deleteConfirm': 'حذف الكورس',
+    'courses.prev': 'السابق',
+    'courses.next': 'التالي',
+    'courses.pageOf': 'صفحة {{page}} من {{total}}',
+
+    // Create Course
+    'createCourse.back': 'العودة إلى الكورسات',
+    'createCourse.title': 'إنشاء كورس جديد',
+    'createCourse.subtitle':
+      'ابدأ بكتابة عنوان الكورس وملخصه العام، وبعد النشر يمكنك إضافة الوحدات والدروس مباشرة.',
+    'createCourse.nameLabel': 'عنوان الكورس',
+    'createCourse.namePlaceholder': 'مثال: أساسيات الأنظمة الموزعة',
+    'createCourse.descLabel': 'وصف الكورس',
+    'createCourse.descPlaceholder':
+      'اشرح ما سيتعلمه الطالب، المتطلبات السابقة، والموضوعات الأساسية...',
+    'createCourse.submit': 'نشر الكورس',
+    'createCourse.submitting': 'جاري النشر...',
+
+    // Course Details / Player
+    'player.allCourses': 'كل الكورسات',
+    'player.editCourse': 'تعديل الكورس',
+    'player.addModule': 'إضافة وحدة',
+    'player.progressLabel': 'نسبة الإنجاز',
+    'player.allCompleted': 'أنهيت جميع الدروس بنجاح',
+    'player.enrollGateTitle': 'سجّل في الكورس لفتح المنهج الكامل',
+    'player.enrollGateBody':
+      'تُفتح الوحدات، الشروحات، فيديوهات الدروس، وتتبع الإنجاز فور اشتراكك في هذا الكورس.',
+    'player.enrollBtn': 'التسجيل في الكورس',
+    'player.enrolling': 'جاري التسجيل...',
+    'player.enrollStudentOnly':
+      'الوصول قبل التسجيل متاح لحسابات الطلاب عند الاشتراك أو لمدرب الكورس.',
+    'player.syncWarning': 'تعذّر جلب بيانات بعض الوحدات بشكل كامل.',
+    'player.showCurriculum': 'منهج الكورس',
+    'player.hideCurriculum': 'إخفاء المنهج',
+    'player.curriculum': 'المنهج الدراسي',
+    'player.activeLessonAria': 'محتوى الدرس الحالي',
+    'player.editModuleAria': 'تعديل الوحدة {{title}}',
+    'player.deleteModuleAria': 'حذف الوحدة {{title}}',
+    'player.noModulesTitle': 'لا توجد وحدات بعد',
+    'player.noModulesAdmin': 'أضف أول وحدة لبدء بناء دروس هذا الكورس.',
+    'player.noModulesStudent': 'لم يُضف المدرب وحدات لهذا الكورس حتى الآن.',
+    'player.moduleLabel': 'الوحدة {{num}}',
+    'player.addLesson': 'إضافة درس',
+    'player.videoIncluded': 'يتضمن فيديو',
+    'player.noLessonsInModule': 'لا توجد دروس في هذه الوحدة بعد.',
+    'player.placeholderTitle': 'فيديو تجريبي للدرس',
+    'player.placeholderBody':
+      'هذا الدرس التجريبي يستخدم رابطاً تمهيدياً ({{url}}). أضف رابط يوتيوب فعلياً من تعديل الدرس لتشغيل الفيديو هنا.',
+    'player.unsupportedVideo': 'صيغة رابط الفيديو غير مدعومة',
+    'player.unsupportedVideoHint': 'استخدم رابط YouTube قياسي للمشاهدة أو المشاركة.',
+    'player.editLesson': 'تعديل الدرس',
+    'player.prevLesson': 'الدرس السابق',
+    'player.nextLesson': 'الدرس التالي',
+    'player.completed': 'مكتمل',
+    'player.markComplete': 'تحديد كمكتمل',
+    'player.progressMarkedDone': 'تم تحديد "{{title}}" كمكتمل.',
+    'player.progressMarkedUndone': 'تم إلغاء اكتمال "{{title}}".',
+    'player.noSelectionTitle': 'لا يوجد درس محدد',
+    'player.noSelectionModulesEmpty': 'أضف وحدة أولاً لبدء إعداد منهج الكورس.',
+    'player.noSelectionLessonsEmpty': 'أضف درساً إلى أي وحدة من القائمة الجانبية.',
+    'player.deleteModuleTitle': 'حذف الوحدة',
+    'player.deleteLessonTitle': 'حذف الدرس',
+    'player.deleteConfirmMsg': 'هل تريد حذف "{{title}}"؟ لا يمكن التراجع عن هذا الإجراء.',
+    'player.returnCatalog': 'العودة للكتالوج',
+
+    // Profile
+    'profile.title': 'إعدادات الحساب',
+    'profile.subtitle': 'حدّث بياناتك الشخصية وإعدادات أمان الحساب.',
+    'profile.roleLabel': 'الدور',
+    'profile.detailsTitle': 'البيانات الشخصية',
+    'profile.detailsNote': 'تظهر التعديلات مباشرة في جلستك الحالية.',
+    'profile.nameLabel': 'الاسم الكامل',
+    'profile.emailLabel': 'البريد الإلكتروني',
+    'profile.saveBtn': 'حفظ البيانات',
+    'profile.updated': 'تم تحديث بيانات الحساب.',
+    'profile.securityTitle': 'كلمة المرور والأمان',
+    'profile.securityNote':
+      'تغيير كلمة المرور ينهي الجلسات الحالية ويتطلب تسجيل الدخول من جديد.',
+    'profile.currentPw': 'كلمة المرور الحالية',
+    'profile.currentPwRequired': 'كلمة المرور الحالية مطلوبة',
+    'profile.newPw': 'كلمة المرور الجديدة',
+    'profile.confirmPw': 'تأكيد كلمة المرور الجديدة',
+    'profile.updatePwBtn': 'تحديث كلمة المرور',
+    'profile.updatingPw': 'جاري التحديث...',
+    'profile.pwUpdatedMsg':
+      'تم تغيير كلمة المرور. سيتم تسجيل خروجك لتدخل بكلمة المرور الجديدة...',
+
+    // Authoring Modals
+    'modal.addModuleTitle': 'إضافة وحدة جديدة',
+    'modal.addModuleDesc': 'اجمع الدروس المترابطة داخل قسم منظم في المنهج.',
+    'modal.moduleTitleLabel': 'عنوان الوحدة',
+    'modal.moduleTitlePh': 'مثال: الوحدة الأولى: الأساسيات',
+    'modal.moduleSummaryLabel': 'ملخص قصير',
+    'modal.moduleSummaryPh': 'الهدف الرئيسي من هذه الوحدة',
+    'modal.moduleOverviewLabel': 'نظرة عامة',
+    'modal.moduleOverviewPh': 'ما الموضوعات التي تغطيها هذه الوحدة؟',
+    'modal.saveModule': 'حفظ الوحدة',
+    'modal.editModuleTitle': 'تعديل الوحدة',
+    'modal.moduleObjectiveLabel': 'هدف الوحدة',
+
+    'modal.addLessonTitle': 'إضافة درس جديد',
+    'modal.addLessonDesc': 'أنشئ درساً نصياً مع إمكانية إرفاق فيديو من YouTube.',
+    'modal.lessonTitleLabel': 'عنوان الدرس',
+    'modal.lessonTitlePh': 'مثال: مقدمة في بناء الـ API',
+    'modal.lessonDescLabel': 'وصف مختصر',
+    'modal.lessonDescPh': 'جملة توضح فكرة الدرس الأساسية',
+    'modal.lessonNotesLabel': 'محتوى الدرس',
+    'modal.lessonNotesPh': 'اكتب مادة القراءة أو شرح الدرس هنا...',
+    'modal.lessonVideoLabel': 'رابط فيديو YouTube',
+    'modal.optional': '(اختياري)',
+    'modal.saveLesson': 'حفظ الدرس',
+    'modal.editLessonTitle': 'تعديل الدرس',
+
+    'modal.editCourseTitle': 'تعديل بيانات الكورس',
+    'modal.courseTitleLabel': 'عنوان الكورس',
+    'modal.courseDescLabel': 'الوصف',
+    'modal.saveChanges': 'حفظ التعديلات',
+  },
+};
+
+const COUNT_FORMS = {
+  course: {
+    en: { zero: '0 courses', one: '1 course', many: '{{n}} courses' },
+    ar: {
+      zero: 'لا توجد كورسات',
+      one: 'كورس واحد',
+      two: 'كورسان',
+      few: '{{n}} كورسات',
+      many: '{{n}} كورساً',
+    },
+  },
+  module: {
+    en: { zero: '0 modules', one: '1 module', many: '{{n}} modules' },
+    ar: {
+      zero: '0 وحدات',
+      one: 'وحدة واحدة',
+      two: 'وحدتان',
+      few: '{{n}} وحدات',
+      many: '{{n}} وحدة',
+    },
+  },
+  lesson: {
+    en: { zero: '0 lessons', one: '1 lesson', many: '{{n}} lessons' },
+    ar: {
+      zero: '0 دروس',
+      one: 'درس واحد',
+      two: 'درسان',
+      few: '{{n}} دروس',
+      many: '{{n}} درساً',
+    },
+  },
+};
+
+export const formatPluralCount = (count, noun, lang) => {
+  const forms = COUNT_FORMS[noun]?.[lang] || COUNT_FORMS[noun]?.en;
+  if (!forms) return String(count);
+
+  if (lang === 'ar') {
+    if (count === 0) return forms.zero;
+    if (count === 1) return forms.one;
+    if (count === 2) return forms.two;
+    if (count >= 3 && count <= 10) return forms.few.replace('{{n}}', String(count));
+    return forms.many.replace('{{n}}', String(count));
+  }
+
+  if (count === 0) return forms.zero;
+  if (count === 1) return forms.one;
+  return forms.many.replace('{{n}}', String(count));
+};
+
+const SERVER_MESSAGE_AR = {
+  'Invalid email or password': 'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+  'Account Already Exist': 'هذا البريد الإلكتروني مسجّل بالفعل.',
+  'Course not found': 'الكورس غير موجود.',
+  'Module not found': 'الوحدة غير موجودة.',
+  'Lesson not found': 'الدرس غير موجود.',
+  'You are already enrolled in this course': 'أنت مسجّل بالفعل في هذا الكورس.',
+  'You must be enrolled to access this course content':
+    'يجب التسجيل في الكورس أولاً للوصول إلى الدروس.',
+  'Incorrect current password.': 'كلمة المرور الحالية غير صحيحة.',
+  'New password cannot be the same as the current password.':
+    'كلمة المرور الجديدة يجب أن تختلف عن الحالية.',
+  'Invalid or expired reset token.': 'رابط الاستعادة غير صالح أو انتهت صلاحيته.',
+  'If an account exists, a password reset email has been sent.':
+    'إذا كان البريد مسجلاً لدينا، فقد أرسلنا إليه رابط استعادة كلمة المرور.',
+  'Password reset successfully.': 'تمت إعادة تعيين كلمة المرور بنجاح.',
+  'Password changed successfully.': 'تم تغيير كلمة المرور بنجاح.',
+};
+
+export const translateServerError = (message, lang, fallbackKey) => {
+  if (!message) {
+    return fallbackKey ? TRANSLATIONS[lang]?.[fallbackKey] || '' : '';
+  }
+  if (lang === 'ar') {
+    if (SERVER_MESSAGE_AR[message]) return SERVER_MESSAGE_AR[message];
+    if (message.startsWith('Network error:')) {
+      return 'تعذّر الاتصال بالخادم. تأكد من تشغيل الـ Backend على المنفذ المحدد.';
+    }
+  }
+  return message;
+};

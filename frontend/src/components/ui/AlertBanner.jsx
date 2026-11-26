@@ -6,6 +6,7 @@ import {
   WarningCircle,
   X,
 } from '@phosphor-icons/react';
+import { useLanguage } from '../../context/LanguageContext';
 
 const VARIANT_STYLES = {
   error: {
@@ -27,8 +28,8 @@ const VARIANT_STYLES = {
     role: 'alert',
   },
   info: {
-    container: 'bg-[#EFF6FF] border-[#BFDBFE] text-[#1E40AF]',
-    iconColor: 'text-[#1D4ED8]',
+    container: 'bg-[#CCFBF1] border-[#5EEAD4] text-[#115E59]',
+    iconColor: 'text-[#0D9488]',
     Icon: Info,
     role: 'status',
   },
@@ -40,6 +41,7 @@ export const AlertBanner = ({
   onDismiss,
   className = '',
 }) => {
+  const { t } = useLanguage();
   const style = VARIANT_STYLES[variant] || VARIANT_STYLES.info;
   const { Icon } = style;
 
@@ -59,8 +61,8 @@ export const AlertBanner = ({
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="Dismiss message"
-          className="shrink-0 rounded p-0.5 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+          aria-label={t('common.dismiss')}
+          className="shrink-0 rounded p-0.5 opacity-70 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
         >
           <X size={16} aria-hidden="true" />
         </button>

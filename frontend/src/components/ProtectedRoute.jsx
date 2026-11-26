@@ -1,9 +1,11 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export const ProtectedRoute = ({ children, allowedRoles }) => {
   const { userToken, currentUser, userLoading } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
 
   if (!userToken) {
@@ -14,9 +16,9 @@ export const ProtectedRoute = ({ children, allowedRoles }) => {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div
-          className="h-7 w-7 animate-spin rounded-full border-2 border-[#E2E8F0] border-t-[#1D4ED8]"
+          className="h-7 w-7 animate-spin rounded-full border-2 border-[#99F6E4] border-t-[#0D9488]"
           role="status"
-          aria-label="Verifying access"
+          aria-label={t('common.verifyingAccess')}
         />
       </div>
     );

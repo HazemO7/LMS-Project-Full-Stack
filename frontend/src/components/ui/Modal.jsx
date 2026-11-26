@@ -1,5 +1,9 @@
 import React, { useEffect, useId, useRef } from 'react';
 import { X } from '@phosphor-icons/react';
+import { useLanguage } from '../../context/LanguageContext';
+
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 export const Modal = ({
   open,
@@ -9,6 +13,7 @@ export const Modal = ({
   children,
   maxWidthClass = 'max-w-lg',
 }) => {
+  const { t } = useLanguage();
   const titleId = useId();
   const panelRef = useRef(null);
 
@@ -20,12 +25,48 @@ export const Modal = ({
     document.body.style.overflow = 'hidden';
 
     const focusTimer = window.setTimeout(() => {
-      panelRef.current?.focus();
+      const panel = panelRef.current;
+      if (!panel) return;
+      const focusable = panel.querySelectorAll(FOCUSABLE_SELECTOR);
+      if (focusable.length > 0) {
+        focusable[0].focus();
+      } else {
+        panel.focus();
+      }
     }, 0);
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
+        e.preventDefault();
         onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && panelRef.current) {
+        const focusable = Array.from(
+          panelRef.current.querySelectorAll(FOCUSABLE_SELECTOR)
+        );
+        if (focusable.length === 0) {
+          e.preventDefault();
+          panelRef.current.focus();
+          return;
+        }
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (
+            document.activeElement === first ||
+            document.activeElement === panelRef.current
+          ) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     };
 
@@ -44,7 +85,7 @@ export const Modal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/60 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B3B3C]/65 p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -55,30 +96,31 @@ export const Modal = ({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`w-full ${maxWidthClass} rounded-xl border border-[#E2E8F0] bg-white shadow-xl outline-none`}
+        className={`flex max-h-[calc(100vh-2rem)] w-full flex-col ${maxWidthClass} overflow-hidden rounded-xl border border-[#99F6E4] bg-white shadow-xl outline-none`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[#E2E8F0] px-6 py-4">
+        <div className="h-1 shrink-0 w-full bg-gradient-to-r from-[#0D9488] to-[#F59E0B]" />
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-[#CCFBF1] bg-[#F0FDFA] px-6 py-4">
           <div>
             <h2
               id={titleId}
-              className="font-display text-lg font-semibold text-[#0F172A]"
+              className="font-display text-lg font-semibold text-[#0D2E2F]"
             >
               {title}
             </h2>
             {description && (
-              <p className="mt-1 text-sm text-[#475569]">{description}</p>
+              <p className="mt-1 text-sm text-[#335C5D]">{description}</p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close modal"
-            className="rounded-lg p-1.5 text-[#475569] transition-colors hover:bg-[#EEF1F6] hover:text-[#0F172A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+            aria-label={t('common.closeModal')}
+            className="rounded-lg p-1.5 text-[#335C5D] transition-colors hover:bg-[#CCFBF1] hover:text-[#0D2E2F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
           >
             <X size={18} aria-hidden="true" />
           </button>
         </div>
-        <div className="px-6 py-5">{children}</div>
+        <div className="overflow-y-auto px-6 py-5">{children}</div>
       </div>
     </div>
   );

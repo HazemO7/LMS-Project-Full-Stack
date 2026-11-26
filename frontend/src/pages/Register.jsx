@@ -3,18 +3,21 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Eye, EyeSlash, UserPlus } from '@phosphor-icons/react';
 import { authAPI } from '../services/api';
-import { PASSWORD_RULES } from '../utils/passwordRules';
+import { useLanguage } from '../context/LanguageContext';
+import { getPasswordRules } from '../utils/passwordRules';
 import { AuthShell } from '../components/AuthShell';
 import { AlertBanner } from '../components/ui/AlertBanner';
+import { FormErrorSummary } from '../components/ui/FormErrorSummary';
 import { PasswordStrengthMeter } from '../components/ui/PasswordStrengthMeter';
 
 export const Register = () => {
   const navigate = useNavigate();
+  const { t, tServer } = useLanguage();
   const {
     register,
     handleSubmit,
     watch,
-    formState: { errors },
+    formState: { errors, submitCount },
   } = useForm();
 
   const [error, setError] = useState('');
@@ -49,47 +52,54 @@ export const Register = () => {
 
   return (
     <AuthShell
-      title="Create account"
-      subtitle="Register as a student to enroll in courses and track progress."
-      asideTitle="Start learning with a clear syllabus."
-      asideBody="Student accounts get instant access to course enrollment, lesson checklists, and progress tracking."
-      asidePoints={[
-        'Enroll in published engineering and design courses',
-        'Save completion state across every module and lesson',
-        'Strong password policy enforced automatically on signup',
-      ]}
+      title={t('register.title')}
+      subtitle={t('register.subtitle')}
+      asideTitle={t('register.asideTitle')}
+      asideBody={t('register.asideBody')}
+      asidePoints={[t('register.aside1'), t('register.aside2'), t('register.aside3')]}
     >
       {error && (
         <AlertBanner variant="error" className="mb-5" onDismiss={() => setError('')}>
-          {error}
+          {tServer(error)}
         </AlertBanner>
       )}
+
+      <div className="mb-5">
+        <FormErrorSummary
+          errors={errors}
+          submitCount={submitCount}
+          fieldMap={{
+            name: 'register-name',
+            email: 'register-email',
+            password: 'register-password',
+          }}
+        />
+      </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
         <div>
           <label
             htmlFor="register-name"
-            className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+            className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
           >
-            Full name
+            {t('register.nameLabel')}
           </label>
           <input
             id="register-name"
             type="text"
             autoComplete="name"
-            placeholder="Alex Rivera"
+            placeholder={t('register.namePlaceholder')}
             disabled={loading}
             aria-invalid={Boolean(errors.name)}
             {...register('name', {
-              required: 'Full name is required',
-              validate: (value) =>
-                value.trim().length >= 3 || 'Name must be at least 3 characters',
-              maxLength: { value: 50, message: 'Name cannot exceed 50 characters' },
+              required: t('register.nameRequired'),
+              validate: (value) => value.trim().length >= 3 || t('register.nameMin'),
+              maxLength: { value: 50, message: t('register.nameMax') },
             })}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 ${
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
               errors.name
-                ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                : 'border-[#CBD5E1] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20'
+                ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
             }`}
           />
           {errors.name && (
@@ -102,28 +112,29 @@ export const Register = () => {
         <div>
           <label
             htmlFor="register-email"
-            className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+            className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
           >
-            Email address
+            {t('auth.emailLabel')}
           </label>
           <input
             id="register-email"
             type="email"
+            dir="ltr"
             autoComplete="email"
-            placeholder="alex@example.com"
+            placeholder={t('auth.emailPlaceholder')}
             disabled={loading}
             aria-invalid={Boolean(errors.email)}
             {...register('email', {
-              required: 'Email address is required',
+              required: t('auth.emailRequired'),
               pattern: {
                 value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                message: 'Please enter a valid email address',
+                message: t('auth.emailInvalid'),
               },
             })}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 ${
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
               errors.email
-                ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                : 'border-[#CBD5E1] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20'
+                ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
             }`}
           />
           {errors.email && (
@@ -136,30 +147,30 @@ export const Register = () => {
         <div>
           <label
             htmlFor="register-password"
-            className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+            className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
           >
-            Password
+            {t('auth.passwordLabel')}
           </label>
-          <div className="relative">
+          <div className="relative" dir="ltr">
             <input
               id="register-password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
-              placeholder="Create a strong password"
+              placeholder={t('register.passwordPlaceholder')}
               disabled={loading}
               aria-invalid={Boolean(errors.password)}
-              {...register('password', PASSWORD_RULES)}
-              className={`w-full rounded-lg border px-3.5 py-2.5 pr-11 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 ${
+              {...register('password', getPasswordRules(t))}
+              className={`w-full rounded-lg border py-2.5 pl-3.5 pr-11 text-left text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
                 errors.password
-                  ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                  : 'border-[#CBD5E1] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20'
+                  ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                  : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
               }`}
             />
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-[#64748B] hover:text-[#0F172A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+              aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-[#335C5D] hover:text-[#0B3B3C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
             >
               {showPassword ? (
                 <EyeSlash size={18} aria-hidden="true" />
@@ -182,19 +193,19 @@ export const Register = () => {
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1D4ED8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-2 disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           <UserPlus size={17} weight="bold" aria-hidden="true" />
-          {loading ? 'Creating account...' : 'Create account'}
+          {loading ? t('register.submitting') : t('register.submit')}
         </button>
 
-        <p className="text-center text-sm text-[#475569]">
-          Already have an account?{' '}
+        <p className="text-center text-sm text-[#335C5D]">
+          {t('register.hasAccount')}{' '}
           <Link
             to="/login"
-            className="font-semibold text-[#1D4ED8] hover:text-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+            className="font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
           >
-            Sign in
+            {t('register.signInLink')}
           </Link>
         </p>
       </form>

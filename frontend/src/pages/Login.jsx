@@ -3,18 +3,21 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Eye, EyeSlash, SignIn } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { authAPI } from '../services/api';
 import { AuthShell } from '../components/AuthShell';
 import { AlertBanner } from '../components/ui/AlertBanner';
+import { FormErrorSummary } from '../components/ui/FormErrorSummary';
 
 export const Login = () => {
   const { loginUser } = useAuth();
+  const { t, tServer } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, submitCount },
   } = useForm();
 
   const [error, setError] = useState('');
@@ -27,6 +30,7 @@ export const Login = () => {
   const fromPath = location.state?.from?.pathname || '/courses';
   const redirectedFromProtected = Boolean(location.state?.from);
   const justRegistered = Boolean(location.state?.registered);
+  const passwordChanged = Boolean(location.state?.passwordChanged);
 
   useEffect(() => {
     if (!lockedUntil) {
@@ -90,35 +94,33 @@ export const Login = () => {
 
   return (
     <AuthShell
-      title="Sign in"
-      subtitle="Access your enrolled courses, modules, and progress."
-      asideTitle="Pick up right where you stopped."
-      asideBody="Your active course enrollments, completed lessons, and role permissions stay synced across sessions."
-      asidePoints={[
-        'Role-based dashboards for students, instructors, and admins',
-        'Protected enrollment and lesson progress persistence',
-        'Brute-force lockout protection on repeated failed attempts',
-      ]}
+      title={t('login.title')}
+      subtitle={t('login.subtitle')}
+      asideTitle={t('login.asideTitle')}
+      asideBody={t('login.asideBody')}
+      asidePoints={[t('login.aside1'), t('login.aside2'), t('login.aside3')]}
     >
       <div className="space-y-4">
         {justRegistered && (
-          <AlertBanner variant="success">
-            Account created successfully. Sign in with your email and password.
-          </AlertBanner>
+          <AlertBanner variant="success">{t('login.justRegistered')}</AlertBanner>
         )}
 
-        {redirectedFromProtected && !justRegistered && (
-          <AlertBanner variant="info">
-            Please sign in to access this page.
-          </AlertBanner>
+        {passwordChanged && (
+          <AlertBanner variant="success">{t('login.passwordChanged')}</AlertBanner>
+        )}
+
+        {redirectedFromProtected && !justRegistered && !passwordChanged && (
+          <AlertBanner variant="info">{t('login.redirected')}</AlertBanner>
         )}
 
         {error && !lockedUntil && (
           <AlertBanner variant="error" onDismiss={() => setError('')}>
-            <span>{error}</span>
+            <span>{tServer(error)}</span>
             {remainingAttempts !== null && (
               <span className="mt-1 block font-mono-tabular text-xs font-medium">
-                {remainingAttempts} {remainingAttempts === 1 ? 'attempt' : 'attempts'} remaining before temporary lockout.
+                {remainingAttempts === 1
+                  ? t('login.attemptRemainingOne')
+                  : t('login.attemptsRemaining', { count: remainingAttempts })}
               </span>
             )}
           </AlertBanner>
@@ -126,41 +128,51 @@ export const Login = () => {
 
         {lockedUntil && (
           <AlertBanner variant="warning">
-            <p className="font-semibold">Account temporarily locked</p>
+            <p className="font-semibold">{t('login.lockedTitle')}</p>
             <p className="mt-0.5">
-              Multiple failed login attempts detected. Try again in{' '}
-              <span className="font-mono-tabular font-semibold">{countdown}</span>.
+              {t('login.lockedBody')}{' '}
+              <span dir="ltr" className="font-mono-tabular font-semibold">
+                {countdown}
+              </span>
+              .
             </p>
           </AlertBanner>
         )}
+
+        <FormErrorSummary
+          errors={errors}
+          submitCount={submitCount}
+          fieldMap={{ email: 'login-email', password: 'login-password' }}
+        />
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-5 space-y-5">
         <div>
           <label
             htmlFor="login-email"
-            className="mb-1.5 block text-sm font-medium text-[#0F172A]"
+            className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
           >
-            Email address
+            {t('auth.emailLabel')}
           </label>
           <input
             id="login-email"
             type="email"
+            dir="ltr"
             autoComplete="email"
-            placeholder="you@example.com"
+            placeholder={t('auth.emailPlaceholder')}
             disabled={loading}
             aria-invalid={Boolean(errors.email)}
             {...register('email', {
-              required: 'Email address is required',
+              required: t('auth.emailRequired'),
               pattern: {
                 value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                message: 'Please enter a valid email address',
+                message: t('auth.emailInvalid'),
               },
             })}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 ${
+            className={`w-full rounded-lg border px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
               errors.email
-                ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                : 'border-[#CBD5E1] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20'
+                ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
             }`}
           />
           {errors.email && (
@@ -174,39 +186,39 @@ export const Login = () => {
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <label
               htmlFor="login-password"
-              className="block text-sm font-medium text-[#0F172A]"
+              className="block text-sm font-medium text-[#0D2E2F]"
             >
-              Password
+              {t('auth.passwordLabel')}
             </label>
             <Link
               to="/forgot-password"
-              className="text-xs font-medium text-[#1D4ED8] hover:text-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+              className="text-xs font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
             >
-              Forgot password?
+              {t('login.forgot')}
             </Link>
           </div>
-          <div className="relative">
+          <div className="relative" dir="ltr">
             <input
               id="login-password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
-              placeholder="Enter your password"
+              placeholder={t('login.passwordPlaceholder')}
               disabled={loading}
               aria-invalid={Boolean(errors.password)}
               {...register('password', {
-                required: 'Password is required',
+                required: t('auth.passwordRequired'),
               })}
-              className={`w-full rounded-lg border px-3.5 py-2.5 pr-11 text-sm text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 ${
+              className={`w-full rounded-lg border py-2.5 pl-3.5 pr-11 text-left text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
                 errors.password
-                  ? 'border-[#DC2626] focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                  : 'border-[#CBD5E1] focus:border-[#1D4ED8] focus:ring-[#1D4ED8]/20'
+                  ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
+                  : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
               }`}
             />
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-[#64748B] hover:text-[#0F172A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+              aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-[#335C5D] hover:text-[#0B3B3C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
             >
               {showPassword ? (
                 <EyeSlash size={18} aria-hidden="true" />
@@ -225,19 +237,19 @@ export const Login = () => {
         <button
           type="submit"
           disabled={loading || Boolean(lockedUntil)}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#1D4ED8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8] focus-visible:ring-offset-2 disabled:opacity-60"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
         >
-          <SignIn size={17} weight="bold" aria-hidden="true" />
-          {loading ? 'Signing in...' : 'Sign in'}
+          <SignIn size={17} weight="bold" aria-hidden="true" className="rtl:rotate-180" />
+          {loading ? t('login.submitting') : t('login.submit')}
         </button>
 
-        <p className="text-center text-sm text-[#475569]">
-          New to Foundry?{' '}
+        <p className="text-center text-sm text-[#335C5D]">
+          {t('login.newUser')}{' '}
           <Link
             to="/register"
-            className="font-semibold text-[#1D4ED8] hover:text-[#1E40AF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]"
+            className="font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
           >
-            Create an account
+            {t('login.createOne')}
           </Link>
         </p>
       </form>
