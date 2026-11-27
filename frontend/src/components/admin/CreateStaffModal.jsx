@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, EnvelopeSimple, Key, UserPlus } from '@phosphor-icons/react';
 import { Modal } from '../ui/Modal';
 import { AlertBanner } from '../ui/AlertBanner';
@@ -253,36 +253,79 @@ const buildStaffCreatePayload = (form, autoGeneratePassword) => ({
   sendEmail: form.sendEmail,
 });
 
-export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
-  const { t, tServer } = useLanguage();
+const copyTextToClipboard = async (text) => {
+  if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
+  await navigator.clipboard.writeText(text);
+};
+
+const formatCredentialsText = (result) =>
+  `Email: ${result.data.email}\nTemporary Password: ${result.temporaryPassword}`;
+
+const useStaffCopyState = (sessionRef, t) => {
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
+  const attemptRef = useRef(0);
+  const timerRef = useRef(null);
+
+  const resetCopyState = useCallback(() => {
+    attemptRef.current += 1;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+    setCopied(false);
+    setCopyError('');
+  }, []);
+
+  const isStaleAttempt = (sessionId, attemptId) =>
+    sessionRef.current !== sessionId || attemptRef.current !== attemptId;
+
+  const scheduleCopiedReset = (sessionId, attemptId) => {
+    timerRef.current = setTimeout(() => {
+      if (!isStaleAttempt(sessionId, attemptId)) setCopied(false);
+    }, 2500);
+  };
+
+  const handleCopyCredentials = async (createdResult) => {
+    if (!createdResult?.data) return;
+    const sessionId = sessionRef.current;
+    const attemptId = ++attemptRef.current;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setCopyError('');
+    setCopied(false);
+    try {
+      await copyTextToClipboard(formatCredentialsText(createdResult));
+      if (isStaleAttempt(sessionId, attemptId)) return;
+      setCopied(true);
+      scheduleCopiedReset(sessionId, attemptId);
+    } catch {
+      if (isStaleAttempt(sessionId, attemptId)) return;
+      setCopied(false);
+      setCopyError(t('admin.copyCredentialsFailed'));
+    }
+  };
+
+  return { copied, copyError, clearCopyError: () => setCopyError(''), resetCopyState, handleCopyCredentials };
+};
+
+const useStaffFormState = (open, onCreated, t) => {
   const [form, setForm] = useState(INITIAL_STAFF_FORM);
   const [autoGeneratePassword, setAutoGeneratePassword] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [createdResult, setCreatedResult] = useState(null);
-  const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState('');
   const sessionRef = useRef(0);
-  const copyAttemptRef = useRef(0);
-  const copyTimerRef = useRef(null);
+  const copyState = useStaffCopyState(sessionRef, t);
+
+  const { resetCopyState } = copyState;
 
   useEffect(() => {
     sessionRef.current += 1;
-    copyAttemptRef.current += 1;
-    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-    copyTimerRef.current = null;
+    resetCopyState();
     setForm(INITIAL_STAFF_FORM);
     setAutoGeneratePassword(true);
     setSubmitting(false);
     setError('');
     setCreatedResult(null);
-    setCopied(false);
-    setCopyError('');
-  }, [open]);
-
-  const requestClose = () => {
-    if (!submitting) onClose();
-  };
+  }, [open, resetCopyState]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -300,57 +343,47 @@ export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
     }
   };
 
-  const handleCopyCredentials = async () => {
-    if (!createdResult?.data) return;
-    const sessionId = sessionRef.current;
-    const attemptId = ++copyAttemptRef.current;
-    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-    setCopyError('');
-    setCopied(false);
-    const text = `Email: ${createdResult.data.email}\nTemporary Password: ${createdResult.temporaryPassword}`;
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
-      await navigator.clipboard.writeText(text);
-      if (sessionRef.current !== sessionId || copyAttemptRef.current !== attemptId) return;
-      setCopied(true);
-      copyTimerRef.current = setTimeout(() => {
-        if (sessionRef.current === sessionId && copyAttemptRef.current === attemptId) setCopied(false);
-      }, 2500);
-    } catch {
-      if (sessionRef.current !== sessionId || copyAttemptRef.current !== attemptId) return;
-      setCopied(false);
-      setCopyError(t('admin.copyCredentialsFailed'));
-    }
+  return {
+    form, setForm, autoGeneratePassword, setAutoGeneratePassword,
+    submitting, error, createdResult, copyState, handleSubmit,
+  };
+};
+
+export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
+  const { t, tServer } = useLanguage();
+  const state = useStaffFormState(open, onCreated, t);
+  const requestClose = () => {
+    if (!state.submitting) onClose();
   };
 
   return (
     <Modal
       open={open}
       onClose={requestClose}
-      title={createdResult ? t('admin.staffCreatedTitle') : t('admin.addStaffTitle')}
-      description={createdResult ? t('admin.staffCreatedDesc') : t('admin.addStaffDesc')}
+      title={state.createdResult ? t('admin.staffCreatedTitle') : t('admin.addStaffTitle')}
+      description={state.createdResult ? t('admin.staffCreatedDesc') : t('admin.addStaffDesc')}
       maxWidthClass="max-w-xl"
     >
-      {createdResult ? (
+      {state.createdResult ? (
         <StaffCredentialsSummary
-          createdResult={createdResult}
-          copied={copied}
-          copyError={copyError}
-          onClearCopyError={() => setCopyError('')}
-          onCopy={handleCopyCredentials}
+          createdResult={state.createdResult}
+          copied={state.copyState.copied}
+          copyError={state.copyState.copyError}
+          onClearCopyError={state.copyState.clearCopyError}
+          onCopy={() => state.copyState.handleCopyCredentials(state.createdResult)}
           onDone={requestClose}
           t={t}
         />
       ) : (
         <StaffAccountForm
-          form={form}
-          setForm={setForm}
+          form={state.form}
+          setForm={state.setForm}
           isSuperAdmin={callerRole === 'super_admin'}
-          autoGeneratePassword={autoGeneratePassword}
-          setAutoGeneratePassword={setAutoGeneratePassword}
-          submitting={submitting}
-          error={error}
-          onSubmit={handleSubmit}
+          autoGeneratePassword={state.autoGeneratePassword}
+          setAutoGeneratePassword={state.setAutoGeneratePassword}
+          submitting={state.submitting}
+          error={state.error}
+          onSubmit={state.handleSubmit}
           onCancel={requestClose}
           t={t}
           tServer={tServer}

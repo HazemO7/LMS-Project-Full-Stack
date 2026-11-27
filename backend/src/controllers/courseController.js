@@ -151,7 +151,7 @@ const handleCourseMutationError = (res, req, actionLabel, error) => {
     return res.status(500).json({ status: "error", message: `Failed to ${actionLabel.toLowerCase()}` });
 };
 
-const runCourseMutation = async (req, res, actionLabel, mutationFn, buildSuccessBody) => {
+const runCourseMutation = async (req, res, { actionLabel, mutationFn, buildSuccessBody }) => {
     try {
         if (!isValidObjectId(req.params.id)) {
             return res.status(400).json({ status: "fail", message: "Invalid course ID" });
@@ -180,24 +180,20 @@ const updateCourse = (req, res) => {
     if (error) return res.status(error.status).json(error.body);
 
     const updateFields = buildCourseUpdateFields(req.body, uniqueIds);
-    return runCourseMutation(
-        req,
-        res,
-        "Update course",
-        () => executeCourseUpdate(req, updateFields, uniqueIds),
-        (outcome) => ({ status: "success", data: outcome.data })
-    );
+    return runCourseMutation(req, res, {
+        actionLabel: "Update course",
+        mutationFn: () => executeCourseUpdate(req, updateFields, uniqueIds),
+        buildSuccessBody: (outcome) => ({ status: "success", data: outcome.data }),
+    });
 };
 
 // Delete Course
 const deleteCourse = (req, res) =>
-    runCourseMutation(
-        req,
-        res,
-        "Delete course",
-        () => executeCourseDelete(req),
-        () => ({ status: "success", message: "Course deleted successfully" })
-    );
+    runCourseMutation(req, res, {
+        actionLabel: "Delete course",
+        mutationFn: () => executeCourseDelete(req),
+        buildSuccessBody: () => ({ status: "success", message: "Course deleted successfully" }),
+    });
 
 module.exports = {
     createCourse,

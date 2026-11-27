@@ -48,44 +48,71 @@ const StatusCell = ({ suspended, isLocked, mustChangePassword, t }) => {
   );
 };
 
-const UserActionButtons = ({ user, flags, actions, t }) => {
-  const { editable, isSelf, isSuperAdmin, isLocked, suspended } = flags;
+const UnlockButton = ({ visible, onClick, label }) => {
+  if (!visible) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className="rounded-lg border border-[#FDE68A] bg-[#FEF3C7] p-1.5 text-[#92400E] hover:bg-[#FDE68A]"
+    >
+      <LockOpen size={15} aria-hidden="true" />
+    </button>
+  );
+};
+
+const ToggleStatusButton = ({ visible, suspended, onClick, t }) => {
+  if (!visible) return null;
   const toggleBtnStyle = suspended
     ? 'border-[#A7F3D0] bg-[#D1FAE5] text-[#065F46] hover:bg-[#A7F3D0]'
     : 'border-[#FECACA] bg-[#FEF2F2] text-[#DC2626] hover:bg-[#FEE2E2]';
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={suspended ? t('admin.activateAccount') : t('admin.suspendAccount')}
+      className={`rounded-lg border p-1.5 ${toggleBtnStyle}`}
+    >
+      {suspended ? <PlayCircle size={15} aria-hidden="true" /> : <PauseCircle size={15} aria-hidden="true" />}
+    </button>
+  );
+};
 
+const DeleteUserButton = ({ visible, onClick, label }) => {
+  if (!visible) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      className="rounded-lg border border-[#FECACA] bg-white p-1.5 text-[#DC2626] hover:bg-[#FEF2F2]"
+    >
+      <Trash size={15} aria-hidden="true" />
+    </button>
+  );
+};
+
+const UserActionButtons = ({ user, flags, actions, t }) => {
+  const { editable, isSelf, isSuperAdmin, isLocked, suspended } = flags;
   return (
     <div className="inline-flex items-center gap-1.5">
-      {editable && isLocked && (
-        <button
-          type="button"
-          onClick={() => actions.onUnlockUser(user)}
-          title={t('admin.unlockAccount')}
-          className="rounded-lg border border-[#FDE68A] bg-[#FEF3C7] p-1.5 text-[#92400E] hover:bg-[#FDE68A]"
-        >
-          <LockOpen size={15} aria-hidden="true" />
-        </button>
-      )}
-      {editable && !isSelf && (
-        <button
-          type="button"
-          onClick={() => actions.onToggleStatus(user)}
-          title={suspended ? t('admin.activateAccount') : t('admin.suspendAccount')}
-          className={`rounded-lg border p-1.5 ${toggleBtnStyle}`}
-        >
-          {suspended ? <PlayCircle size={15} aria-hidden="true" /> : <PauseCircle size={15} aria-hidden="true" />}
-        </button>
-      )}
-      {isSuperAdmin && !isSelf && (
-        <button
-          type="button"
-          onClick={() => actions.onDeleteUser(user)}
-          title={t('admin.deleteUserTitle')}
-          className="rounded-lg border border-[#FECACA] bg-white p-1.5 text-[#DC2626] hover:bg-[#FEF2F2]"
-        >
-          <Trash size={15} aria-hidden="true" />
-        </button>
-      )}
+      <UnlockButton
+        visible={editable && isLocked}
+        onClick={() => actions.onUnlockUser(user)}
+        label={t('admin.unlockAccount')}
+      />
+      <ToggleStatusButton
+        visible={editable && !isSelf}
+        suspended={suspended}
+        onClick={() => actions.onToggleStatus(user)}
+        t={t}
+      />
+      <DeleteUserButton
+        visible={isSuperAdmin && !isSelf}
+        onClick={() => actions.onDeleteUser(user)}
+        label={t('admin.deleteUserTitle')}
+      />
     </div>
   );
 };

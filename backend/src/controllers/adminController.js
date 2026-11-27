@@ -42,7 +42,7 @@ const handleServerError = (req, res, context, error) => {
     });
 };
 
-const runLockedGovernanceAction = async (req, res, context, idErrorMsg, executor, formatBody) => {
+const runLockedGovernanceAction = async (req, res, { context, idErrorMsg, executor, formatBody }) => {
     try {
         if (!isValidObjectId(req.params.id)) {
             return res.status(400).json({ status: "fail", message: idErrorMsg });
@@ -154,44 +154,36 @@ const createStaffUser = async (req, res) => {
 };
 
 const updateUserRole = (req, res) =>
-    runLockedGovernanceAction(
-        req,
-        res,
-        "updateUserRole",
-        "Invalid user ID",
-        executeUserRoleUpdate,
-        (outcome) => ({ status: "success", data: sanitizeUser(outcome.updated) })
-    );
+    runLockedGovernanceAction(req, res, {
+        context: "updateUserRole",
+        idErrorMsg: "Invalid user ID",
+        executor: executeUserRoleUpdate,
+        formatBody: (outcome) => ({ status: "success", data: sanitizeUser(outcome.updated) }),
+    });
 
 const updateUserStatus = (req, res) =>
-    runLockedGovernanceAction(
-        req,
-        res,
-        "updateUserStatus",
-        "Invalid user ID",
-        executeUserStatusUpdate,
-        (outcome) => ({ status: "success", data: sanitizeUser(outcome.updated) })
-    );
+    runLockedGovernanceAction(req, res, {
+        context: "updateUserStatus",
+        idErrorMsg: "Invalid user ID",
+        executor: executeUserStatusUpdate,
+        formatBody: (outcome) => ({ status: "success", data: sanitizeUser(outcome.updated) }),
+    });
 
 const deleteUser = (req, res) =>
-    runLockedGovernanceAction(
-        req,
-        res,
-        "deleteUser",
-        "Invalid user ID",
-        executeUserDeletion,
-        () => ({ status: "success", message: "User deleted successfully" })
-    );
+    runLockedGovernanceAction(req, res, {
+        context: "deleteUser",
+        idErrorMsg: "Invalid user ID",
+        executor: executeUserDeletion,
+        formatBody: () => ({ status: "success", message: "User deleted successfully" }),
+    });
 
 const transferCourseOwnership = (req, res) =>
-    runLockedGovernanceAction(
-        req,
-        res,
-        "transferCourseOwnership",
-        "Invalid course ID",
-        executeCourseTransfer,
-        (outcome) => ({ status: "success", data: outcome.data })
-    );
+    runLockedGovernanceAction(req, res, {
+        context: "transferCourseOwnership",
+        idErrorMsg: "Invalid course ID",
+        executor: executeCourseTransfer,
+        formatBody: (outcome) => ({ status: "success", data: outcome.data }),
+    });
 
 const enrichCoursesWithCounts = async (courses) => {
     const courseIds = courses.map((c) => c._id);
@@ -279,19 +271,25 @@ const createManualEnrollment = async (req, course, student) => {
     return { enrollment };
 };
 
+const resolveEnrollmentTargets = async (req) => {
+    if (!isValidObjectId(req.params.id)) {
+        return { error: { status: 400, body: { status: "fail", message: "Invalid course ID" } } };
+    }
+    const course = await Course.findById(req.params.id);
+    if (!course) return { error: { status: 404, body: { status: "fail", message: "Course not found" } } };
+
+    const query = req.body.userId ? { _id: req.body.userId } : { email: req.body.email.trim().toLowerCase() };
+    const student = await User.findOne(query);
+    if (!student) return { error: { status: 404, body: { status: "fail", message: "User not found" } } };
+    return { course, student };
+};
+
 const manualEnrollUser = async (req, res) => {
     try {
-        if (!isValidObjectId(req.params.id)) {
-            return res.status(400).json({ status: "fail", message: "Invalid course ID" });
-        }
-        const course = await Course.findById(req.params.id);
-        if (!course) return res.status(404).json({ status: "fail", message: "Course not found" });
+        const targets = await resolveEnrollmentTargets(req);
+        if (targets.error) return res.status(targets.error.status).json(targets.error.body);
 
-        const query = req.body.userId ? { _id: req.body.userId } : { email: req.body.email.trim().toLowerCase() };
-        const student = await User.findOne(query);
-        if (!student) return res.status(404).json({ status: "fail", message: "User not found" });
-
-        const result = await createManualEnrollment(req, course, student);
+        const result = await createManualEnrollment(req, targets.course, targets.student);
         if (result.error) return res.status(result.error.status).json(result.error.body);
         return res.status(201).json({ status: "success", data: result.enrollment });
     } catch (error) {

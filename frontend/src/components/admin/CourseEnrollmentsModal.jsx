@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Trash, UserPlus } from '@phosphor-icons/react';
 import { Modal } from '../ui/Modal';
 import { AlertBanner } from '../ui/AlertBanner';
@@ -18,9 +18,22 @@ const updateIdSet = (prev, id, shouldAdd) => {
   return next;
 };
 
+const extractUserId = (item) => item.user?._id || item.user;
+const removeEnrollmentItem = (list, userId) => list.filter((item) => extractUserId(item) !== userId);
+
+const runSessionRequest = async ({ sessionRef, sessionId, run, onError, onFinally }) => {
+  try {
+    await run();
+  } catch (err) {
+    if (sessionRef.current === sessionId) onError(err);
+  } finally {
+    if (sessionRef.current === sessionId) onFinally();
+  }
+};
+
 const EnrollmentListItem = ({ item, removingUserIds, onUnenroll, t }) => {
   const student = item.user;
-  const uid = student?._id || item.user;
+  const uid = extractUserId(item);
   return (
     <li className="flex items-center justify-between gap-3 px-4 py-2.5">
       <div className="min-w-0">
@@ -58,80 +71,70 @@ const EnrollmentList = ({ loading, enrollments, removingUserIds, onUnenroll, t }
   );
 };
 
-const useCourseEnrollmentsState = (open, course, onChanged) => {
+const useCourseEnrollmentsState = (course, onChanged) => {
   const [enrollments, setEnrollments] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(Boolean(course?._id));
   const [email, setEmail] = useState('');
   const [adding, setAdding] = useState(false);
   const [removingUserIds, setRemovingUserIds] = useState(() => new Set());
   const [error, setError] = useState('');
   const sessionRef = useRef(0);
-
-  const isCurrentSession = (sessionId) => sessionRef.current === sessionId;
-
-  const loadEnrollments = useCallback(async (targetCourseId, sessionId) => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await adminAPI.getCourseEnrollments(targetCourseId);
-      if (isCurrentSession(sessionId)) setEnrollments(res.data || []);
-    } catch (err) {
-      if (isCurrentSession(sessionId)) setError(err.message || 'Failed to load enrollments');
-    } finally {
-      if (isCurrentSession(sessionId)) setLoading(false);
-    }
-  }, []);
+  const courseId = course?._id;
 
   useEffect(() => {
     const sessionId = ++sessionRef.current;
-    setEnrollments([]);
-    setError('');
-    setEmail('');
-    setAdding(false);
-    setRemovingUserIds(new Set());
-    if (!open || !course?._id) {
-      setLoading(false);
-      return;
-    }
-    loadEnrollments(course._id, sessionId);
-  }, [open, course?._id, loadEnrollments]);
+    if (!courseId) return;
+    runSessionRequest({
+      sessionRef,
+      sessionId,
+      onError: (err) => setError(err.message || 'Failed to load enrollments'),
+      onFinally: () => setLoading(false),
+      run: async () => {
+        const res = await adminAPI.getCourseEnrollments(courseId);
+        if (sessionRef.current === sessionId) setEnrollments(res.data || []);
+      },
+    });
+  }, [courseId]);
 
-  const handleEnroll = async (e) => {
+  const handleEnroll = (e) => {
     e.preventDefault();
-    const courseId = course?._id;
     if (!canSubmitEnrollment({ adding, loading, email, courseId })) return;
     const sessionId = sessionRef.current;
     setAdding(true);
     setError('');
-    try {
-      const res = await adminAPI.enrollUser(courseId, { email: email.trim() });
-      onChanged?.(courseId);
-      if (!isCurrentSession(sessionId)) return;
-      setEnrollments((prev) => [res.data, ...prev]);
-      setEmail('');
-    } catch (err) {
-      if (isCurrentSession(sessionId)) setError(err.message || 'Failed to enroll user');
-    } finally {
-      if (isCurrentSession(sessionId)) setAdding(false);
-    }
+    return runSessionRequest({
+      sessionRef,
+      sessionId,
+      onError: (err) => setError(err.message || 'Failed to enroll user'),
+      onFinally: () => setAdding(false),
+      run: async () => {
+        const res = await adminAPI.enrollUser(courseId, { email: email.trim() });
+        onChanged?.(courseId);
+        if (sessionRef.current !== sessionId) return;
+        setEnrollments((prev) => [res.data, ...prev]);
+        setEmail('');
+      },
+    });
   };
 
-  const handleUnenroll = async (userId) => {
-    const courseId = course?._id;
+  const handleUnenroll = (userId) => {
     if (!courseId || removingUserIds.has(userId)) return;
     const sessionId = sessionRef.current;
     setError('');
     setRemovingUserIds((prev) => updateIdSet(prev, userId, true));
-    try {
-      await adminAPI.unenrollUser(courseId, userId);
-      onChanged?.(courseId);
-      if (!isCurrentSession(sessionId)) return;
-      setEnrollments((prev) => prev.filter((item) => (item.user?._id || item.user) !== userId));
-    } catch (err) {
-      if (isCurrentSession(sessionId)) setError(err.message || 'Failed to remove enrollment');
-    } finally {
-      if (isCurrentSession(sessionId)) setRemovingUserIds((prev) => updateIdSet(prev, userId, false));
-    }
+    return runSessionRequest({
+      sessionRef,
+      sessionId,
+      onError: (err) => setError(err.message || 'Failed to remove enrollment'),
+      onFinally: () => setRemovingUserIds((prev) => updateIdSet(prev, userId, false)),
+      run: async () => {
+        await adminAPI.unenrollUser(courseId, userId);
+        onChanged?.(courseId);
+        if (sessionRef.current === sessionId) {
+          setEnrollments((prev) => removeEnrollmentItem(prev, userId));
+        }
+      },
+    });
   };
 
   return {
@@ -139,10 +142,45 @@ const useCourseEnrollmentsState = (open, course, onChanged) => {
   };
 };
 
+const CourseEnrollmentsBody = ({ course, onChanged, t, tServer }) => {
+  const state = useCourseEnrollmentsState(course, onChanged);
+  return (
+    <div className="space-y-4">
+      {state.error && <AlertBanner variant="error">{tServer(state.error)}</AlertBanner>}
+      <form onSubmit={state.handleEnroll} className="flex flex-col gap-2 sm:flex-row">
+        <input
+          type="email"
+          dir="ltr"
+          required
+          value={state.email}
+          onChange={(e) => state.setEmail(e.target.value)}
+          placeholder={t('admin.enrollEmailPh')}
+          className="flex-1 rounded-lg border border-[#99F6E4] px-3.5 py-2 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+        />
+        <button
+          type="submit"
+          disabled={state.adding || state.loading}
+          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E] disabled:opacity-60"
+        >
+          <UserPlus size={15} weight="bold" aria-hidden="true" />
+          {state.adding ? t('common.saving') : t('admin.enrollStudentBtn')}
+        </button>
+      </form>
+      <div className="max-h-72 overflow-y-auto rounded-xl border border-[#CCFBF1]">
+        <EnrollmentList
+          loading={state.loading}
+          enrollments={state.enrollments}
+          removingUserIds={state.removingUserIds}
+          onUnenroll={state.handleUnenroll}
+          t={t}
+        />
+      </div>
+    </div>
+  );
+};
+
 export const CourseEnrollmentsModal = ({ open, onClose, course, onChanged }) => {
   const { t, tServer } = useLanguage();
-  const state = useCourseEnrollmentsState(open, course, onChanged);
-
   return (
     <Modal
       open={open}
@@ -151,37 +189,15 @@ export const CourseEnrollmentsModal = ({ open, onClose, course, onChanged }) => 
       description={course ? course.title : ''}
       maxWidthClass="max-w-xl"
     >
-      <div className="space-y-4">
-        {state.error && <AlertBanner variant="error">{tServer(state.error)}</AlertBanner>}
-        <form onSubmit={state.handleEnroll} className="flex flex-col gap-2 sm:flex-row">
-          <input
-            type="email"
-            dir="ltr"
-            required
-            value={state.email}
-            onChange={(e) => state.setEmail(e.target.value)}
-            placeholder={t('admin.enrollEmailPh')}
-            className="flex-1 rounded-lg border border-[#99F6E4] px-3.5 py-2 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
-          />
-          <button
-            type="submit"
-            disabled={state.adding || state.loading}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E] disabled:opacity-60"
-          >
-            <UserPlus size={15} weight="bold" aria-hidden="true" />
-            {state.adding ? t('common.saving') : t('admin.enrollStudentBtn')}
-          </button>
-        </form>
-        <div className="max-h-72 overflow-y-auto rounded-xl border border-[#CCFBF1]">
-          <EnrollmentList
-            loading={state.loading}
-            enrollments={state.enrollments}
-            removingUserIds={state.removingUserIds}
-            onUnenroll={state.handleUnenroll}
-            t={t}
-          />
-        </div>
-      </div>
+      {open && (
+        <CourseEnrollmentsBody
+          key={course?._id || 'none'}
+          course={course}
+          onChanged={onChanged}
+          t={t}
+          tServer={tServer}
+        />
+      )}
     </Modal>
   );
 };

@@ -2,6 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { adminAPI } from '../../services/api';
 import { buildSettingsPatch, DEFAULT_SETTINGS, normalizeSettingsData } from './adminConstants';
 
+const isActiveReq = (reqIdRef, reqId) => reqId === reqIdRef.current;
+
+const runGuardedFetch = async ({ reqIdRef, setLoading, onStart, task, onError, fallbackError }) => {
+  const reqId = ++reqIdRef.current;
+  onStart?.();
+  setLoading(true);
+  try {
+    await task(() => isActiveReq(reqIdRef, reqId), reqId);
+  } catch (err) {
+    if (isActiveReq(reqIdRef, reqId)) onError(err.message || fallbackError);
+  } finally {
+    if (isActiveReq(reqIdRef, reqId)) setLoading(false);
+  }
+};
+
 const fetchAllActiveByRole = async (role, reqId, reqIdRef) => {
   const all = [];
   let cursor = '';
@@ -26,6 +41,48 @@ const deduplicateUsersById = (lists) => {
     }
   }
   return merged;
+};
+
+const applyUsersPageResult = (res, usersPage, setters) => {
+  const totalPages = Math.max(1, res.totalPages || 1);
+  setters.setUsersTotalPages(totalPages);
+  if (usersPage > totalPages) {
+    setters.setUsersPage(totalPages);
+    return;
+  }
+  setters.setFetchedAt(Date.now());
+  setters.setUsers(res.data || []);
+};
+
+const toggleSetItem = (prev, id) => {
+  const next = new Set(prev);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+};
+
+const applyLoadedSettings = (data, baselineRef, setters) => {
+  if (!data) {
+    setters.setSettingsLoaded(false);
+    setters.setSettingsLoadError('Failed to load platform settings');
+    return;
+  }
+  const normalized = normalizeSettingsData(data);
+  baselineRef.current = normalized;
+  setters.setSettingsForm(normalized);
+  setters.setSettingsLoaded(true);
+};
+
+const persistSettingsUpdate = async ({ patch, reqIdRef, baselineRef, setters, onSaved }) => {
+  const res = await adminAPI.updateSettings(patch);
+  reqIdRef.current += 1;
+  setters.setSettingsLoading(false);
+  if (res?.data) {
+    const normalized = normalizeSettingsData(res.data);
+    baselineRef.current = normalized;
+    setters.setSettingsForm(normalized);
+  }
+  onSaved();
 };
 
 export const useAdminStats = (onError) => {
@@ -64,32 +121,18 @@ export const useAdminUsers = (activeTab, onError) => {
   const [usersRefreshTick, setUsersRefreshTick] = useState(0);
   const reqIdRef = useRef(0);
 
-  const fetchUsers = useCallback(async () => {
-    const reqId = ++reqIdRef.current;
-    setUsersLoading(true);
-    try {
+  const fetchUsers = useCallback(() => runGuardedFetch({
+    reqIdRef,
+    setLoading: setUsersLoading,
+    onError,
+    fallbackError: 'Failed to load users',
+    task: async (isCurrent) => {
       const res = await adminAPI.getUsers({
-        page: usersPage,
-        limit: 10,
-        role: roleFilter,
-        status: statusFilter,
-        search: userSearch,
+        page: usersPage, limit: 10, role: roleFilter, status: statusFilter, search: userSearch,
       });
-      if (reqId !== reqIdRef.current) return;
-      const totalPages = Math.max(1, res.totalPages || 1);
-      setUsersTotalPages(totalPages);
-      if (usersPage > totalPages) {
-        setUsersPage(totalPages);
-        return;
-      }
-      setFetchedAt(Date.now());
-      setUsers(res.data || []);
-    } catch (err) {
-      if (reqId === reqIdRef.current) onError(err.message || 'Failed to load users');
-    } finally {
-      if (reqId === reqIdRef.current) setUsersLoading(false);
-    }
-  }, [usersPage, roleFilter, statusFilter, userSearch, onError]);
+      if (isCurrent()) applyUsersPageResult(res, usersPage, { setUsersTotalPages, setUsersPage, setFetchedAt, setUsers });
+    },
+  }), [usersPage, roleFilter, statusFilter, userSearch, onError]);
 
   useEffect(() => {
     if (activeTab === 'users' && usersRefreshTick >= 0) fetchUsers();
@@ -112,20 +155,18 @@ export const useAdminCourses = (activeTab, onError) => {
   const [courseSearch, setCourseSearch] = useState('');
   const reqIdRef = useRef(0);
 
-  const fetchCourses = useCallback(async () => {
-    const reqId = ++reqIdRef.current;
-    setCoursesLoading(true);
-    try {
+  const fetchCourses = useCallback(() => runGuardedFetch({
+    reqIdRef,
+    setLoading: setCoursesLoading,
+    onError,
+    fallbackError: 'Failed to load courses',
+    task: async (isCurrent) => {
       const res = await adminAPI.getCourses({ page: coursesPage, limit: 10, search: courseSearch });
-      if (reqId !== reqIdRef.current) return;
+      if (!isCurrent()) return;
       setCourses(res.data || []);
       setCoursesTotalPages(res.totalPages || 1);
-    } catch (err) {
-      if (reqId === reqIdRef.current) onError(err.message || 'Failed to load courses');
-    } finally {
-      if (reqId === reqIdRef.current) setCoursesLoading(false);
-    }
-  }, [coursesPage, courseSearch, onError]);
+    },
+  }), [coursesPage, courseSearch, onError]);
 
   useEffect(() => {
     if (activeTab === 'courses') fetchCourses();
@@ -143,25 +184,26 @@ export const useAdminStaffPool = (activeTab, isSuperAdmin) => {
   const [staffPoolError, setStaffPoolError] = useState('');
   const reqIdRef = useRef(0);
 
-  const fetchStaffPool = useCallback(async () => {
-    if (!isSuperAdmin) return;
-    const reqId = ++reqIdRef.current;
-    setStaffPoolLoading(true);
-    setStaffPoolError('');
-    try {
-      const lists = await Promise.all([
-        fetchAllActiveByRole('instructor', reqId, reqIdRef),
-        fetchAllActiveByRole('admin', reqId, reqIdRef),
-        fetchAllActiveByRole('super_admin', reqId, reqIdRef),
-      ]);
-      if (reqId === reqIdRef.current) setStaffPool(deduplicateUsersById(lists));
-    } catch (err) {
-      if (reqId !== reqIdRef.current) return;
-      setStaffPool([]);
-      setStaffPoolError(err.message || 'Failed to load eligible owners');
-    } finally {
-      if (reqId === reqIdRef.current) setStaffPoolLoading(false);
-    }
+  const fetchStaffPool = useCallback(() => {
+    if (!isSuperAdmin) return Promise.resolve();
+    return runGuardedFetch({
+      reqIdRef,
+      setLoading: setStaffPoolLoading,
+      onStart: () => setStaffPoolError(''),
+      fallbackError: 'Failed to load eligible owners',
+      onError: (msg) => {
+        setStaffPool([]);
+        setStaffPoolError(msg);
+      },
+      task: async (isCurrent, reqId) => {
+        const lists = await Promise.all([
+          fetchAllActiveByRole('instructor', reqId, reqIdRef),
+          fetchAllActiveByRole('admin', reqId, reqIdRef),
+          fetchAllActiveByRole('super_admin', reqId, reqIdRef),
+        ]);
+        if (isCurrent()) setStaffPool(deduplicateUsersById(lists));
+      },
+    });
   }, [isSuperAdmin]);
 
   useEffect(() => {
@@ -180,30 +222,22 @@ export const useAdminSettings = (activeTab, isSuperAdmin, setError, setSuccessMs
   const reqIdRef = useRef(0);
   const baselineRef = useRef(null);
 
-  const fetchSettings = useCallback(async () => {
-    if (!isSuperAdmin) return;
-    const reqId = ++reqIdRef.current;
-    setSettingsLoading(true);
-    setSettingsLoadError('');
-    try {
-      const res = await adminAPI.getSettings();
-      if (reqId !== reqIdRef.current) return;
-      if (res.data) {
-        const normalized = normalizeSettingsData(res.data);
-        baselineRef.current = normalized;
-        setSettingsForm(normalized);
-        setSettingsLoaded(true);
-      } else {
+  const fetchSettings = useCallback(() => {
+    if (!isSuperAdmin) return Promise.resolve();
+    return runGuardedFetch({
+      reqIdRef,
+      setLoading: setSettingsLoading,
+      onStart: () => setSettingsLoadError(''),
+      fallbackError: 'Failed to load platform settings',
+      onError: (msg) => {
         setSettingsLoaded(false);
-        setSettingsLoadError('Failed to load platform settings');
-      }
-    } catch (err) {
-      if (reqId !== reqIdRef.current) return;
-      setSettingsLoaded(false);
-      setSettingsLoadError(err.message || 'Failed to load platform settings');
-    } finally {
-      if (reqId === reqIdRef.current) setSettingsLoading(false);
-    }
+        setSettingsLoadError(msg);
+      },
+      task: async (isCurrent) => {
+        const res = await adminAPI.getSettings();
+        if (isCurrent()) applyLoadedSettings(res.data, baselineRef, { setSettingsForm, setSettingsLoaded, setSettingsLoadError });
+      },
+    });
   }, [isSuperAdmin]);
 
   useEffect(() => {
@@ -222,15 +256,11 @@ export const useAdminSettings = (activeTab, isSuperAdmin, setError, setSuccessMs
     setError('');
     setSuccessMsg('');
     try {
-      const res = await adminAPI.updateSettings(patch);
-      reqIdRef.current += 1;
-      setSettingsLoading(false);
-      if (res?.data) {
-        const normalized = normalizeSettingsData(res.data);
-        baselineRef.current = normalized;
-        setSettingsForm(normalized);
-      }
-      setSuccessMsg(t('admin.settingsSavedMsg'));
+      await persistSettingsUpdate({
+        patch, reqIdRef, baselineRef,
+        setters: { setSettingsLoading, setSettingsForm },
+        onSaved: () => setSuccessMsg(t('admin.settingsSavedMsg')),
+      });
     } catch (err) {
       setError(err.message || 'Failed to update settings');
     } finally {
@@ -253,34 +283,27 @@ export const useAdminAuditLogs = (activeTab, isSuperAdmin, onError) => {
   const [expandedAuditIds, setExpandedAuditIds] = useState(() => new Set());
   const reqIdRef = useRef(0);
 
-  const fetchAuditLogs = useCallback(async () => {
-    if (!isSuperAdmin) return;
-    const reqId = ++reqIdRef.current;
-    setAuditLoading(true);
-    try {
-      const res = await adminAPI.getAuditLogs({ page: auditPage, limit: 15, action: auditActionFilter });
-      if (reqId !== reqIdRef.current) return;
-      setAuditLogs(res.data || []);
-      setAuditTotalPages(res.totalPages || 1);
-    } catch (err) {
-      if (reqId === reqIdRef.current) onError(err.message || 'Failed to load audit logs');
-    } finally {
-      if (reqId === reqIdRef.current) setAuditLoading(false);
-    }
+  const fetchAuditLogs = useCallback(() => {
+    if (!isSuperAdmin) return Promise.resolve();
+    return runGuardedFetch({
+      reqIdRef,
+      setLoading: setAuditLoading,
+      onError,
+      fallbackError: 'Failed to load audit logs',
+      task: async (isCurrent) => {
+        const res = await adminAPI.getAuditLogs({ page: auditPage, limit: 15, action: auditActionFilter });
+        if (!isCurrent()) return;
+        setAuditLogs(res.data || []);
+        setAuditTotalPages(res.totalPages || 1);
+      },
+    });
   }, [isSuperAdmin, auditPage, auditActionFilter, onError]);
 
   useEffect(() => {
     if (activeTab === 'audit') fetchAuditLogs();
   }, [activeTab, fetchAuditLogs]);
 
-  const toggleAuditDetails = (logId) => {
-    setExpandedAuditIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(logId)) next.delete(logId);
-      else next.add(logId);
-      return next;
-    });
-  };
+  const toggleAuditDetails = (logId) => setExpandedAuditIds((prev) => toggleSetItem(prev, logId));
 
   return {
     auditLogs, auditLoading, auditPage, auditTotalPages, auditActionFilter, expandedAuditIds,

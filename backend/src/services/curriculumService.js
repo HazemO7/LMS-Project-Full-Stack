@@ -15,17 +15,15 @@ const isValidObjectId = (id) => {
     return OBJECT_ID_REGEX.test(id);
 };
 
-const parseIdList = (rawList, listErrorMsg, itemErrorMsg, useFailStatus = false) => {
-    if (rawList === undefined) return { uniqueIds: null };
-    const wrapErr = (message) => ({
-        error: { status: 400, body: useFailStatus ? { status: "fail", message } : { message } },
-    });
-    if (!Array.isArray(rawList)) return wrapErr(listErrorMsg);
+const buildListError = (message, useFailStatus) => ({
+    error: { status: 400, body: useFailStatus ? { status: "fail", message } : { message } },
+});
 
+const dedupeValidObjectIds = (rawList, itemErrorMsg, useFailStatus) => {
     const uniqueIds = [];
     const seen = new Set();
     for (const rawId of rawList) {
-        if (!isValidObjectId(rawId)) return wrapErr(itemErrorMsg);
+        if (!isValidObjectId(rawId)) return buildListError(itemErrorMsg, useFailStatus);
         const canonicalId = new mongoose.Types.ObjectId(rawId).toString();
         if (!seen.has(canonicalId)) {
             seen.add(canonicalId);
@@ -35,9 +33,27 @@ const parseIdList = (rawList, listErrorMsg, itemErrorMsg, useFailStatus = false)
     return { uniqueIds };
 };
 
+const parseIdList = (rawList, listErrorMsg, itemErrorMsg, useFailStatus = false) => {
+    if (rawList === undefined) return { uniqueIds: null };
+    if (!Array.isArray(rawList)) return buildListError(listErrorMsg, useFailStatus);
+    return dedupeValidObjectIds(rawList, itemErrorMsg, useFailStatus);
+};
+
 const isModuleForeignToCourse = (mod, courseIdStr, existingModuleIdSet) => {
     if (mod.course) return mod.course.toString() !== courseIdStr;
     return !existingModuleIdSet.has(mod._id.toString());
+};
+
+const hasForeignModules = async (course, requestedModules, uniqueModuleIds, previousModuleIds) => {
+    const otherCourses = await Course.find({
+        _id: { $ne: course._id },
+        modules: { $in: uniqueModuleIds },
+    }).select("_id");
+    if (otherCourses.length > 0) return true;
+
+    const existingSet = new Set(previousModuleIds);
+    const courseIdStr = course._id.toString();
+    return requestedModules.some((mod) => isModuleForeignToCourse(mod, courseIdStr, existingSet));
 };
 
 const assertCallerCanAttachModules = async (course, uniqueModuleIds, previousModuleIds, user) => {
@@ -49,44 +65,39 @@ const assertCallerCanAttachModules = async (course, uniqueModuleIds, previousMod
     }
     if (isAdminRole(user.role)) return null;
 
-    const otherCourses = await Course.find({
-        _id: { $ne: course._id },
-        modules: { $in: uniqueModuleIds },
-    }).select("_id");
-
-    const existingSet = new Set(previousModuleIds);
-    const courseIdStr = course._id.toString();
-    const hasForeign =
-        otherCourses.length > 0 ||
-        requestedModules.some((mod) => isModuleForeignToCourse(mod, courseIdStr, existingSet));
-
-    if (hasForeign) {
+    const foreign = await hasForeignModules(course, requestedModules, uniqueModuleIds, previousModuleIds);
+    if (foreign) {
         return { status: 403, body: { status: "fail", message: "Not authorized to attach modules from another course" } };
     }
     return null;
 };
 
-const syncCourseModules = async (courseId, updatedCourseId, uniqueModuleIds, previousModuleIds, isAdmin) => {
+const detachRemovedModules = async (courseId, uniqueModuleIds, previousModuleIds) => {
+    const newModuleSet = new Set(uniqueModuleIds);
+    const removedModuleIds = previousModuleIds.filter((id) => !newModuleSet.has(id));
+    if (removedModuleIds.length === 0) return;
+
+    await Module.updateMany(
+        { _id: { $in: removedModuleIds }, course: courseId },
+        { $set: { course: null } }
+    );
+};
+
+const unlinkModulesFromOtherCourses = async (updatedCourseId, uniqueModuleIds, isAdmin) => {
+    if (!isAdmin || uniqueModuleIds.length === 0) return;
+    await Course.updateMany(
+        { _id: { $ne: updatedCourseId }, modules: { $in: uniqueModuleIds } },
+        { $pull: { modules: { $in: uniqueModuleIds } } }
+    );
+};
+
+const syncCourseModules = async ({ courseId, updatedCourseId, uniqueModuleIds, previousModuleIds, isAdmin }) => {
     if (uniqueModuleIds === null) return;
     if (uniqueModuleIds.length > 0) {
         await Module.updateMany({ _id: { $in: uniqueModuleIds } }, { $set: { course: updatedCourseId } });
     }
-
-    const newModuleSet = new Set(uniqueModuleIds);
-    const removedModuleIds = previousModuleIds.filter((id) => !newModuleSet.has(id));
-    if (removedModuleIds.length > 0) {
-        await Module.updateMany(
-            { _id: { $in: removedModuleIds }, course: courseId },
-            { $set: { course: null } }
-        );
-    }
-
-    if (uniqueModuleIds.length > 0 && isAdmin) {
-        await Course.updateMany(
-            { _id: { $ne: updatedCourseId }, modules: { $in: uniqueModuleIds } },
-            { $pull: { modules: { $in: uniqueModuleIds } } }
-        );
-    }
+    await detachRemovedModules(courseId, uniqueModuleIds, previousModuleIds);
+    await unlinkModulesFromOtherCourses(updatedCourseId, uniqueModuleIds, isAdmin);
 };
 
 const canModifyCourse = (course, user) => {
@@ -114,8 +125,21 @@ const executeCourseUpdate = async (req, updateFields, uniqueModuleIds) => {
         { returnDocument: "after" }
     ).populate("instructor", PUBLIC_INSTRUCTOR_FIELDS);
 
-    await syncCourseModules(course._id, updatedCourse._id, uniqueModuleIds, previousModuleIds, isAdminRole(req.user.role));
+    await syncCourseModules({
+        courseId: course._id,
+        updatedCourseId: updatedCourse._id,
+        uniqueModuleIds,
+        previousModuleIds,
+        isAdmin: isAdminRole(req.user.role),
+    });
     return { status: 200, data: updatedCourse };
+};
+
+const buildLessonDeleteCriteria = (moduleIds, lessonIds) => {
+    const criteria = [];
+    if (moduleIds.length > 0) criteria.push({ module: { $in: moduleIds } });
+    if (lessonIds.length > 0) criteria.push({ _id: { $in: lessonIds }, module: null });
+    return criteria;
 };
 
 const deleteCourseModulesAndLessons = async (course) => {
@@ -128,13 +152,9 @@ const deleteCourseModulesAndLessons = async (course) => {
 
     const moduleIds = courseModules.map((m) => m._id);
     const lessonIds = courseModules.flatMap((m) => (Array.isArray(m.lesson) ? m.lesson : []));
+    const deleteCriteria = buildLessonDeleteCriteria(moduleIds, lessonIds);
 
-    const deleteCriteria = [];
-    if (moduleIds.length > 0) deleteCriteria.push({ module: { $in: moduleIds } });
-    if (lessonIds.length > 0) deleteCriteria.push({ _id: { $in: lessonIds }, module: null });
-    if (deleteCriteria.length > 0) {
-        await Lesson.deleteMany({ $or: deleteCriteria });
-    }
+    if (deleteCriteria.length > 0) await Lesson.deleteMany({ $or: deleteCriteria });
     if (moduleIds.length > 0) {
         await Module.deleteMany({ _id: { $in: moduleIds }, course: { $in: [null, course._id] } });
     }
@@ -208,6 +228,16 @@ const verifySingleLessonAttachable = async (les, ctx) => {
     return checkOtherHoldersOwnership(otherHolders, ctx);
 };
 
+const verifyAllLessonsAttachable = async (requestedLessons, ctx) => {
+    for (const les of requestedLessons) {
+        const allowed = await verifySingleLessonAttachable(les, ctx);
+        if (!allowed) {
+            return { status: 403, body: { message: "Not authorized to attach lessons from another instructor's course" } };
+        }
+    }
+    return null;
+};
+
 const assertCallerCanAttachLessons = async (existingModule, uniqueLessonIds, previousLessonIds, user) => {
     if (!uniqueLessonIds || uniqueLessonIds.length === 0) return null;
 
@@ -222,24 +252,27 @@ const assertCallerCanAttachLessons = async (existingModule, uniqueLessonIds, pre
         lesson: { $in: uniqueLessonIds },
     }).select("_id course lesson");
 
-    const ctx = {
+    return verifyAllLessonsAttachable(requestedLessons, {
         existingModuleId: existingModule._id.toString(),
         existingLessonSet: new Set(previousLessonIds),
         otherModuleMap: buildOtherModuleMap(otherModules),
         courseCache: new Map(),
         userId: user._id,
-    };
-
-    for (const les of requestedLessons) {
-        const allowed = await verifySingleLessonAttachable(les, ctx);
-        if (!allowed) {
-            return { status: 403, body: { message: "Not authorized to attach lessons from another instructor's course" } };
-        }
-    }
-    return null;
+    });
 };
 
-const syncModuleLessons = async (existingModuleId, updatedModuleId, uniqueLessonIds, previousLessonIds) => {
+const detachRemovedLessons = async (existingModuleId, uniqueLessonIds, previousLessonIds) => {
+    const newLessonSet = new Set(uniqueLessonIds);
+    const removedLessonIds = previousLessonIds.filter((id) => !newLessonSet.has(id));
+    if (removedLessonIds.length === 0) return;
+
+    await Lesson.updateMany(
+        { _id: { $in: removedLessonIds }, module: existingModuleId },
+        { $set: { module: null } }
+    );
+};
+
+const syncModuleLessons = async ({ existingModuleId, updatedModuleId, uniqueLessonIds, previousLessonIds }) => {
     if (uniqueLessonIds === null) return;
     if (uniqueLessonIds.length > 0) {
         await Lesson.updateMany({ _id: { $in: uniqueLessonIds } }, { $set: { module: updatedModuleId } });
@@ -248,58 +281,41 @@ const syncModuleLessons = async (existingModuleId, updatedModuleId, uniqueLesson
             { $pull: { lesson: { $in: uniqueLessonIds } } }
         );
     }
-
-    const newLessonSet = new Set(uniqueLessonIds);
-    const removedLessonIds = previousLessonIds.filter((id) => !newLessonSet.has(id));
-    if (removedLessonIds.length > 0) {
-        await Lesson.updateMany(
-            { _id: { $in: removedLessonIds }, module: existingModuleId },
-            { $set: { module: null } }
-        );
-    }
+    await detachRemovedLessons(existingModuleId, uniqueLessonIds, previousLessonIds);
 };
 
 const executeModuleUpdate = async (req, updateFields, uniqueLessonIds) => {
     const existingModule = await Module.findById(req.params.id);
-    if (!existingModule) {
-        return { status: 404, body: { message: "Module not found" } };
-    }
+    if (!existingModule) return { status: 404, body: { message: "Module not found" } };
 
     const previousLessonIds = (existingModule.lesson || []).map((id) => id.toString());
     const attachmentError = await assertCallerCanAttachLessons(existingModule, uniqueLessonIds, previousLessonIds, req.user);
     if (attachmentError) return attachmentError;
 
-    const updatedModule = await Module.findByIdAndUpdate(
-        req.params.id,
-        updateFields,
-        { returnDocument: "after" }
-    );
-    if (!updatedModule) {
-        return { status: 404, body: { message: "Module not found" } };
-    }
+    const updatedModule = await Module.findByIdAndUpdate(req.params.id, updateFields, { returnDocument: "after" });
+    if (!updatedModule) return { status: 404, body: { message: "Module not found" } };
 
-    await syncModuleLessons(existingModule._id, updatedModule._id, uniqueLessonIds, previousLessonIds);
+    await syncModuleLessons({
+        existingModuleId: existingModule._id,
+        updatedModuleId: updatedModule._id,
+        uniqueLessonIds,
+        previousLessonIds,
+    });
     return { status: 200, module: updatedModule };
 };
 
 const executeModuleDelete = async (moduleId) => {
     const mod = await Module.findById(moduleId);
-    if (!mod) {
-        return { status: 404, body: { message: "Module not found" } };
-    }
+    if (!mod) return { status: 404, body: { message: "Module not found" } };
 
     const lessonIds = Array.isArray(mod.lesson) ? mod.lesson : [];
-    const membershipCriteria = [{ module: mod._id }];
-    if (lessonIds.length > 0) {
-        membershipCriteria.push({ _id: { $in: lessonIds }, module: null });
-    }
-    const membership = { $or: membershipCriteria };
+    const criteria = [{ module: mod._id }];
+    if (lessonIds.length > 0) criteria.push({ _id: { $in: lessonIds }, module: null });
+    const membership = { $or: criteria };
 
     const lessonsToDelete = await Lesson.find(membership).select("_id");
-    const deleteLessonIds = lessonsToDelete.map((l) => l._id);
-
-    if (deleteLessonIds.length > 0) {
-        await Progress.deleteMany({ lesson: { $in: deleteLessonIds } });
+    if (lessonsToDelete.length > 0) {
+        await Progress.deleteMany({ lesson: { $in: lessonsToDelete.map((l) => l._id) } });
         await Lesson.deleteMany(membership);
     }
 

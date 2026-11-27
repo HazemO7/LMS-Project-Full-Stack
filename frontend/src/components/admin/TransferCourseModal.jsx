@@ -76,17 +76,28 @@ const OwnerSelectField = ({
   );
 };
 
-export const TransferCourseModal = ({
-  open,
-  onClose,
-  course,
-  instructors = [],
-  staffLoading = false,
-  staffError = '',
-  onRetryStaff,
-  onTransferred,
-}) => {
-  const { t, tServer } = useLanguage();
+const TransferModalActions = ({ saving, submitDisabled, onCancel, t }) => (
+  <div className="flex justify-end gap-3 border-t border-[#CCFBF1] pt-4">
+    <button
+      type="button"
+      onClick={onCancel}
+      disabled={saving}
+      className="rounded-lg border border-[#99F6E4] bg-white px-4 py-2 text-sm font-medium text-[#0D2E2F] hover:bg-[#F0FDFA]"
+    >
+      {t('common.cancel')}
+    </button>
+    <button
+      type="submit"
+      disabled={submitDisabled}
+      className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E] disabled:opacity-60"
+    >
+      <ArrowsLeftRight size={16} aria-hidden="true" />
+      {saving ? t('common.saving') : t('admin.confirmTransfer')}
+    </button>
+  </div>
+);
+
+const useTransferState = (open, course, onClose, onTransferred, t) => {
   const [selectedId, setSelectedId] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -102,6 +113,11 @@ export const TransferCourseModal = ({
   const requestClose = useCallback(() => {
     if (!saving) onClose();
   }, [saving, onClose]);
+
+  const handleSelect = (val) => {
+    setSelectedId(val);
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -123,16 +139,39 @@ export const TransferCourseModal = ({
     }
   };
 
+  return { selectedId, saving, error, currentOwnerId, requestClose, handleSelect, handleSubmit };
+};
+
+export const TransferCourseModal = ({
+  open,
+  onClose,
+  course,
+  instructors = [],
+  staffLoading = false,
+  staffError = '',
+  onRetryStaff,
+  onTransferred,
+}) => {
+  const { t, tServer } = useLanguage();
+  const state = useTransferState(open, course, onClose, onTransferred, t);
+  const submitDisabled = isTransferSubmitDisabled({
+    saving: state.saving,
+    staffLoading,
+    staffError,
+    selectedId: state.selectedId,
+    currentOwnerId: state.currentOwnerId,
+  });
+
   return (
     <Modal
       open={open}
-      onClose={requestClose}
+      onClose={state.requestClose}
       title={t('admin.transferCourseTitle')}
       description={course ? course.title : ''}
       maxWidthClass="max-w-md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <AlertBanner variant="error">{tServer(error)}</AlertBanner>}
+      <form onSubmit={state.handleSubmit} className="space-y-4">
+        {state.error && <AlertBanner variant="error">{tServer(state.error)}</AlertBanner>}
         <StaffErrorBanner
           staffError={staffError}
           staffLoading={staffLoading}
@@ -142,35 +181,20 @@ export const TransferCourseModal = ({
         />
         <OwnerSelectField
           instructors={instructors}
-          currentOwnerId={currentOwnerId}
-          selectedId={selectedId}
-          disabled={isTransferBlocked({ saving, staffLoading, staffError })}
+          currentOwnerId={state.currentOwnerId}
+          selectedId={state.selectedId}
+          disabled={isTransferBlocked({ saving: state.saving, staffLoading, staffError })}
           staffLoading={staffLoading}
           staffError={staffError}
-          onSelect={(val) => {
-            setSelectedId(val);
-            setError('');
-          }}
+          onSelect={state.handleSelect}
           t={t}
         />
-        <div className="flex justify-end gap-3 border-t border-[#CCFBF1] pt-4">
-          <button
-            type="button"
-            onClick={requestClose}
-            disabled={saving}
-            className="rounded-lg border border-[#99F6E4] bg-white px-4 py-2 text-sm font-medium text-[#0D2E2F] hover:bg-[#F0FDFA]"
-          >
-            {t('common.cancel')}
-          </button>
-          <button
-            type="submit"
-            disabled={isTransferSubmitDisabled({ saving, staffLoading, staffError, selectedId, currentOwnerId })}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E] disabled:opacity-60"
-          >
-            <ArrowsLeftRight size={16} aria-hidden="true" />
-            {saving ? t('common.saving') : t('admin.confirmTransfer')}
-          </button>
-        </div>
+        <TransferModalActions
+          saving={state.saving}
+          submitDisabled={submitDisabled}
+          onCancel={state.requestClose}
+          t={t}
+        />
       </form>
     </Modal>
   );

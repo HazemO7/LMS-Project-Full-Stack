@@ -82,49 +82,57 @@ const guardModuleCreate = async (req, res, next) => {
     return next();
 };
 
-const guardModuleModify = async (req, res, next) => {
-    if (!isValidObjectId(req.params.id)) return deny(res, 400, "Invalid module ID");
-    const mod = await Module.findById(req.params.id);
-    if (!mod) return deny(res, 404, "Module not found");
+const authorizeResourceMutation = async (req, res, next, config) => {
+    const resourceId = config.getId(req);
+    if (!isValidObjectId(resourceId)) return deny(res, 400, config.invalidMsg);
 
-    const course = await resolveCourseFromModule(mod);
+    const doc = await config.findById(resourceId);
+    if (!doc) return deny(res, 404, config.notFoundMsg);
+
+    const course = await config.resolveCourse(doc);
     if (!assertCanMutateCourse(course, req.user)) {
         return deny(res, 403, UNAUTHORIZED_MSG);
     }
     req.course = course;
-    req.moduleDoc = mod;
+    req[config.attachKey] = doc;
     return next();
 };
 
-const guardLessonCreate = async (req, res, next) => {
+const MODULE_MODIFY_CONFIG = {
+    getId: (req) => req.params.id,
+    invalidMsg: "Invalid module ID",
+    notFoundMsg: "Module not found",
+    findById: (id) => Module.findById(id),
+    resolveCourse: resolveCourseFromModule,
+    attachKey: "moduleDoc",
+};
+
+const LESSON_CREATE_CONFIG = {
+    getId: (req) => req.body.module,
+    invalidMsg: "Invalid module ID",
+    notFoundMsg: "Module not found",
+    findById: (id) => Module.findById(id),
+    resolveCourse: resolveCourseFromModule,
+    attachKey: "moduleDoc",
+};
+
+const LESSON_MODIFY_CONFIG = {
+    getId: (req) => req.params.id,
+    invalidMsg: "Invalid lesson ID",
+    notFoundMsg: "Lesson not found",
+    findById: (id) => Lesson.findById(id),
+    resolveCourse: resolveCourseFromLesson,
+    attachKey: "lessonDoc",
+};
+
+const guardModuleModify = (req, res, next) => authorizeResourceMutation(req, res, next, MODULE_MODIFY_CONFIG);
+
+const guardLessonCreate = (req, res, next) => {
     if (!req.body.module) return guardDetachedCreate(req, res, next);
-    if (!isValidObjectId(req.body.module)) return deny(res, 400, "Invalid module ID");
-
-    const mod = await Module.findById(req.body.module);
-    if (!mod) return deny(res, 404, "Module not found");
-
-    const course = await resolveCourseFromModule(mod);
-    if (!assertCanMutateCourse(course, req.user)) {
-        return deny(res, 403, UNAUTHORIZED_MSG);
-    }
-    req.course = course;
-    req.moduleDoc = mod;
-    return next();
+    return authorizeResourceMutation(req, res, next, LESSON_CREATE_CONFIG);
 };
 
-const guardLessonModify = async (req, res, next) => {
-    if (!isValidObjectId(req.params.id)) return deny(res, 400, "Invalid lesson ID");
-    const lesson = await Lesson.findById(req.params.id);
-    if (!lesson) return deny(res, 404, "Lesson not found");
-
-    const course = await resolveCourseFromLesson(lesson);
-    if (!assertCanMutateCourse(course, req.user)) {
-        return deny(res, 403, UNAUTHORIZED_MSG);
-    }
-    req.course = course;
-    req.lessonDoc = lesson;
-    return next();
-};
+const guardLessonModify = (req, res, next) => authorizeResourceMutation(req, res, next, LESSON_MODIFY_CONFIG);
 
 const MUTATION_GUARDS = {
     course: guardCourseMutation,
@@ -149,18 +157,27 @@ const courseOwnershipGuard = (resourceType) => {
     };
 };
 
+const resolveReadableModule = async (id) => {
+    const mod = await Module.findById(id);
+    if (!mod) return { notFoundMessage: "Module not found", course: null };
+    return { course: await resolveCourseFromModule(mod) };
+};
+
+const resolveReadableLesson = async (id) => {
+    const lesson = await Lesson.findById(id);
+    if (!lesson) return { notFoundMessage: "Lesson not found", course: null };
+    return { course: await resolveCourseFromLesson(lesson) };
+};
+
+const READABLE_RESOLVERS = {
+    module: resolveReadableModule,
+    lesson: resolveReadableLesson,
+};
+
 const resolveReadableCourse = async (resourceType, id) => {
-    if (resourceType === "module") {
-        const mod = await Module.findById(id);
-        if (!mod) return { notFoundMessage: "Module not found", course: null };
-        return { course: await resolveCourseFromModule(mod) };
-    }
-    if (resourceType === "lesson") {
-        const lesson = await Lesson.findById(id);
-        if (!lesson) return { notFoundMessage: "Lesson not found", course: null };
-        return { course: await resolveCourseFromLesson(lesson) };
-    }
-    return { course: null };
+    const resolver = READABLE_RESOLVERS[resourceType];
+    if (!resolver) return { course: null };
+    return resolver(id);
 };
 
 const checkStudentReadAccess = async (userId, courseId) => {

@@ -6,10 +6,12 @@ import { useLanguage } from '../context/LanguageContext';
 import { canAuthorCourses, isAdminOrSuper } from '../utils/roleUtils';
 import { BrandMark } from './BrandMark';
 
+const EMPTY_NAV_PERMISSIONS = { canCreateCourse: false, canAccessAdmin: false };
+
 const getNavPermissions = (userToken, currentUser) => {
-  if (!userToken || !currentUser || currentUser.mustChangePassword) {
-    return { canCreateCourse: false, canAccessAdmin: false };
-  }
+  if (!userToken) return EMPTY_NAV_PERMISSIONS;
+  if (!currentUser) return EMPTY_NAV_PERMISSIONS;
+  if (currentUser.mustChangePassword) return EMPTY_NAV_PERMISSIONS;
   return {
     canCreateCourse: canAuthorCourses(currentUser),
     canAccessAdmin: isAdminOrSuper(currentUser),
