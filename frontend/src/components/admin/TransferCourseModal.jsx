@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ArrowsLeftRight } from '@phosphor-icons/react';
 import { Modal } from '../ui/Modal';
 import { AlertBanner } from '../ui/AlertBanner';
@@ -97,49 +97,101 @@ const TransferModalActions = ({ saving, submitDisabled, onCancel, t }) => (
   </div>
 );
 
-const useTransferState = (open, course, onClose, onTransferred, t) => {
+const getCurrentOwnerId = (course) => {
+  if (!course?.instructor) return '';
+  return course.instructor._id || course.instructor;
+};
+
+const getTransferValidationError = ({ course, selectedId, currentOwnerId, t }) => {
+  if (!course || !selectedId) return 'SKIP';
+  if (selectedId === currentOwnerId) return t('admin.sameOwnerError');
+  return '';
+};
+
+const executeCourseTransfer = async ({ courseId, selectedId, onTransferred, onClose, setError, setSaving }) => {
+  setSaving(true);
+  setError('');
+  try {
+    const res = await adminAPI.transferCourse(courseId, selectedId);
+    onTransferred?.(res.data);
+    onClose();
+  } catch (err) {
+    setError(err.message || 'Failed to transfer course ownership');
+  } finally {
+    setSaving(false);
+  }
+};
+
+const useTransferFormState = ({ course, onClose, onTransferred, setSaving, t }) => {
   const [selectedId, setSelectedId] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const currentOwnerId = course?.instructor?._id || course?.instructor || '';
-
-  useEffect(() => {
-    if (open && course) {
-      setSelectedId('');
-      setError('');
-    }
-  }, [open, course]);
-
-  const requestClose = useCallback(() => {
-    if (!saving) onClose();
-  }, [saving, onClose]);
+  const currentOwnerId = getCurrentOwnerId(course);
 
   const handleSelect = (val) => {
     setSelectedId(val);
     setError('');
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    if (!course || !selectedId) return;
-    if (selectedId === currentOwnerId) {
-      setError(t('admin.sameOwnerError'));
+    const validationErr = getTransferValidationError({ course, selectedId, currentOwnerId, t });
+    if (validationErr === 'SKIP') return;
+    if (validationErr) {
+      setError(validationErr);
       return;
     }
-    setSaving(true);
-    setError('');
-    try {
-      const res = await adminAPI.transferCourse(course._id, selectedId);
-      onTransferred?.(res.data);
-      onClose();
-    } catch (err) {
-      setError(err.message || 'Failed to transfer course ownership');
-    } finally {
-      setSaving(false);
-    }
+    return executeCourseTransfer({ courseId: course._id, selectedId, onTransferred, onClose, setError, setSaving });
   };
 
-  return { selectedId, saving, error, currentOwnerId, requestClose, handleSelect, handleSubmit };
+  return { selectedId, error, currentOwnerId, handleSelect, handleSubmit };
+};
+
+const TransferCourseBody = ({
+  course,
+  instructors,
+  staffLoading,
+  staffError,
+  onRetryStaff,
+  onTransferred,
+  saving,
+  setSaving,
+  onClose,
+  onCancel,
+  t,
+  tServer,
+}) => {
+  const state = useTransferFormState({ course, onClose, onTransferred, setSaving, t });
+  const submitDisabled = isTransferSubmitDisabled({
+    saving,
+    staffLoading,
+    staffError,
+    selectedId: state.selectedId,
+    currentOwnerId: state.currentOwnerId,
+  });
+
+  return (
+    <form onSubmit={state.handleSubmit} className="space-y-4">
+      {state.error && <AlertBanner variant="error">{tServer(state.error)}</AlertBanner>}
+      <StaffErrorBanner
+        staffError={staffError}
+        staffLoading={staffLoading}
+        onRetryStaff={onRetryStaff}
+        t={t}
+        tServer={tServer}
+      />
+      <OwnerSelectField
+        instructors={instructors}
+        currentOwnerId={state.currentOwnerId}
+        selectedId={state.selectedId}
+        disabled={isTransferBlocked({ saving, staffLoading, staffError })}
+        staffLoading={staffLoading}
+        staffError={staffError}
+        onSelect={state.handleSelect}
+        t={t}
+      />
+      <TransferModalActions saving={saving} submitDisabled={submitDisabled} onCancel={onCancel} t={t} />
+    </form>
+  );
 };
 
 export const TransferCourseModal = ({
@@ -153,49 +205,36 @@ export const TransferCourseModal = ({
   onTransferred,
 }) => {
   const { t, tServer } = useLanguage();
-  const state = useTransferState(open, course, onClose, onTransferred, t);
-  const submitDisabled = isTransferSubmitDisabled({
-    saving: state.saving,
-    staffLoading,
-    staffError,
-    selectedId: state.selectedId,
-    currentOwnerId: state.currentOwnerId,
-  });
+  const [saving, setSaving] = useState(false);
+  const requestClose = () => {
+    if (!saving) onClose();
+  };
 
   return (
     <Modal
       open={open}
-      onClose={state.requestClose}
+      onClose={requestClose}
       title={t('admin.transferCourseTitle')}
       description={course ? course.title : ''}
       maxWidthClass="max-w-md"
     >
-      <form onSubmit={state.handleSubmit} className="space-y-4">
-        {state.error && <AlertBanner variant="error">{tServer(state.error)}</AlertBanner>}
-        <StaffErrorBanner
-          staffError={staffError}
+      {open && (
+        <TransferCourseBody
+          key={course?._id || 'none'}
+          course={course}
+          instructors={instructors}
           staffLoading={staffLoading}
+          staffError={staffError}
           onRetryStaff={onRetryStaff}
+          onTransferred={onTransferred}
+          saving={saving}
+          setSaving={setSaving}
+          onClose={onClose}
+          onCancel={requestClose}
           t={t}
           tServer={tServer}
         />
-        <OwnerSelectField
-          instructors={instructors}
-          currentOwnerId={state.currentOwnerId}
-          selectedId={state.selectedId}
-          disabled={isTransferBlocked({ saving: state.saving, staffLoading, staffError })}
-          staffLoading={staffLoading}
-          staffError={staffError}
-          onSelect={state.handleSelect}
-          t={t}
-        />
-        <TransferModalActions
-          saving={state.saving}
-          submitDisabled={submitDisabled}
-          onCancel={state.requestClose}
-          t={t}
-        />
-      </form>
+      )}
     </Modal>
   );
 };
