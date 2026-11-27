@@ -80,6 +80,8 @@ const persistSettingsUpdate = async ({ patch, reqIdRef, baselineRef, setters, on
     const normalized = normalizeSettingsData(res.data);
     baselineRef.current = normalized;
     setters.setSettingsForm(normalized);
+    setters.setSettingsLoadError('');
+    setters.setSettingsLoaded(true);
   }
   onSaved();
 };
@@ -273,7 +275,7 @@ export const useAdminSettings = (activeTab, isSuperAdmin, setError, setSuccessMs
     try {
       await persistSettingsUpdate({
         patch, reqIdRef, baselineRef,
-        setters: { setSettingsLoading, setSettingsForm },
+        setters: { setSettingsLoading, setSettingsForm, setSettingsLoaded, setSettingsLoadError },
         onSaved: () => setSuccessMsg(t('admin.settingsSavedMsg')),
       });
     } catch (err) {

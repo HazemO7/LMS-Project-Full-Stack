@@ -56,32 +56,55 @@ const AdminHeroHeader = ({ callerRole, isSuperAdmin, onAddStaff, t }) => (
   </section>
 );
 
-const AdminTabBar = ({ tabs, activeTab, onSelectTab, t }) => (
-  <div
-    role="tablist"
-    aria-label={t('admin.tabsAria')}
-    className="mb-6 flex flex-wrap gap-2 rounded-xl border border-[#99F6E4] bg-white p-1.5 shadow-xs"
-  >
-    {tabs.map((tab) => {
-      const Icon = tab.icon;
-      const active = activeTab === tab.id;
-      const tabStyle = active ? 'bg-[#0D9488] text-white' : 'text-[#335C5D] hover:bg-[#F0FDFA] hover:text-[#0B3B3C]';
-      return (
-        <button
-          key={tab.id}
-          type="button"
-          role="tab"
-          aria-selected={active}
-          onClick={() => onSelectTab(tab.id)}
-          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${tabStyle}`}
-        >
-          <Icon size={16} weight={active ? 'fill' : 'duotone'} aria-hidden="true" />
-          {tab.label}
-        </button>
-      );
-    })}
-  </div>
-);
+const getNextTabIndex = (key, idx, count) => {
+  if (key === 'ArrowRight') return (idx + 1) % count;
+  if (key === 'ArrowLeft') return (idx - 1 + count) % count;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  return -1;
+};
+
+const AdminTabBar = ({ tabs, activeTab, onSelectTab, t }) => {
+  const handleTabKeyDown = (e, idx) => {
+    const nextIdx = getNextTabIndex(e.key, idx, tabs.length);
+    if (nextIdx < 0) return;
+    e.preventDefault();
+    const nextTab = tabs[nextIdx];
+    onSelectTab(nextTab.id);
+    document.getElementById(`admin-tab-${nextTab.id}`)?.focus();
+  };
+
+  return (
+    <div
+      role="tablist"
+      aria-label={t('admin.tabsAria')}
+      className="mb-6 flex flex-wrap gap-2 rounded-xl border border-[#99F6E4] bg-white p-1.5 shadow-xs"
+    >
+      {tabs.map((tab, idx) => {
+        const Icon = tab.icon;
+        const active = activeTab === tab.id;
+        const tabStyle = active ? 'bg-[#0D9488] text-white' : 'text-[#335C5D] hover:bg-[#F0FDFA] hover:text-[#0B3B3C]';
+        return (
+          <button
+            key={tab.id}
+            id={`admin-tab-${tab.id}`}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            aria-controls={`admin-panel-${tab.id}`}
+            tabIndex={active ? 0 : -1}
+            onClick={() => onSelectTab(tab.id)}
+            onKeyDown={(e) => handleTabKeyDown(e, idx)}
+            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${tabStyle}`}
+          >
+            <Icon size={16} weight={active ? 'fill' : 'duotone'} aria-hidden="true" />
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
 const AdminTabContent = ({
   activeTab, isSuperAdmin, currentUserId, stats, statsLoading, usersState,
@@ -351,20 +374,22 @@ export const AdminDashboard = () => {
         <AdminTabBar tabs={getAdminTabs(isSuperAdmin, t)} activeTab={activeTab} onSelectTab={setActiveTab} t={t} />
         {error && <AlertBanner variant="error" className="mb-6" onDismiss={() => setError('')}>{tServer(error)}</AlertBanner>}
         {successMsg && <AlertBanner variant="success" className="mb-6" onDismiss={() => setSuccessMsg('')}>{successMsg}</AlertBanner>}
-        <AdminTabContent
-          activeTab={activeTab}
-          isSuperAdmin={isSuperAdmin}
-          currentUserId={currentUser?._id}
-          stats={stats}
-          statsLoading={statsLoading}
-          usersState={usersState}
-          coursesState={coursesState}
-          settingsState={settingsState}
-          auditState={auditState}
-          handlers={handlers}
-          t={t}
-          tServer={tServer}
-        />
+        <div role="tabpanel" id={`admin-panel-${activeTab}`} aria-labelledby={`admin-tab-${activeTab}`}>
+          <AdminTabContent
+            activeTab={activeTab}
+            isSuperAdmin={isSuperAdmin}
+            currentUserId={currentUser?._id}
+            stats={stats}
+            statsLoading={statsLoading}
+            usersState={usersState}
+            coursesState={coursesState}
+            settingsState={settingsState}
+            auditState={auditState}
+            handlers={handlers}
+            t={t}
+            tServer={tServer}
+          />
+        </div>
       </div>
       <AdminDashboardModals
         callerRole={currentUser?.role}

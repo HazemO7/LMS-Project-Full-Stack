@@ -76,17 +76,17 @@ const createCourse = async (req, res) => {
     }
 };
 
-const parsePositivePageParam = (raw, fallback) => {
+const parsePositivePageParam = (raw, fallback, max = Infinity) => {
     const parsed = parseInt(raw, 10);
-    if (Number.isNaN(parsed)) return fallback;
-    return parsed < 1 ? fallback : parsed;
+    if (Number.isNaN(parsed) || parsed < 1) return fallback;
+    return Math.min(parsed, max);
 };
 
 // Get All Courses
 const getCourses = async (req, res) => {
     try {
         const page = parsePositivePageParam(req.query.page, 1);
-        const limit = parsePositivePageParam(req.query.limit, 6);
+        const limit = parsePositivePageParam(req.query.limit, 6, 100);
         const skip = (page - 1) * limit;
 
         const query = {};
