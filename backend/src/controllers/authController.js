@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 const logger = require("../utils/logger");
-const { generateResetToken, hashToken } = require("../services/authService");
+const { generateResetToken, hashToken, replaceUserPassword } = require("../services/authService");
 const { sendPasswordResetEmail } = require("../services/emailService");
 const { sanitizeUser } = require("../services/adminGovernanceHelper");
 
@@ -187,13 +187,6 @@ const forgotPassword = catchAsync(async (req, res, next) => {
 
 
 
-const buildTokenVersionFilter = (userId, expectedVersion) => {
-    const versionMatch = expectedVersion === 0
-        ? { $or: [{ tokenVersion: 0 }, { tokenVersion: { $exists: false } }] }
-        : { tokenVersion: expectedVersion };
-    return { _id: userId, ...versionMatch };
-};
-
 // PUT /api/auth/reset-password/:token
 const resetPassword = catchAsync(async (req, res, next) => {
     const { token } = req.params;
@@ -215,29 +208,14 @@ const resetPassword = catchAsync(async (req, res, next) => {
         return next(new AppError("New password cannot be the same as the current password.", 400));
     }
 
-    const expectedTokenVersion = user.tokenVersion ?? 0;
     const hash = await bcrypt.hash(password, 10);
-    const updated = await User.findOneAndUpdate(
-        {
-            ...buildTokenVersionFilter(user._id, expectedTokenVersion),
-            resetPasswordToken: hashedToken,
-            resetPasswordExpire: { $gt: Date.now() },
-        },
-        {
-            $set: {
-                password: hash,
-                passwordChangedAt: new Date(),
-                mustChangePassword: false,
-            },
-            $unset: {
-                resetPasswordToken: 1,
-                resetPasswordExpire: 1,
-                resetPasswordTokenCreatedAt: 1,
-            },
-            $inc: { tokenVersion: 1 },
-        },
-        { returnDocument: "after" }
-    );
+    const updated = await replaceUserPassword({
+        User,
+        user,
+        newPasswordHash: hash,
+        extraFilter: { resetPasswordToken: hashedToken, resetPasswordExpire: { $gt: Date.now() } },
+        clearReset: true,
+    });
     if (!updated) {
         return next(new AppError("Invalid or expired reset token.", 400));
     }
@@ -268,20 +246,8 @@ const changePassword = catchAsync(async (req, res, next) => {
         return next(new AppError("New password cannot be the same as the current password.", 400));
     }
 
-    const expectedTokenVersion = user.tokenVersion ?? 0;
     const hash = await bcrypt.hash(newPassword, 10);
-    const updated = await User.findOneAndUpdate(
-        buildTokenVersionFilter(user._id, expectedTokenVersion),
-        {
-            $set: {
-                password: hash,
-                passwordChangedAt: new Date(),
-                mustChangePassword: false,
-            },
-            $inc: { tokenVersion: 1 },
-        },
-        { returnDocument: "after" }
-    );
+    const updated = await replaceUserPassword({ User, user, newPasswordHash: hash });
     if (!updated) {
         return next(new AppError("Password was changed concurrently. Please retry.", 409));
     }

@@ -2,6 +2,7 @@ const User = require('../models/User');
 const bcrypt = require('bcrypt');
 const { validatePasswordPolicy } = require('../utils/passwordUtils');
 const { USER_SAFE_PROJECTION, sanitizeUser } = require('../services/adminGovernanceHelper');
+const { buildTokenVersionFilter } = require('../services/authService');
 const { updateUserRole } = require('./adminController');
 const logger = require('../utils/logger');
 
@@ -125,13 +126,6 @@ const buildProfileUpdateData = async (body, currentUser) => {
         expectedTokenVersion: passwordResult.expectedTokenVersion,
         updateData: { ...updateData, ...passwordResult.fields },
     };
-};
-
-const buildTokenVersionFilter = (userId, expectedVersion) => {
-    const versionMatch = expectedVersion === 0
-        ? { $or: [{ tokenVersion: 0 }, { tokenVersion: { $exists: false } }] }
-        : { tokenVersion: expectedVersion };
-    return { _id: userId, ...versionMatch };
 };
 
 const persistProfileUpdate = (userId, updateData, expectedTokenVersion) => {
