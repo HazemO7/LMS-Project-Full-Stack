@@ -306,9 +306,13 @@ const syncModuleLessons = async ({ existingModuleId, updatedModuleId, uniqueLess
     await detachRemovedLessons(existingModuleId, uniqueLessonIds, previousLessonIds);
 };
 
+const MODULE_FORBIDDEN = { status: 403, body: { message: "Not authorized to modify this course curriculum" } };
+
 const moduleOwnershipError = (course, user) => {
-    if (isAdminRole(user.role) || (course && canModifyCourse(course, user))) return null;
-    return { status: 403, body: { message: "Not authorized to modify this course curriculum" } };
+    if (isAdminRole(user.role)) return null;
+    if (!course) return MODULE_FORBIDDEN;
+    if (canModifyCourse(course, user)) return null;
+    return MODULE_FORBIDDEN;
 };
 
 const executeModuleUpdate = async (req, updateFields, uniqueLessonIds) => {
@@ -335,6 +339,21 @@ const executeModuleUpdate = async (req, updateFields, uniqueLessonIds) => {
     return { status: 200, module: updatedModule };
 };
 
+const isModuleSharedWithOtherCourse = (mod, course) => {
+    const ownerCourseId = mod.course || course?._id || null;
+    return Course.exists({ _id: { $ne: ownerCourseId }, modules: mod._id });
+};
+
+const deleteModuleLessonsAndProgress = async (mod) => {
+    const { ids, error } = await buildLessonDeleteCriteria([mod._id], mod.lesson || []);
+    if (error) return error;
+    if (ids.length > 0) {
+        await Progress.deleteMany({ lesson: { $in: ids } });
+        await Lesson.deleteMany({ _id: { $in: ids } });
+    }
+    return null;
+};
+
 const executeModuleDelete = async (req) => {
     const mod = await Module.findById(req.params.id);
     if (!mod) return { status: 404, body: { message: "Module not found" } };
@@ -343,18 +362,11 @@ const executeModuleDelete = async (req) => {
     const ownershipError = moduleOwnershipError(course, req.user);
     if (ownershipError) return ownershipError;
 
-    const sharedModule = await Course.exists({
-        _id: { $ne: mod.course || course?._id || null },
-        modules: mod._id,
-    });
+    const sharedModule = await isModuleSharedWithOtherCourse(mod, course);
     if (sharedModule) return sharedChildConflict("module", "course");
 
-    const { ids, error } = await buildLessonDeleteCriteria([mod._id], mod.lesson || []);
-    if (error) return error;
-    if (ids.length > 0) {
-        await Progress.deleteMany({ lesson: { $in: ids } });
-        await Lesson.deleteMany({ _id: { $in: ids } });
-    }
+    const deleteError = await deleteModuleLessonsAndProgress(mod);
+    if (deleteError) return deleteError;
 
     await Course.updateMany({ modules: mod._id }, { $pull: { modules: mod._id } });
     await Module.findByIdAndDelete(mod._id);
