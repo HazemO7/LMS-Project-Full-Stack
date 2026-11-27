@@ -51,7 +51,7 @@ const StatusCell = ({ suspended, isLocked, mustChangePassword, t }) => {
 const ActionIconButton = ({ visible, onClick, title, className, children }) => {
   if (!visible) return null;
   return (
-    <button type="button" onClick={onClick} title={title} className={`rounded-lg border p-1.5 ${className}`}>
+    <button type="button" onClick={onClick} title={title} aria-label={title} className={`rounded-lg border p-1.5 ${className}`}>
       {children}
     </button>
   );

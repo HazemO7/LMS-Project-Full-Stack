@@ -95,6 +95,64 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect(String((await Child.findById(child._id))[backlink])).toBe(String(source._id));
     });
 
+    it.each(["put", "delete"])("denies module %s when a transfer wins the lock after route authorization", async (method) => {
+        const { token: adminToken } = await createAndLoginUser({ name: "Owner", email: "owner@example.com", role: "super_admin" });
+        const { user: oldOwner, token } = await createAndLoginUser({ name: "Old", email: "old@example.com", role: "instructor" });
+        const { user: newOwner } = await createAndLoginUser({ name: "New", email: "new@example.com", role: "instructor" });
+        const fields = { title: "Original", description: "Desc", content: "Text" };
+        const course = await Course.create({ ...fields, instructor: oldOwner._id });
+        const mod = await Module.create({ ...fields, course: course._id });
+        const originalAcquire = GovernanceLock.findOneAndUpdate;
+        const acquire = jest.spyOn(GovernanceLock, "findOneAndUpdate").mockImplementationOnce(async function (filter, ...args) {
+            const transfer = await request(app).patch(`/api/admin/courses/${course._id}/transfer`)
+                .set("Authorization", `Bearer ${adminToken}`).send({ newInstructorId: newOwner._id.toString() });
+            expect(transfer.statusCode).toBe(200);
+            expect(filter._id).toBe(acquire.mock.calls[1][0]._id);
+            return originalAcquire.call(this, filter, ...args);
+        });
+
+        try {
+            const mutation = request(app)[method](`/api/modules/${mod._id}`).set("Authorization", `Bearer ${token}`);
+            if (method === "put") mutation.send({ title: "Changed" });
+            expect((await mutation).statusCode).toBe(403);
+            expect((await Module.findById(mod._id)).title).toBe("Original");
+        } finally {
+            acquire.mockRestore();
+        }
+    });
+
+    it("rejects course and module cascades before deleting shared curriculum or progress", async () => {
+        const { user, token } = await createAndLoginUser({ name: "Admin", email: "cascade@example.com", role: "admin" });
+        const fields = { title: "Curriculum", description: "Desc", content: "Text" };
+        const course = await Course.create(fields);
+        const otherCourse = await Course.create(fields);
+        const mod = await Module.create({ ...fields, course: course._id });
+        const lesson = await Lesson.create({ ...fields, module: mod._id });
+        const otherModule = await Module.create({ ...fields, course: otherCourse._id, lesson: [lesson._id] });
+        const progress = await Progress.create({ user: user._id, course: course._id, lesson: lesson._id });
+
+        const remove = (resource, id) => request(app).delete(`/api/${resource}/${id}`)
+            .set("Authorization", `Bearer ${token}`);
+
+        // A separate module holds the lesson even though its backlink points into the cascade.
+        expect((await remove("courses", course._id)).statusCode).toBe(409);
+        expect((await remove("modules", mod._id)).statusCode).toBe(409);
+        expect(await Progress.exists({ _id: progress._id })).toBeTruthy();
+        expect(await Lesson.exists({ _id: lesson._id })).toBeTruthy();
+
+        await Module.updateOne({ _id: otherModule._id }, { $pull: { lesson: lesson._id } });
+        await Course.updateOne({ _id: otherCourse._id }, { $push: { modules: mod._id } });
+        expect((await remove("courses", course._id)).statusCode).toBe(409);
+        expect((await remove("modules", mod._id)).statusCode).toBe(409);
+        expect(await Module.exists({ _id: mod._id })).toBeTruthy();
+        expect(await Progress.exists({ _id: progress._id })).toBeTruthy();
+
+        await Course.updateOne({ _id: otherCourse._id }, { $pull: { modules: mod._id } });
+        expect((await remove("modules", mod._id)).statusCode).toBe(200);
+        expect(await Lesson.exists({ _id: lesson._id })).toBeNull();
+        expect(await Progress.exists({ _id: progress._id })).toBeNull();
+    });
+
     it("seeds super_admin and idempotently promotes legacy owner admin", async () => {
         process.env.ADMIN_NAME = "Owner";
         process.env.ADMIN_EMAIL = "owner@example.com";
@@ -200,9 +258,11 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
                 name: "New Instructor",
                 email: "inst@example.com",
                 role: "instructor",
+                temporaryPassword: " Aa1!abc ",
                 sendEmail: false,
             });
         const tempPassword = createRes.body.temporaryPassword;
+        expect(tempPassword).toBe(" Aa1!abc ");
 
         const loginRes = await request(app)
             .post("/api/auth/login")

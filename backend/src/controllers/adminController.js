@@ -17,6 +17,7 @@ const {
     isPrivilegedRole,
     buildUserFilterQuery,
     fetchUsersByCursor,
+    resolveActiveActor,
     executeUserRoleUpdate,
     executeUserStatusUpdate,
     executeUserDeletion,
@@ -127,12 +128,17 @@ const createStaffUser = async (req, res) => {
             return res.status(403).json({ status: "fail", message: "Only a Super Admin can create administrator accounts." });
         }
 
-        const existing = await User.findOne({ email: email.trim().toLowerCase() });
-        if (existing) {
-            return res.status(400).json({ status: "fail", message: "Account Already Exist" });
-        }
+        const { error, newUser, plainTempPassword } = await withSuperAdminLock(async () => {
+            const { error: actorError } = await resolveActiveActor(req, isPrivilegedRole(role));
+            if (actorError) return { error: actorError };
 
-        const { newUser, plainTempPassword } = await createStaffAccountRecord(req);
+            const existing = await User.findOne({ email: email.trim().toLowerCase() });
+            if (existing) {
+                return { error: { status: 400, body: { status: "fail", message: "Account Already Exist" } } };
+            }
+            return createStaffAccountRecord(req);
+        });
+        if (error) return res.status(error.status).json(error.body);
         await recordAudit({
             req,
             action: "USER_CREATED",
@@ -254,21 +260,13 @@ const getCourseEnrollments = async (req, res) => {
     }
 };
 
-const createManualEnrollment = async (req, course, student) => {
+const createManualEnrollment = async (course, student) => {
     const existing = await Enrollment.findOne({ user: student._id, course: course._id });
     if (existing) return { error: { status: 400, body: { status: "fail", message: "User is already enrolled in this course" } } };
 
     const enrollment = await Enrollment.create({ user: student._id, course: course._id });
     await enrollment.populate("user", "name email role isActive");
-
-    await recordAudit({
-        req,
-        action: "ENROLLMENT_ADDED",
-        targetType: "Enrollment",
-        targetId: enrollment._id,
-        metadata: { courseId: course._id.toString(), courseTitle: course.title, studentEmail: student.email },
-    });
-    return { enrollment };
+    return { enrollment, course, student };
 };
 
 const resolveEnrollmentTargets = async (req) => {
@@ -286,12 +284,21 @@ const resolveEnrollmentTargets = async (req) => {
 
 const manualEnrollUser = async (req, res) => {
     try {
-        const targets = await resolveEnrollmentTargets(req);
-        if (targets.error) return res.status(targets.error.status).json(targets.error.body);
+        const { error, enrollment, course, student } = await withSuperAdminLock(async () => {
+            const targets = await resolveEnrollmentTargets(req);
+            if (targets.error) return { error: targets.error };
+            return createManualEnrollment(targets.course, targets.student);
+        });
+        if (error) return res.status(error.status).json(error.body);
 
-        const result = await createManualEnrollment(req, targets.course, targets.student);
-        if (result.error) return res.status(result.error.status).json(result.error.body);
-        return res.status(201).json({ status: "success", data: result.enrollment });
+        await recordAudit({
+            req,
+            action: "ENROLLMENT_ADDED",
+            targetType: "Enrollment",
+            targetId: enrollment._id,
+            metadata: { courseId: course._id.toString(), courseTitle: course.title, studentEmail: student.email },
+        });
+        return res.status(201).json({ status: "success", data: enrollment });
     } catch (error) {
         if (error && error.code === 11000) {
             return res.status(400).json({ status: "fail", message: "User is already enrolled in this course" });

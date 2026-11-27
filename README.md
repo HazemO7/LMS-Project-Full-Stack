@@ -248,7 +248,7 @@ Available frontend scripts:
 | `NODE_ENV` | Recommended | `development` | Set to `development` for verbose logs/stack traces, or `production` for info-level logs and sanitized errors. |
 | `ADMIN_NAME` | For auto-seed | `Admin` | Display name for the seeded admin account. |
 | `ADMIN_EMAIL` | For auto-seed | `admin@lms.com` | Email for the seeded admin account. |
-| `ADMIN_PASSWORD` | For auto-seed | `admin123` | Password for the seeded admin account (hashed with bcrypt on insert). |
+| `ADMIN_PASSWORD` | For auto-seed | See `backend/.env.example` | Password for the seeded Super Admin account (hashed with bcrypt on insert). |
 | `SMTP_HOST` | Optional | — | SMTP server host for sending password-reset emails. |
 | `SMTP_PORT` | Optional | `587` | SMTP server port (`465` uses TLS/SSL). |
 | `SMTP_USER` | Optional | — | SMTP authentication username. |
@@ -268,8 +268,8 @@ Available frontend scripts:
 ## Automatic Database Seeding & Default Admin
 
 When the backend connects to MongoDB, `src/seed/index.js` runs automatically:
-- **Default Admin**: Created only if no user with `role: "admin"` exists and `ADMIN_NAME`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` are set.
-  - Default credentials from `.env.example`: `admin@lms.com` / `admin123` (change in production).
+- **Default Super Admin**: When no Super Admin exists and the seed variables are set, the seeder creates the account or promotes an existing Admin with the configured email.
+  - For a newly seeded account, sign in with your configured `ADMIN_EMAIL` and `ADMIN_PASSWORD`. Set a unique password for production. Existing accounts keep their prior password, including when promoted by the seeder.
   - You can also run `node scripts/createAdmin.js` inside `backend/` manually.
 - **Demo Courses**: Inserts 7 sample courses (with nested modules and lessons in the first course) only if the `courses` collection is empty.
 

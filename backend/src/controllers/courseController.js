@@ -1,7 +1,7 @@
 const Course = require("../models/Course");
 const User = require("../models/User");
 const { isAdminRole } = require("../middleware/authmiddleware");
-const { withGovernanceLock } = require("../services/governanceLockService");
+const { withSuperAdminLock } = require("../services/governanceLockService");
 const {
     PUBLIC_INSTRUCTOR_FIELDS,
     isValidObjectId,
@@ -37,8 +37,9 @@ const isEligibleInstructor = (userDoc) => {
 
 const resolveCourseInstructor = async (req) => {
     const requestedId = req.body.instructor;
-    if (!requestedId) return { instructorDoc: req.user };
-    if (!isAdminRole(req.user.role)) return { instructorDoc: req.user };
+    const actor = await User.findById(req.user._id).select(PUBLIC_INSTRUCTOR_FIELDS + " role isActive");
+    if (!isEligibleInstructor(actor)) return { error: INVALID_INSTRUCTOR_ERROR };
+    if (!requestedId || !isAdminRole(actor.role)) return { instructorDoc: actor };
     if (!isValidObjectId(requestedId)) return { error: INVALID_INSTRUCTOR_ERROR };
 
     const target = await User.findById(requestedId).select(PUBLIC_INSTRUCTOR_FIELDS + " role isActive");
@@ -49,17 +50,24 @@ const resolveCourseInstructor = async (req) => {
 // Create Course
 const createCourse = async (req, res) => {
     try {
-        const { error, instructorDoc } = await resolveCourseInstructor(req);
-        if (error) return res.status(error.status).json(error.body);
+        const { error, instructorDoc, savedCourse } = await withSuperAdminLock(async () => {
+            const resolved = await resolveCourseInstructor(req);
+            if (resolved.error) return resolved;
 
-        const { title, description } = req.body;
-        const savedCourse = await Course.create({ title, description, instructor: instructorDoc._id });
+            const { title, description } = req.body;
+            const savedCourse = await Course.create({ title, description, instructor: resolved.instructorDoc._id });
+            return { ...resolved, savedCourse };
+        });
+        if (error) return res.status(error.status).json(error.body);
         const responseData = savedCourse.toObject();
         responseData.instructor = buildPublicInstructor(instructorDoc);
 
         logger.info("Course created successfully", { courseId: savedCourse._id, instructorId: instructorDoc._id, requestId: req.id });
         return res.status(201).json({ status: "success", data: responseData });
     } catch (error) {
+        if (error.isOperational) {
+            return res.status(error.statusCode).json({ status: "fail", message: error.message });
+        }
         if (error.name === "ValidationError") {
             return res.status(400).json({ status: "fail", message: error.message });
         }
@@ -157,7 +165,7 @@ const runCourseMutation = async (req, res, { actionLabel, mutationFn, buildSucce
             return res.status(400).json({ status: "fail", message: "Invalid course ID" });
         }
 
-        const outcome = await withGovernanceLock("curriculum_mutation", mutationFn);
+        const outcome = await withSuperAdminLock(mutationFn);
         if (outcome.status !== 200) {
             return res.status(outcome.status).json(outcome.body);
         }

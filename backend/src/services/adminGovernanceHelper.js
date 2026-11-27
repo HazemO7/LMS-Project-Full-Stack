@@ -358,8 +358,7 @@ const dispatchOnboardingEmail = async (newUser, plainTempPassword, sendEmail) =>
 const createStaffAccountRecord = async (req) => {
     const { name, email, role, temporaryPassword, specialty = "", bio = "" } = req.body;
     const normalizedEmail = email.trim().toLowerCase();
-    const trimmedTemp = temporaryPassword ? temporaryPassword.trim() : "";
-    const plainTempPassword = trimmedTemp || generateTemporaryPassword(12);
+    const plainTempPassword = temporaryPassword || generateTemporaryPassword(12);
     const hashedPassword = await bcrypt.hash(plainTempPassword, 10);
 
     const newUser = await User.create({
@@ -397,6 +396,7 @@ module.exports = {
     isPrivilegedRole,
     buildUserFilterQuery,
     fetchUsersByCursor,
+    resolveActiveActor,
     executeUserRoleUpdate,
     executeUserStatusUpdate,
     executeUserDeletion,

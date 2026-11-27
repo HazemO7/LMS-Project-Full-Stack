@@ -1,6 +1,8 @@
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key';
 
 const request = require('supertest');
+const bcrypt = require('bcrypt');
+const { createHash } = require('node:crypto');
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const app = require('../../app');
@@ -69,6 +71,33 @@ describe('Authentication & Password Recovery', () => {
             // The service clears the token if email fails. 
             // We'll mock the emailService so it doesn't fail.
         });
+    });
+
+    it('keeps the reset token and rotation requirement until the password changes', async () => {
+        const token = 'a'.repeat(64);
+        const resetPasswordToken = createHash('sha256').update(token).digest('hex');
+        const { _id, password: originalHash } = await User.create({
+            ...validUser,
+            password: await bcrypt.hash(validUser.password, 10),
+            mustChangePassword: true,
+            resetPasswordToken,
+            resetPasswordExpire: new Date(Date.now() + 60_000),
+        });
+
+        const reset = (password) => request(app).put(`/api/auth/reset-password/${token}`).send({ password });
+        expect((await reset(validUser.password)).statusCode).toBe(400);
+        expect(await User.findById(_id)).toMatchObject({
+            password: originalHash,
+            mustChangePassword: true,
+            resetPasswordToken,
+        });
+
+        const newPassword = 'NewPassword123!';
+        expect((await reset(newPassword)).statusCode).toBe(200);
+        const user = await User.findById(_id);
+        expect(user.mustChangePassword).toBe(false);
+        expect(user.resetPasswordToken).toBeUndefined();
+        expect(await bcrypt.compare(newPassword, user.password)).toBe(true);
     });
 
     describe('Rate Limiting', () => {

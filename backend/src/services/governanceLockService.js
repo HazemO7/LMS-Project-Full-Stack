@@ -87,8 +87,8 @@ const withGovernanceLock = async (key, fn, options = {}) => {
 };
 
 /**
- * Shared serialization boundary for operations that can demote, suspend, delete a super_admin,
- * or transfer course ownership.
+ * Serializes account governance and curriculum changes that depend on current ownership
+ * or user existence, including course transfers.
  */
 const withSuperAdminLock = (fn, options) => withGovernanceLock("super_admin_mutation", fn, options);
 

@@ -1,5 +1,5 @@
 const Module = require("../models/Module");
-const { withGovernanceLock } = require("../services/governanceLockService");
+const { withSuperAdminLock } = require("../services/governanceLockService");
 const {
     isValidObjectId,
     parseIdList,
@@ -84,7 +84,7 @@ const runModuleMutation = async (req, res, actionLabel, mutationFn, formatRespon
             return res.status(400).json({ message: "Invalid module ID" });
         }
 
-        const outcome = await withGovernanceLock("curriculum_mutation", mutationFn);
+        const outcome = await withSuperAdminLock(mutationFn);
         if (outcome.status !== 200) {
             return res.status(outcome.status).json(outcome.body);
         }
@@ -121,7 +121,7 @@ const deleteModule = (req, res) =>
         req,
         res,
         "Delete module",
-        () => executeModuleDelete(req.params.id),
+        () => executeModuleDelete(req),
         () => ({ message: "Module deleted successfully" })
     );
 

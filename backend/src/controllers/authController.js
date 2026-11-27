@@ -201,6 +201,11 @@ const resetPassword = catchAsync(async (req, res, next) => {
         return next(new AppError("Invalid or expired reset token.", 400));
     }
 
+    const samePassword = await bcrypt.compare(password, user.password);
+    if (samePassword) {
+        return next(new AppError("New password cannot be the same as the current password.", 400));
+    }
+
     const hash = await bcrypt.hash(password, 10);
     user.password = hash;
     user.passwordChangedAt = new Date(Date.now() - 1000); // Backdate 1s to avoid race conditions with JWT iat

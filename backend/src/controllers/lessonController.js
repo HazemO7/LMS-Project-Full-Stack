@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Lesson = require('../models/Lesson');
 const Module = require('../models/Module');
 const Progress = require('../models/Progress');
-const { withGovernanceLock } = require("../services/governanceLockService");
+const { withSuperAdminLock } = require("../services/governanceLockService");
 const { resolveCourseFromLesson } = require("../middleware/courseOwnershipGuard");
 const { isAdminRole } = require("../middleware/authmiddleware");
 const logger = require('../utils/logger');
@@ -149,7 +149,7 @@ const executeLessonDelete = async (req) => {
 // Delete Lesson
 const deleteLesson = async (req, res) => {
     try {
-        const outcome = await withGovernanceLock("curriculum_mutation", () => executeLessonDelete(req));
+        const outcome = await withSuperAdminLock(() => executeLessonDelete(req));
         if (outcome.status !== 200) {
             return res.status(outcome.status).json({ message: outcome.message });
         }
