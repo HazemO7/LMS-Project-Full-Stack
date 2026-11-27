@@ -35,8 +35,37 @@ const verifyPasswordChanged = (passwordChangedAt, jwtTimestamp) => {
     return false; // Not changed
 };
 
+const buildTokenVersionFilter = (userId, expectedVersion) => {
+    const versionMatch = expectedVersion === 0
+        ? { $or: [{ tokenVersion: 0 }, { tokenVersion: { $exists: false } }] }
+        : { tokenVersion: expectedVersion };
+    return { _id: userId, ...versionMatch };
+};
+
+const replaceUserPassword = async ({ User, user, newPasswordHash, extraFilter = {}, clearReset = false }) => {
+    const filter = { ...buildTokenVersionFilter(user._id, user.tokenVersion ?? 0), ...extraFilter };
+    const update = {
+        $set: {
+            password: newPasswordHash,
+            passwordChangedAt: new Date(),
+            mustChangePassword: false,
+        },
+        $inc: { tokenVersion: 1 },
+    };
+    if (clearReset) {
+        update.$unset = {
+            resetPasswordToken: 1,
+            resetPasswordExpire: 1,
+            resetPasswordTokenCreatedAt: 1,
+        };
+    }
+    return User.findOneAndUpdate(filter, update, { returnDocument: 'after' });
+};
+
 module.exports = {
     generateResetToken,
     hashToken,
-    verifyPasswordChanged
+    verifyPasswordChanged,
+    buildTokenVersionFilter,
+    replaceUserPassword,
 };

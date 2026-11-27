@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
 
 const lessonSchema = new mongoose.Schema({
+  module: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Module',
+    default: null
+  },
+  order: {
+    type: Number,
+    default: 0
+  },
   title: {
     type: String,
     required: true

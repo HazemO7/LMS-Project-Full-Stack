@@ -20,6 +20,7 @@ import {
 import { coursesAPI, lessonsAPI, modulesAPI, progressAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { canManageCourse } from '../utils/roleUtils';
 import { CreateModuleModal } from '../components/CreateModuleModal';
 import { CreateLessonModal } from '../components/CreateLessonModal';
 import { EditCourseModal } from '../components/EditCourseModal';
@@ -28,6 +29,17 @@ import { EditLessonModal } from '../components/EditLessonModal';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { getYouTubeEmbedUrl, isDemoPlaceholderVideo } from '../utils/youtube';
+
+const InstructorByline = ({ instructor, t }) => {
+  if (!instructor?.name) return null;
+  const specialtySuffix = instructor.specialty ? ` · ${instructor.specialty}` : '';
+  return (
+    <p className="mt-1.5 text-xs font-semibold text-[#FBBF24]">
+      {t('courses.byInstructor', { name: instructor.name })}
+      {specialtySuffix}
+    </p>
+  );
+};
 
 export const CourseDetails = () => {
   const { id } = useParams();
@@ -170,13 +182,7 @@ export const CourseDetails = () => {
       ? flattenedLessons[activeIndex + 1]
       : null;
 
-  const canManage = Boolean(
-    currentUser &&
-      course &&
-      (currentUser.role === 'admin' ||
-        (course.instructor &&
-          (course.instructor._id || course.instructor) === currentUser._id))
-  );
+  const canManage = canManageCourse(currentUser, course);
 
   const handleEnroll = async () => {
     setEnrolling(true);
@@ -546,6 +552,7 @@ export const CourseDetails = () => {
               <h1 dir="auto" className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
                 {course.title}
               </h1>
+              <InstructorByline instructor={course.instructor} t={t} />
               <p dir="auto" className="mt-2 max-w-[68ch] text-sm leading-relaxed text-[#CCFBF1]/90 sm:text-base">
                 {course.description}
               </p>
@@ -881,9 +888,6 @@ export const CourseDetails = () => {
           setActiveModuleId(null);
         }}
         moduleId={activeModuleId}
-        existingLessons={
-          modules.find((m) => (m._id || m.id) === activeModuleId)?.lesson || []
-        }
         onLessonCreated={handleLessonCreated}
       />
 

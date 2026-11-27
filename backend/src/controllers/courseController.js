@@ -1,199 +1,207 @@
 const Course = require("../models/Course");
+const User = require("../models/User");
+const { isAdminRole } = require("../middleware/authmiddleware");
+const { withSuperAdminLock } = require("../services/governanceLockService");
+const {
+    PUBLIC_INSTRUCTOR_FIELDS,
+    isValidObjectId,
+    parseIdList,
+    executeCourseUpdate,
+    executeCourseDelete,
+} = require("../services/curriculumService");
 const logger = require("../utils/logger");
 
+const INSTRUCTOR_ROLES = new Set(["instructor", "admin", "super_admin"]);
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const INVALID_INSTRUCTOR_ERROR = {
+    status: 400,
+    body: { status: "fail", message: "Selected instructor is invalid or inactive" },
+};
+
+const buildPublicInstructor = (userDoc) => {
+    if (!userDoc) return null;
+    return {
+        _id: userDoc._id,
+        name: userDoc.name,
+        specialty: userDoc.specialty || "",
+        bio: userDoc.bio || "",
+    };
+};
+
+const isEligibleInstructor = (userDoc) => {
+    if (!userDoc) return false;
+    if (userDoc.isActive === false) return false;
+    return INSTRUCTOR_ROLES.has(userDoc.role);
+};
+
+const resolveCourseInstructor = async (req) => {
+    const requestedId = req.body.instructor;
+    const actor = await User.findById(req.user._id).select(PUBLIC_INSTRUCTOR_FIELDS + " role isActive");
+    if (!isEligibleInstructor(actor)) return { error: INVALID_INSTRUCTOR_ERROR };
+    if (!requestedId || !isAdminRole(actor.role)) return { instructorDoc: actor };
+    if (!isValidObjectId(requestedId)) return { error: INVALID_INSTRUCTOR_ERROR };
+
+    const target = await User.findById(requestedId).select(PUBLIC_INSTRUCTOR_FIELDS + " role isActive");
+    if (!isEligibleInstructor(target)) return { error: INVALID_INSTRUCTOR_ERROR };
+    return { instructorDoc: target };
+};
 
 // Create Course
-
 const createCourse = async (req, res) => {
     try {
-        const { title, description } = req.body;
-        // create new course instance
-        const course = new Course({
-            title,
-            description,
-            instructor: req.user._id
-        });
-        // save course to database
-        const savedCourse = await course.save();
-        
-        logger.info("Course created successfully", { courseId: savedCourse._id, instructorId: req.user._id, requestId: req.id });
-        
-        // send response
-        res.status(201).json({
-            status: "success",
-            data: savedCourse
-        });
+        const { error, instructorDoc, savedCourse } = await withSuperAdminLock(async () => {
+            const resolved = await resolveCourseInstructor(req);
+            if (resolved.error) return resolved;
 
-    } catch (error) {
-        res.status(500).json({
-            status: "error",
-            message: error.message
+            const { title, description } = req.body;
+            const savedCourse = await Course.create({ title, description, instructor: resolved.instructorDoc._id });
+            return { ...resolved, savedCourse };
         });
+        if (error) return res.status(error.status).json(error.body);
+        const responseData = savedCourse.toObject();
+        responseData.instructor = buildPublicInstructor(instructorDoc);
+
+        logger.info("Course created successfully", { courseId: savedCourse._id, instructorId: instructorDoc._id, requestId: req.id });
+        return res.status(201).json({ status: "success", data: responseData });
+    } catch (error) {
+        if (error.isOperational) {
+            return res.status(error.statusCode).json({ status: "fail", message: error.message });
+        }
+        if (error.name === "ValidationError") {
+            return res.status(400).json({ status: "fail", message: error.message });
+        }
+        logger.error("Create course error", { error: error.message, requestId: req.id });
+        return res.status(500).json({ status: "error", message: "Failed to create course" });
     }
 };
 
+const parsePositivePageParam = (raw, fallback, max = Infinity) => {
+    const parsed = parseInt(raw, 10);
+    if (Number.isNaN(parsed) || parsed < 1) return fallback;
+    return Math.min(parsed, max);
+};
 
 // Get All Courses
-
 const getCourses = async (req, res) => {
     try {
-        let { page = 1, limit = 6, search = "" } = req.query;
-
-        page = parseInt(page);
-        limit = parseInt(limit);
-
-        if (isNaN(page) || page < 1) page = 1;
-        if (isNaN(limit) || limit < 1) limit = 6;
-
+        const page = parsePositivePageParam(req.query.page, 1);
+        const limit = parsePositivePageParam(req.query.limit, 6, 100);
         const skip = (page - 1) * limit;
 
         const query = {};
-
-        if (search) {
-            query.title = {
-                $regex: search,
-                $options: "i"
-            };
+        const searchTerm = req.query.search ? String(req.query.search).trim() : "";
+        if (searchTerm) {
+            query.title = { $regex: escapeRegex(searchTerm), $options: "i" };
         }
 
-        const totalCourses = await Course.countDocuments(query);
+        const [totalCourses, courses] = await Promise.all([
+            Course.countDocuments(query),
+            Course.find(query).populate("instructor", PUBLIC_INSTRUCTOR_FIELDS).skip(skip).limit(limit),
+        ]);
 
-        const courses = await Course.find(query)
-            .skip(skip)
-            .limit(limit);
-
-        res.json({
+        return res.json({
             status: "success",
             page,
             limit,
             totalCourses,
             totalPages: Math.ceil(totalCourses / limit),
             results: courses.length,
-            data: courses
+            data: courses,
         });
-
     } catch (error) {
-        res.status(500).json({
-            status: "error",
-            message: error.message
-        });
+        logger.error("Get courses error", { error: error.message, requestId: req.id });
+        return res.status(500).json({ status: "error", message: "Failed to load courses" });
     }
 };
 
-// Get Course By ID
-const getCourseById = async (req, res) => {
+const fetchAndSendCourseById = async (req, res, includeModules) => {
     try {
-        const course = await Course.findById(req.params.id);
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ status: "fail", message: "Invalid course ID" });
+        }
 
-        if (!course) {
-            return res.status(404).json({
-                status: "fail",
-                message: "Course not found"
+        let query = Course.findById(req.params.id).populate("instructor", PUBLIC_INSTRUCTOR_FIELDS);
+        if (includeModules) {
+            query = query.populate({
+                path: "modules",
+                populate: { path: "lesson", model: "Lesson" },
             });
         }
 
-        res.json({
-            status: "success",
-            data: course
-        });
-
+        const course = await query;
+        if (!course) {
+            return res.status(404).json({ status: "fail", message: "Course not found" });
+        }
+        return res.json({ status: "success", data: course });
     } catch (error) {
-        res.status(500).json({
-            status: "error",
-            message: error.message
-        });
+        logger.error("Get course error", { error: error.message, includeModules, requestId: req.id });
+        return res.status(500).json({ status: "error", message: "Failed to load course" });
     }
 };
 
+const getCourseById = (req, res) => fetchAndSendCourseById(req, res, false);
+const getCourseByIdFull = (req, res) => fetchAndSendCourseById(req, res, true);
 
-const getCourseByIdFull = async (req, res) => {
+const buildCourseUpdateFields = (body, uniqueModuleIds) => {
+    const updateFields = {};
+    if (body.title !== undefined) updateFields.title = body.title;
+    if (body.description !== undefined) updateFields.description = body.description;
+    if (uniqueModuleIds !== null) updateFields.modules = uniqueModuleIds;
+    return updateFields;
+};
+
+const handleCourseMutationError = (res, req, actionLabel, error) => {
+    if (error && error.isOperational) {
+        return res.status(error.statusCode).json({ status: "fail", message: error.message });
+    }
+    logger.error(`${actionLabel} error`, { error: error?.message, courseId: req.params.id, requestId: req.id });
+    return res.status(500).json({ status: "error", message: `Failed to ${actionLabel.toLowerCase()}` });
+};
+
+const runCourseMutation = async (req, res, { actionLabel, mutationFn, buildSuccessBody }) => {
     try {
-        const course = await Course.findById(req.params.id)
-            .populate({
-                path: 'modules',
-                populate: {
-                    path: 'lesson',
-                    model: 'Lesson'
-                }
-            });
-
-        if (!course) {
-            return res.status(404).json({
-                status: "fail",
-                message: "Course not found"
-            });
+        if (!isValidObjectId(req.params.id)) {
+            return res.status(400).json({ status: "fail", message: "Invalid course ID" });
         }
-        res.json({
-            status: "success",
-            data: course
-        });
+
+        const outcome = await withSuperAdminLock(mutationFn);
+        if (outcome.status !== 200) {
+            return res.status(outcome.status).json(outcome.body);
+        }
+
+        logger.info(`Course ${actionLabel} succeeded`, { courseId: req.params.id, userId: req.user._id, requestId: req.id });
+        return res.json(buildSuccessBody(outcome));
     } catch (error) {
-        res.status(500).json({
-            status: "error",
-            message: error.message
-        });
+        return handleCourseMutationError(res, req, actionLabel, error);
     }
 };
 
 // Update Course
+const updateCourse = (req, res) => {
+    const { error, uniqueIds } = parseIdList(
+        req.body.modules,
+        "Modules must be an array of IDs",
+        "Invalid module ID provided",
+        true
+    );
+    if (error) return res.status(error.status).json(error.body);
 
-const updateCourse = async (req, res) => {
-    try {
-        let course = await Course.findById(req.params.id);
-        if (!course) {
-            return res.status(404).json({ status: "fail", message: "Course not found" });
-        }
-        if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-            return res.status(403).json({ status: "fail", message: "Not authorized to update this course" });
-        }
-
-        course = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true });
-
-        logger.info("Course updated successfully", { courseId: course._id, userId: req.user._id, requestId: req.id });
-
-        res.json({
-            status: "success",
-            data: course
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            status: "error",
-            message: error.message
-        });
-    }
+    const updateFields = buildCourseUpdateFields(req.body, uniqueIds);
+    return runCourseMutation(req, res, {
+        actionLabel: "Update course",
+        mutationFn: () => executeCourseUpdate(req, updateFields, uniqueIds),
+        buildSuccessBody: (outcome) => ({ status: "success", data: outcome.data }),
+    });
 };
 
 // Delete Course
-const deleteCourse = async (req, res) => {
-    try {
-        const course = await Course.findById(req.params.id);
-        if (!course) {
-            return res.status(404).json({ status: "fail", message: "Course not found" });
-        }
-
-        if (course.instructor.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-            return res.status(403).json({ status: "fail", message: "Not authorized to delete this course" });
-        }
-
-        await Course.findByIdAndDelete(req.params.id);
-
-        logger.info("Course deleted successfully", { courseId: req.params.id, userId: req.user._id, requestId: req.id });
-
-        res.json({
-            status: "success",
-            message: "Course deleted successfully"
-        });
-
-    } catch (error) {
-        res.status(500).json({
-            status: "error",
-            message: error.message
-        });
-    }
-};
-
-
+const deleteCourse = (req, res) =>
+    runCourseMutation(req, res, {
+        actionLabel: "Delete course",
+        mutationFn: () => executeCourseDelete(req),
+        buildSuccessBody: () => ({ status: "success", message: "Course deleted successfully" }),
+    });
 
 module.exports = {
     createCourse,
@@ -202,4 +210,4 @@ module.exports = {
     getCourseByIdFull,
     updateCourse,
     deleteCourse,
-}
+};

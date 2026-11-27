@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from './ui/Modal';
 import { AlertBanner } from './ui/AlertBanner';
-import { coursesAPI, modulesAPI } from '../services/api';
+import { modulesAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 
 export const CreateModuleModal = ({
   show,
   onHide,
   courseId,
-  existingModules = [],
   onModuleCreated,
 }) => {
   const { t, tServer } = useLanguage();
@@ -32,14 +31,8 @@ export const CreateModuleModal = ({
     setLoading(true);
     setError('');
     try {
-      const newModuleRes = await modulesAPI.create(moduleData);
+      const newModuleRes = await modulesAPI.create({ ...moduleData, course: courseId });
       const newModule = newModuleRes.data || newModuleRes;
-      const moduleId = newModule._id || newModule.id || newModule;
-
-      const updatedModules = existingModules.map((m) => m._id || m.id || m);
-      if (moduleId) updatedModules.push(moduleId);
-
-      await coursesAPI.update(courseId, { modules: updatedModules });
 
       onModuleCreated(newModule);
       onHide();

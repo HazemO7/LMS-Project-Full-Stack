@@ -1,12 +1,14 @@
 const User = require("../models/User");
+const PlatformSettings = require("../models/PlatformSettings");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
 const catchAsync = require("../utils/catchAsync");
 const AppError = require("../utils/AppError");
 const logger = require("../utils/logger");
-const { generateResetToken, hashToken } = require("../services/authService");
+const { generateResetToken, hashToken, replaceUserPassword } = require("../services/authService");
 const { sendPasswordResetEmail } = require("../services/emailService");
+const { sanitizeUser } = require("../services/adminGovernanceHelper");
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_TIME = 5 * 60 * 1000; // 5 minutes
@@ -20,6 +22,11 @@ const LOCK_TIME = 5 * 60 * 1000; // 5 minutes
 
 // POST /api/auth/register
 const register = catchAsync(async (req, res, next) => {
+    const settings = await PlatformSettings.getSingleton();
+    if (!settings.allowPublicRegistration) {
+        return next(new AppError("Public registration is currently closed by the administrator.", 403));
+    }
+
     // get Data (assuming validation middleware passed and attached req.body)
     const { name, email, password } = req.body;
     
@@ -45,7 +52,7 @@ const register = catchAsync(async (req, res, next) => {
 
     res.status(201).json({
         msg: "Done Created User",
-        data: user,
+        data: sanitizeUser(user),
     });
 });
 
@@ -95,6 +102,14 @@ const login = catchAsync(async (req, res, next) => {
         });
     }
 
+    if (user.isActive === false) {
+        logger.warn("Suspended user attempted login", { userId: user._id, requestId: req.id, ip: req.ip });
+        return res.status(403).json({
+            message: "Your account has been suspended. Please contact administration.",
+            code: "ACCOUNT_SUSPENDED",
+        });
+    }
+
     
     // Step 6: Successful login
     if (user.loginAttempts > 0 || user.lockUntil) {
@@ -113,6 +128,7 @@ const login = catchAsync(async (req, res, next) => {
         {
             id: user._id,
             role: user.role,
+            tokenVersion: user.tokenVersion ?? 0,
         },
         process.env.JWT_SECRET,
         {
@@ -123,6 +139,8 @@ const login = catchAsync(async (req, res, next) => {
     res.status(200).json({
         msg: "Success Login",
         token,
+        role: user.role,
+        mustChangePassword: Boolean(user.mustChangePassword),
     });
 });
 
@@ -185,15 +203,22 @@ const resetPassword = catchAsync(async (req, res, next) => {
         return next(new AppError("Invalid or expired reset token.", 400));
     }
 
+    const samePassword = await bcrypt.compare(password, user.password);
+    if (samePassword) {
+        return next(new AppError("New password cannot be the same as the current password.", 400));
+    }
+
     const hash = await bcrypt.hash(password, 10);
-    user.password = hash;
-    user.passwordChangedAt = new Date(Date.now() - 1000); // Backdate 1s to avoid race conditions with JWT iat
-    
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    user.resetPasswordTokenCreatedAt = undefined;
-    
-    await user.save();
+    const updated = await replaceUserPassword({
+        User,
+        user,
+        newPasswordHash: hash,
+        extraFilter: { resetPasswordToken: hashedToken, resetPasswordExpire: { $gt: Date.now() } },
+        clearReset: true,
+    });
+    if (!updated) {
+        return next(new AppError("Invalid or expired reset token.", 400));
+    }
 
     logger.info("Password reset completed successfully", { userId: user._id, requestId: req.id });
     res.status(200).json({ message: "Password reset successfully." });
@@ -222,9 +247,10 @@ const changePassword = catchAsync(async (req, res, next) => {
     }
 
     const hash = await bcrypt.hash(newPassword, 10);
-    user.password = hash;
-    user.passwordChangedAt = new Date(Date.now() - 1000);
-    await user.save();
+    const updated = await replaceUserPassword({ User, user, newPasswordHash: hash });
+    if (!updated) {
+        return next(new AppError("Password was changed concurrently. Please retry.", 409));
+    }
 
     logger.info("Password changed successfully", { userId: user._id, requestId: req.id });
     res.status(200).json({ message: "Password changed successfully." });

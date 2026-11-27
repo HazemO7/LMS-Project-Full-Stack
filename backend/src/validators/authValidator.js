@@ -1,8 +1,11 @@
 const Joi = require('joi');
-const { validatePasswordPolicy } = require('../utils/passwordUtils');
+const { validatePasswordPolicy, isPasswordOverByteLimit } = require('../utils/passwordUtils');
 
 // Custom Joi validation using the password policy utility
 const passwordMethod = (value, helpers) => {
+    if (isPasswordOverByteLimit(value)) {
+        return helpers.message('Password must not exceed 72 bytes.');
+    }
     if (!validatePasswordPolicy(value)) {
         return helpers.message('Password must be at least 8 characters long, include uppercase, lowercase, number, and a special character.');
     }

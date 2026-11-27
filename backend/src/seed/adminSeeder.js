@@ -4,23 +4,30 @@ const User = require("../models/User");
 
 const seedAdmin = async () => {
     try {
-        // Check if there is at least one admin
-        const adminExists = await User.findOne({ role: "admin" });
-        if (adminExists) {
-            console.log("Admin already exists.");
+        // Check if there is at least one super_admin
+        const superAdminExists = await User.findOne({ role: "super_admin" });
+        if (superAdminExists) {
+            console.log("Super Admin already exists.");
             return;
         }
 
         // Check if admin credentials are provided in env
         const { ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD } = process.env;
         if (!ADMIN_NAME || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
-            console.log("Admin credentials not found in environment variables. Skipping admin seed.");
+            console.log("Admin credentials not found in environment variables. Skipping super_admin seed.");
             return;
         }
 
-        // Check if a user with the admin email already exists (even if not admin)
-        const emailExists = await User.findOne({ email: ADMIN_EMAIL });
-        if (emailExists) {
+        // Check if a user with the admin email already exists
+        const existingByEmail = await User.findOne({ email: ADMIN_EMAIL });
+        if (existingByEmail) {
+            if (existingByEmail.role === "admin") {
+                existingByEmail.role = "super_admin";
+                existingByEmail.isActive = true;
+                await existingByEmail.save();
+                console.log("Promoted existing owner admin account to super_admin.");
+                return;
+            }
             console.log("A user with the admin email already exists.");
             return;
         }
@@ -28,17 +35,19 @@ const seedAdmin = async () => {
         // Hash the password using the same mechanism as registration
         const hashPassword = await bcrypt.hash(ADMIN_PASSWORD, 10);
 
-        // Create the admin user
+        // Create the default super_admin user
         await User.create({
             name: ADMIN_NAME,
             email: ADMIN_EMAIL,
             password: hashPassword,
-            role: "admin",
+            role: "super_admin",
+            isActive: true,
+            mustChangePassword: false,
         });
 
-        console.log("Default admin created successfully.");
+        console.log("Default super_admin created successfully.");
     } catch (error) {
-        console.error("Error seeding default admin:", error);
+        console.error("Error seeding default super_admin:", error);
     }
 };
 
