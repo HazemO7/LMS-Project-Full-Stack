@@ -181,7 +181,7 @@ const AdminDashboardModals = ({
       onClose={closeCreateStaff}
       callerRole={callerRole}
       onCreated={() => {
-        usersState.fetchUsers();
+        usersState.refreshUsers();
         fetchStats();
       }}
     />
@@ -203,7 +203,7 @@ const AdminDashboardModals = ({
       onClose={closeEnrollments}
       course={enrollmentsTarget}
       onChanged={() => {
-        coursesState.fetchCourses();
+        coursesState.refreshCourses();
         fetchStats();
       }}
     />

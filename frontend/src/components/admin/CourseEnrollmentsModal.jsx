@@ -19,7 +19,7 @@ const updateIdSet = (prev, id, shouldAdd) => {
 };
 
 const extractUserId = (item) => item.user?._id || item.user;
-const removeEnrollmentItem = (list, userId) => list.filter((item) => extractUserId(item) !== userId);
+const removeEnrollmentItem = (list, enrollmentId) => list.filter((item) => item._id !== enrollmentId);
 
 const runSessionRequest = async ({ sessionRef, sessionId, run, onError, onFinally }) => {
   try {
@@ -43,7 +43,7 @@ const EnrollmentListItem = ({ item, removingUserIds, onUnenroll, t }) => {
       <button
         type="button"
         disabled={removingUserIds.has(uid)}
-        onClick={() => onUnenroll(uid)}
+        onClick={() => onUnenroll(uid, item._id)}
         aria-label={t('admin.unenrollAria')}
         className="rounded-lg p-1.5 text-[#52797A] hover:bg-[#FEF2F2] hover:text-[#DC2626] disabled:cursor-not-allowed disabled:opacity-40"
       >
@@ -117,7 +117,7 @@ const useCourseEnrollmentsState = (course, onChanged) => {
     });
   };
 
-  const handleUnenroll = (userId) => {
+  const handleUnenroll = (userId, enrollmentId) => {
     if (!courseId || removingUserIds.has(userId)) return;
     const sessionId = sessionRef.current;
     setError('');
@@ -131,7 +131,7 @@ const useCourseEnrollmentsState = (course, onChanged) => {
         await adminAPI.unenrollUser(courseId, userId);
         onChanged?.(courseId);
         if (sessionRef.current === sessionId) {
-          setEnrollments((prev) => removeEnrollmentItem(prev, userId));
+          setEnrollments((prev) => removeEnrollmentItem(prev, enrollmentId));
         }
       },
     });

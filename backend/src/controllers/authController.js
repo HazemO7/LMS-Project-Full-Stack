@@ -128,6 +128,7 @@ const login = catchAsync(async (req, res, next) => {
         {
             id: user._id,
             role: user.role,
+            tokenVersion: user.tokenVersion ?? 0,
         },
         process.env.JWT_SECRET,
         {
@@ -209,7 +210,8 @@ const resetPassword = catchAsync(async (req, res, next) => {
 
     const hash = await bcrypt.hash(password, 10);
     user.password = hash;
-    user.passwordChangedAt = new Date(Date.now() - 1000); // Backdate 1s to avoid race conditions with JWT iat
+    user.passwordChangedAt = new Date();
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     user.mustChangePassword = false;
     
     user.resetPasswordToken = undefined;
@@ -246,7 +248,8 @@ const changePassword = catchAsync(async (req, res, next) => {
 
     const hash = await bcrypt.hash(newPassword, 10);
     user.password = hash;
-    user.passwordChangedAt = new Date(Date.now() - 1000);
+    user.passwordChangedAt = new Date();
+    user.tokenVersion = (user.tokenVersion || 0) + 1;
     user.mustChangePassword = false;
     await user.save();
 

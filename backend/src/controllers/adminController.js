@@ -137,6 +137,7 @@ const createStaffUser = async (req, res) => {
                 return { error: { status: 400, body: { status: "fail", message: "Account Already Exist" } } };
             }
             const created = await createStaffAccountRecord(req);
+            if (created.error) return created;
             await recordAudit({
                 req,
                 action: "USER_CREATED",
@@ -286,6 +287,8 @@ const resolveEnrollmentTargets = async (req) => {
 const manualEnrollUser = async (req, res) => {
     try {
         const { error, enrollment } = await withSuperAdminLock(async () => {
+            const { error: actorError } = await resolveActiveActor(req);
+            if (actorError) return { error: actorError };
             const targets = await resolveEnrollmentTargets(req);
             if (targets.error) return { error: targets.error };
             const created = await createManualEnrollment(targets.course, targets.student);

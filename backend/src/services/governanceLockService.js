@@ -1,12 +1,23 @@
+const { AsyncLocalStorage } = require("async_hooks");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 const GovernanceLock = require("../models/GovernanceLock");
 const AppError = require("../utils/AppError");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const postCommitStorage = new AsyncLocalStorage();
 
 // Include all Mongoose operations in the callback (including helper queries) in the transaction.
 mongoose.set("transactionAsyncLocalStorage", true);
+
+const afterTransactionCommit = (fn) => {
+    const queue = postCommitStorage.getStore();
+    if (queue) {
+        queue.push(fn);
+        return;
+    }
+    fn();
+};
 
 const createLockDocument = async (key, ownerToken, expiresAt) => {
     try {
@@ -51,18 +62,24 @@ const releaseLock = async (key, ownerToken, released) => {
 };
 
 const runFencedTransaction = async (key, ownerToken, fn, released) => {
-    return mongoose.connection.transaction(async () => {
-        const result = await fn();
-        // Fence the commit: a takeover conflicts with this write and an expired lease aborts all work.
-        const fence = await GovernanceLock.updateOne(
-            { _id: key, ownerToken, expiresAt: { $gt: new Date() } },
-            { $set: released }
-        );
-        if (!fence.matchedCount) {
-            throw new AppError("Governance lock expired before commit. Please retry.", 409);
-        }
-        return result;
-    });
+    const postCommitCallbacks = [];
+    const result = await postCommitStorage.run(postCommitCallbacks, () =>
+        mongoose.connection.transaction(async () => {
+            postCommitCallbacks.length = 0;
+            const value = await fn();
+            // Fence the commit: a takeover conflicts with this write and an expired lease aborts all work.
+            const fence = await GovernanceLock.updateOne(
+                { _id: key, ownerToken, expiresAt: { $gt: new Date() } },
+                { $set: released }
+            );
+            if (!fence.matchedCount) {
+                throw new AppError("Governance lock expired before commit. Please retry.", 409);
+            }
+            return value;
+        })
+    );
+    for (const cb of postCommitCallbacks) cb();
+    return result;
 };
 
 const resolveLockOptions = (options) => ({
@@ -93,6 +110,7 @@ const withGovernanceLock = async (key, fn, options = {}) => {
 const withSuperAdminLock = (fn, options) => withGovernanceLock("super_admin_mutation", fn, options);
 
 module.exports = {
+    afterTransactionCommit,
     withGovernanceLock,
     withSuperAdminLock,
 };

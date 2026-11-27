@@ -38,6 +38,9 @@ const buildRejection = (status, body, logMsg = null, logMeta = null) => ({
     logMeta,
 });
 
+const isTokenVersionStale = (decoded, user) =>
+    (decoded.tokenVersion ?? 0) !== (user.tokenVersion ?? 0);
+
 const validateAuthenticatedUser = (user, decoded, req) => {
     if (!user) {
         return buildRejection(401, { msg: "User no longer exists" }, "Token verified but user no longer exists", {
@@ -53,7 +56,7 @@ const validateAuthenticatedUser = (user, decoded, req) => {
             { userId: user.id, requestId: req.id }
         );
     }
-    if (verifyPasswordChanged(user.passwordChangedAt, decoded.iat)) {
+    if (isTokenVersionStale(decoded, user) || verifyPasswordChanged(user.passwordChangedAt, decoded.iat)) {
         return buildRejection(
             401,
             { msg: "User recently changed password! Please log in again." },

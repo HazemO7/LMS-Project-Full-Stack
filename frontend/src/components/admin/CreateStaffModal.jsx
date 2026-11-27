@@ -26,6 +26,11 @@ const StaffCredentialsSummary = ({
 }) => {
   const emailMsg = createdResult.emailSent ? t('admin.welcomeEmailSent') : t('admin.welcomeEmailSkipped');
   const createdRole = t(`role.${createdResult.data?.role || 'instructor'}`);
+  const copyBtnRef = useRef(null);
+
+  useEffect(() => {
+    copyBtnRef.current?.focus();
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -60,6 +65,7 @@ const StaffCredentialsSummary = ({
 
       <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[#CCFBF1] pt-4">
         <button
+          ref={copyBtnRef}
           type="button"
           onClick={onCopy}
           className="inline-flex items-center gap-1.5 rounded-lg border border-[#99F6E4] bg-white px-4 py-2 text-sm font-semibold text-[#0D2E2F] hover:bg-[#F0FDFA]"

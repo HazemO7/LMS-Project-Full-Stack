@@ -107,11 +107,20 @@ const sendStaffOnboardingEmail = async ({ email, name, role, temporaryPassword, 
         from: process.env.SMTP_FROM || '"Foundry LMS" <noreply@example.com>',
         to: email,
         subject: `Your Foundry LMS ${roleLabel} Account`,
+        text: [
+            `Welcome to Foundry LMS, ${name}`,
+            `Role: ${roleLabel}`,
+            `Sign-in Email: ${email}`,
+            `Temporary Password: ${temporaryPassword}`,
+            `For security, you will be required to change this temporary password immediately after your first sign-in.`,
+            `Sign in: ${loginUrl}`,
+        ].join('\n'),
         html: `
             <h1>Welcome to Foundry LMS, ${safeName}</h1>
             <p>An account has been created for you with the role: <strong>${safeRoleLabel}</strong>.</p>
             <p><strong>Sign-in Email:</strong> ${safeEmail}</p>
-            <p><strong>Temporary Password:</strong> <code>${safeTempPassword}</code></p>
+            <p><strong>Temporary Password:</strong></p>
+            <pre style="display:inline-block;margin:0;padding:2px 6px;white-space:pre-wrap;font-family:monospace;">${safeTempPassword}</pre>
             <p>For security, you will be required to change this temporary password immediately after your first sign-in.</p>
             <p><a href="${safeLoginUrl}">Sign in to Foundry LMS</a></p>
         `

@@ -3,7 +3,8 @@ const Lesson = require('../models/Lesson');
 const Module = require('../models/Module');
 const Progress = require('../models/Progress');
 const { withSuperAdminLock } = require("../services/governanceLockService");
-const { resolveCourseFromModule, resolveCourseFromLesson } = require("../middleware/courseOwnershipGuard");
+const { resolveCurriculumActor } = require("../services/curriculumService");
+const { resolveCourseFromModule } = require("../middleware/courseOwnershipGuard");
 const { isAdminRole } = require("../middleware/authmiddleware");
 const logger = require('../utils/logger');
 
@@ -47,9 +48,15 @@ const handleLessonMutationError = (res, req, actionLabel, error) => {
     return res.status(500).json({ message: `Failed to ${actionLabel.toLowerCase()}` });
 };
 
+const sendLessonOutcome = (res, outcome) =>
+    res.status(outcome.status).json(outcome.body || { message: outcome.message });
+
 const executeLessonCreate = async (req) => {
+    const { actor, error: actorError } = await resolveCurriculumActor(req.user._id, false);
+    if (actorError) return actorError;
+
     const { module, title, description, content, videoUrl, order } = req.body;
-    const authErr = await authorizeLessonParentModule(module, req.user);
+    const authErr = await authorizeLessonParentModule(module, actor);
     if (authErr) return authErr;
 
     const lesson = await Lesson.create({
@@ -68,7 +75,7 @@ const createLesson = async (req, res) => {
     try {
         const outcome = await withSuperAdminLock(() => executeLessonCreate(req));
         if (outcome.status !== 201) {
-            return res.status(outcome.status).json({ message: outcome.message });
+            return sendLessonOutcome(res, outcome);
         }
 
         logger.info("Lesson created successfully", {
@@ -136,17 +143,34 @@ const buildLessonUpdateFields = ({ title, description, content, videoUrl, order 
     return updateFields;
 };
 
-const assertCallerCanMutateLesson = async (req, lesson) => {
-    if (isAdminRole(req.user.role)) return true;
-    const course = await resolveCourseFromLesson(lesson);
-    return isOwnedCourse(course, req.user._id);
+const collectLessonHolderModules = async (lesson) => {
+    const listedModules = await Module.find({ lesson: lesson._id }).select("_id course");
+    if (!lesson.module) return listedModules;
+    const pointedId = lesson.module.toString();
+    if (listedModules.some((mod) => mod._id.toString() === pointedId)) return listedModules;
+    const pointedMod = await Module.findById(lesson.module).select("_id course");
+    return pointedMod ? [...listedModules, pointedMod] : listedModules;
+};
+
+const assertCallerCanMutateLesson = async (actor, lesson) => {
+    if (isAdminRole(actor.role)) return true;
+    const holders = await collectLessonHolderModules(lesson);
+    if (holders.length === 0) return false;
+    for (const mod of holders) {
+        const course = await resolveCourseFromModule(mod);
+        if (!isOwnedCourse(course, actor._id)) return false;
+    }
+    return true;
 };
 
 const executeLessonUpdate = async (req) => {
+    const { actor, error: actorError } = await resolveCurriculumActor(req.user._id, false);
+    if (actorError) return actorError;
+
     const existingLesson = await Lesson.findById(req.params.id);
     if (!existingLesson) return { status: 404, message: 'Lesson not found' };
 
-    const allowed = await assertCallerCanMutateLesson(req, existingLesson);
+    const allowed = await assertCallerCanMutateLesson(actor, existingLesson);
     if (!allowed) return { status: 403, message: UNAUTHORIZED_MSG };
 
     const moduleError = validateLessonModuleUnchanged(req.body.module, existingLesson.module || null);
@@ -170,7 +194,7 @@ const updateLesson = async (req, res) => {
 
         const outcome = await withSuperAdminLock(() => executeLessonUpdate(req));
         if (outcome.status !== 200) {
-            return res.status(outcome.status).json({ message: outcome.message });
+            return sendLessonOutcome(res, outcome);
         }
 
         logger.info("Lesson updated successfully", { lessonId: outcome.lesson._id, requestId: req.id });
@@ -181,10 +205,13 @@ const updateLesson = async (req, res) => {
 };
 
 const executeLessonDelete = async (req) => {
+    const { actor, error: actorError } = await resolveCurriculumActor(req.user._id, false);
+    if (actorError) return actorError;
+
     const lesson = await Lesson.findById(req.params.id);
     if (!lesson) return { status: 404, message: 'Lesson not found' };
 
-    const allowed = await assertCallerCanMutateLesson(req, lesson);
+    const allowed = await assertCallerCanMutateLesson(actor, lesson);
     if (!allowed) {
         return { status: 403, message: UNAUTHORIZED_MSG };
     }
@@ -204,7 +231,7 @@ const deleteLesson = async (req, res) => {
 
         const outcome = await withSuperAdminLock(() => executeLessonDelete(req));
         if (outcome.status !== 200) {
-            return res.status(outcome.status).json({ message: outcome.message });
+            return sendLessonOutcome(res, outcome);
         }
 
         logger.info("Lesson deleted successfully", { lessonId: req.params.id, requestId: req.id });

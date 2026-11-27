@@ -1,4 +1,5 @@
 const AuditLog = require("../models/AuditLog");
+const { afterTransactionCommit } = require("./governanceLockService");
 const logger = require("../utils/logger");
 
 /**
@@ -17,12 +18,14 @@ const recordAudit = async ({ req, action, targetType, targetId = null, metadata 
             ip: req.ip || "",
         });
 
-        logger.info(`Audit: ${action}`, {
-            auditId: entry._id,
-            actorId: req.user._id,
-            targetType,
-            targetId,
-            requestId: req.id,
+        afterTransactionCommit(() => {
+            logger.info(`Audit: ${action}`, {
+                auditId: entry._id,
+                actorId: req.user._id,
+                targetType,
+                targetId,
+                requestId: req.id,
+            });
         });
 
         return entry;

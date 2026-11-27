@@ -4,11 +4,39 @@ const Module = require("../models/Module");
 const Lesson = require("../models/Lesson");
 const Enrollment = require("../models/Enrollment");
 const Progress = require("../models/Progress");
+const User = require("../models/User");
 const { isAdminRole } = require("../middleware/authmiddleware");
 const { resolveCourseFromModule } = require("../middleware/courseOwnershipGuard");
 
 const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 const PUBLIC_INSTRUCTOR_FIELDS = "name specialty bio";
+const CURRICULUM_ROLES = new Set(["instructor", "admin", "super_admin"]);
+
+const buildCurriculumActorError = (status, message, useFailStatus, extra = {}) => ({
+    status,
+    body: useFailStatus ? { status: "fail", message, ...extra } : { message, ...extra },
+});
+
+const resolveCurriculumActor = async (userId, useFailStatus = false) => {
+    const actor = await User.findById(userId).select("_id role isActive");
+    if (!actor) {
+        return { error: buildCurriculumActorError(401, "User no longer exists", useFailStatus) };
+    }
+    if (actor.isActive === false) {
+        return {
+            error: buildCurriculumActorError(
+                403,
+                "Your account has been suspended. Please contact administration.",
+                useFailStatus,
+                { code: "ACCOUNT_SUSPENDED" }
+            ),
+        };
+    }
+    if (!CURRICULUM_ROLES.has(actor.role)) {
+        return { error: buildCurriculumActorError(403, "Forbidden: insufficient role privileges", useFailStatus) };
+    }
+    return { actor };
+};
 
 const isValidObjectId = (id) => {
     if (typeof id !== "string") return false;
@@ -107,16 +135,19 @@ const canModifyCourse = (course, user) => {
 };
 
 const executeCourseUpdate = async (req, updateFields, uniqueModuleIds) => {
+    const { actor, error: actorError } = await resolveCurriculumActor(req.user._id, true);
+    if (actorError) return actorError;
+
     const course = await Course.findById(req.params.id);
     if (!course) {
         return { status: 404, body: { status: "fail", message: "Course not found" } };
     }
-    if (!canModifyCourse(course, req.user)) {
+    if (!canModifyCourse(course, actor)) {
         return { status: 403, body: { status: "fail", message: "Not authorized to update this course" } };
     }
 
     const previousModuleIds = (course.modules || []).map((id) => id.toString());
-    const attachError = await assertCallerCanAttachModules(course, uniqueModuleIds, previousModuleIds, req.user);
+    const attachError = await assertCallerCanAttachModules(course, uniqueModuleIds, previousModuleIds, actor);
     if (attachError) return attachError;
 
     const updatedCourse = await Course.findByIdAndUpdate(
@@ -130,7 +161,7 @@ const executeCourseUpdate = async (req, updateFields, uniqueModuleIds) => {
         updatedCourseId: updatedCourse._id,
         uniqueModuleIds,
         previousModuleIds,
-        isAdmin: isAdminRole(req.user.role),
+        isAdmin: isAdminRole(actor.role),
     });
     return { status: 200, data: updatedCourse };
 };
@@ -182,11 +213,14 @@ const deleteCourseModulesAndLessons = async (course) => {
 };
 
 const executeCourseDelete = async (req) => {
+    const { actor, error: actorError } = await resolveCurriculumActor(req.user._id, true);
+    if (actorError) return actorError;
+
     const course = await Course.findById(req.params.id);
     if (!course) {
         return { status: 404, body: { status: "fail", message: "Course not found" } };
     }
-    if (!canModifyCourse(course, req.user)) {
+    if (!canModifyCourse(course, actor)) {
         return { status: 403, body: { status: "fail", message: "Not authorized to delete this course" } };
     }
 
@@ -325,8 +359,11 @@ const authorizeModuleCourseOnCreate = async (courseId, user) => {
 };
 
 const executeModuleCreate = async (req) => {
+    const { actor, error: actorError } = await resolveCurriculumActor(req.user._id);
+    if (actorError) return actorError;
+
     const { title, description, content, course, order } = req.body;
-    const authErr = await authorizeModuleCourseOnCreate(course, req.user);
+    const authErr = await authorizeModuleCourseOnCreate(course, actor);
     if (authErr) return authErr;
 
     const moduleDoc = await Module.create({
@@ -340,15 +377,18 @@ const executeModuleCreate = async (req) => {
 };
 
 const executeModuleUpdate = async (req, updateFields, uniqueLessonIds) => {
+    const { actor, error: actorError } = await resolveCurriculumActor(req.user._id);
+    if (actorError) return actorError;
+
     const existingModule = await Module.findById(req.params.id);
     if (!existingModule) return { status: 404, body: { message: "Module not found" } };
 
     const course = await resolveCourseFromModule(existingModule);
-    const ownershipError = moduleOwnershipError(course, req.user);
+    const ownershipError = moduleOwnershipError(course, actor);
     if (ownershipError) return ownershipError;
 
     const previousLessonIds = (existingModule.lesson || []).map((id) => id.toString());
-    const attachmentError = await assertCallerCanAttachLessons(existingModule, uniqueLessonIds, previousLessonIds, req.user);
+    const attachmentError = await assertCallerCanAttachLessons(existingModule, uniqueLessonIds, previousLessonIds, actor);
     if (attachmentError) return attachmentError;
 
     const updatedModule = await Module.findByIdAndUpdate(req.params.id, updateFields, { returnDocument: "after" });
@@ -379,11 +419,14 @@ const deleteModuleLessonsAndProgress = async (mod) => {
 };
 
 const executeModuleDelete = async (req) => {
+    const { actor, error: actorError } = await resolveCurriculumActor(req.user._id);
+    if (actorError) return actorError;
+
     const mod = await Module.findById(req.params.id);
     if (!mod) return { status: 404, body: { message: "Module not found" } };
 
     const course = await resolveCourseFromModule(mod);
-    const ownershipError = moduleOwnershipError(course, req.user);
+    const ownershipError = moduleOwnershipError(course, actor);
     if (ownershipError) return ownershipError;
 
     const sharedModule = await isModuleSharedWithOtherCourse(mod, course);
@@ -401,6 +444,7 @@ module.exports = {
     PUBLIC_INSTRUCTOR_FIELDS,
     isValidObjectId,
     parseIdList,
+    resolveCurriculumActor,
     executeCourseUpdate,
     executeCourseDelete,
     executeModuleCreate,

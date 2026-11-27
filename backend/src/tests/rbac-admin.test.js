@@ -15,7 +15,10 @@ const Progress = require("../models/Progress");
 const PlatformSettings = require("../models/PlatformSettings");
 const AuditLog = require("../models/AuditLog");
 const GovernanceLock = require("../models/GovernanceLock");
+const { createHash } = require("node:crypto");
 const { withGovernanceLock } = require("../services/governanceLockService");
+const { recordAudit } = require("../services/auditService");
+const logger = require("../utils/logger");
 const seedAdmin = require("../seed/adminSeeder");
 const { escapeHtml } = require("../services/emailService");
 
@@ -395,11 +398,20 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect(transferRes.statusCode).toBe(200);
         expect(transferRes.body.data.instructor._id).toBe(instB._id.toString());
 
-        // Cannot delete last super_admin
+        // Self-deletion is rejected with its explicit guard message
         const delSuperRes = await request(app)
             .delete(`/api/admin/users/${superUser._id}`)
             .set("Authorization", `Bearer ${superToken}`);
         expect(delSuperRes.statusCode).toBe(400);
+        expect(delSuperRes.body.message).toBe("You cannot delete your own account.");
+
+        // Sole active super_admin self-demotion hits the active-count guard independently
+        const selfDemoteRes = await request(app)
+            .patch(`/api/admin/users/${superUser._id}/role`)
+            .set("Authorization", `Bearer ${superToken}`)
+            .send({ role: "admin" });
+        expect(selfDemoteRes.statusCode).toBe(400);
+        expect(selfDemoteRes.body.message).toBe("Cannot demote the last active Super Admin.");
 
         // Suspend instA -> rejects existing JWT and login
         const suspendRes = await request(app)
@@ -906,5 +918,96 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         } finally {
             acquire.mockRestore();
         }
+    });
+
+    it("revokes same-second pre-rotation tokens across password replacement paths", async () => {
+        const resetPlain = "b".repeat(64);
+        const resetHash = createHash("sha256").update(resetPlain).digest("hex");
+        await createAndLoginUser({ name: "Rotate User", email: "rot-ver@example.com", password: "Password123!", role: "student" });
+        const loginA = await request(app).post("/api/auth/login").send({ email: "rot-ver@example.com", password: "Password123!" });
+
+        await request(app).put("/api/auth/change-password").set("Authorization", `Bearer ${loginA.body.token}`)
+            .send({ currentPassword: "Password123!", newPassword: "Password456!" });
+        expect((await request(app).get("/api/users/me").set("Authorization", `Bearer ${loginA.body.token}`)).statusCode).toBe(401);
+
+        const loginB = await request(app).post("/api/auth/login").send({ email: "rot-ver@example.com", password: "Password456!" });
+        await request(app).patch("/api/users/me").set("Authorization", `Bearer ${loginB.body.token}`)
+            .send({ currentPassword: "Password456!", password: "Password789!" });
+        expect((await request(app).get("/api/users/me").set("Authorization", `Bearer ${loginB.body.token}`)).statusCode).toBe(401);
+
+        const loginC = await request(app).post("/api/auth/login").send({ email: "rot-ver@example.com", password: "Password789!" });
+        await User.updateOne({ email: "rot-ver@example.com" }, { $set: { resetPasswordToken: resetHash, resetPasswordExpire: new Date(Date.now() + 60000) } });
+        await request(app).put(`/api/auth/reset-password/${resetPlain}`).send({ password: "Password999!" });
+        expect((await request(app).get("/api/users/me").set("Authorization", `Bearer ${loginC.body.token}`)).statusCode).toBe(401);
+
+        const loginD = await request(app).post("/api/auth/login").send({ email: "rot-ver@example.com", password: "Password999!" });
+        const meRes = await request(app).get("/api/users/me").set("Authorization", `Bearer ${loginD.body.token}`);
+        expect(meRes.statusCode).toBe(200);
+        expect(meRes.body.data.tokenVersion).toBeUndefined();
+    });
+
+    it("protects shared lessons, rechecks in-lock actor roles, and enforces email/bcrypt/audit invariants", async () => {
+        const { token: superToken } = await createAndLoginUser({ name: "Super", email: "super-inv@example.com", role: "super_admin" });
+        const { user: adminUser, token: adminToken } = await createAndLoginUser({ name: "Demoted Admin", email: "admin-inv@example.com", role: "admin" });
+        const { user: instA, token: tokenA } = await createAndLoginUser({ name: "Inst A", email: "insta-inv@example.com", role: "instructor" });
+        const { user: instB } = await createAndLoginUser({ name: "Inst B", email: "instb-inv@example.com", role: "instructor" });
+        const { user: stu, token: stuToken } = await createAndLoginUser({ name: "Stu", email: "stu-inv@example.com", role: "student" });
+
+        // Shared lesson listed by another instructor's module cannot be mutated or deleted by A
+        const courseA = await Course.create({ title: "Course A", description: "d", instructor: instA._id });
+        const courseB = await Course.create({ title: "Course B", description: "d", instructor: instB._id });
+        const modA = await Module.create({ title: "MA", description: "d", content: "c", course: courseA._id });
+        const sharedLesson = await Lesson.create({ title: "Shared", description: "d", content: "c", module: modA._id });
+        await Module.create({ title: "MB", description: "d", content: "c", course: courseB._id, lesson: [sharedLesson._id] });
+        expect((await request(app).put(`/api/lessons/${sharedLesson._id}`).set("Authorization", `Bearer ${tokenA}`).send({ title: "Edit" })).statusCode).toBe(403);
+        expect((await request(app).delete(`/api/lessons/${sharedLesson._id}`).set("Authorization", `Bearer ${tokenA}`)).statusCode).toBe(403);
+
+        // Exact email comparison catches case collision; >72 UTF-8 byte password rejected
+        await User.create({ name: "Upper", email: "Case@example.com", password: "hashed", role: "student" });
+        await User.create({ name: "Lower", email: "case@example.com", password: "hashed", role: "student" });
+        const upperDoc = await User.findOne({ email: "Case@example.com" });
+        const upperToken = jwt.sign({ id: upperDoc._id, role: "student" }, process.env.JWT_SECRET, { expiresIn: "1d" });
+        expect((await request(app).patch("/api/users/me").set("Authorization", `Bearer ${upperToken}`).send({ email: "CASE@example.com" })).statusCode).toBe(400);
+
+        const over72 = `${"a".repeat(70)}!1A`;
+        expect((await request(app).post("/api/admin/users").set("Authorization", `Bearer ${superToken}`)
+            .send({ name: "Long Pw", email: "longpw@example.com", role: "instructor", temporaryPassword: over72, sendEmail: false })).statusCode).toBe(400);
+
+        // In-lock actor demotion blocks queued admin bypass on curriculum & manualEnroll
+        const origAcquire = GovernanceLock.findOneAndUpdate;
+        const mockLockDemote = () => jest.spyOn(GovernanceLock, "findOneAndUpdate").mockImplementationOnce(async function (filter, ...args) {
+            await User.updateOne({ _id: adminUser._id }, { $set: { role: "student" } });
+            return origAcquire.call(this, filter, ...args);
+        });
+        let demoteHook = mockLockDemote();
+        try {
+            expect((await request(app).put(`/api/courses/${courseA._id}`).set("Authorization", `Bearer ${adminToken}`).send({ title: "Nope" })).statusCode).toBe(403);
+        } finally {
+            demoteHook.mockRestore();
+        }
+        await User.updateOne({ _id: adminUser._id }, { $set: { role: "admin" } });
+        demoteHook = mockLockDemote();
+        try {
+            expect((await request(app).post(`/api/admin/courses/${courseA._id}/enrollments`).set("Authorization", `Bearer ${adminToken}`).send({ userId: stu._id.toString() })).statusCode).toBe(403);
+        } finally {
+            demoteHook.mockRestore();
+        }
+
+        // Rollback on lease expiry writes no AuditLog doc and emits no Audit: info log
+        const infoSpy = jest.spyOn(logger, "info").mockImplementation(() => {});
+        try {
+            await expect(withGovernanceLock("audit-rollback-test", async () => {
+                await recordAudit({ req: { user: { _id: stu._id }, ip: "127.0.0.1", id: "req-1" }, action: "ROLE_UPDATED", targetType: "User", targetId: stu._id });
+                await new Promise((resolve) => setTimeout(resolve, 60));
+            }, { leaseMs: 40 })).rejects.toMatchObject({ statusCode: 409 });
+            expect(infoSpy.mock.calls.some(([msg]) => String(msg).startsWith("Audit:"))).toBe(false);
+            expect(await AuditLog.countDocuments({})).toBe(0);
+        } finally {
+            infoSpy.mockRestore();
+        }
+
+        // Student self-enrollment serializes cleanly with user deletion
+        expect((await request(app).post(`/api/courses/${courseA._id}/enroll`).set("Authorization", `Bearer ${stuToken}`)).statusCode).toBe(201);
+        expect(await Enrollment.countDocuments({ user: stu._id, course: courseA._id })).toBe(1);
     });
 });

@@ -55,6 +55,10 @@ const userSchema = new mongoose.Schema(
         passwordChangedAt: {
             type: Date,
         },
+        tokenVersion: {
+            type: Number,
+            default: 0,
+        },
         loginAttempts: {
             type: Number,
             default: 0,

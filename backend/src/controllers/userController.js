@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
 const { validatePasswordPolicy } = require('../utils/passwordUtils');
-const { USER_SAFE_PROJECTION } = require('../services/adminGovernanceHelper');
+const { USER_SAFE_PROJECTION, sanitizeUser } = require('../services/adminGovernanceHelper');
 const { updateUserRole } = require('./adminController');
 const logger = require('../utils/logger');
 
@@ -27,7 +27,7 @@ const SAME_PASSWORD_RESPONSE = {
 
 const getMe = async (req, res) => {
     try {
-        res.status(200).json({ status: "success", data: req.user });
+        res.status(200).json({ status: "success", data: sanitizeUser(req.user) });
     } catch (error) {
         logger.error("Failed to fetch profile", { error: error.message, userId: req.user?._id, requestId: req.id });
         res.status(500).json({ message: "Failed to load profile" });
@@ -36,7 +36,7 @@ const getMe = async (req, res) => {
 
 const resolveUpdatedEmail = async (rawEmail, currentUser) => {
     const normalizedEmail = String(rawEmail).trim().toLowerCase();
-    if (normalizedEmail === currentUser.email.toLowerCase()) {
+    if (normalizedEmail === currentUser.email) {
         return { email: normalizedEmail };
     }
     const existing = await User.findOne({ email: normalizedEmail, _id: { $ne: currentUser._id } });
@@ -63,7 +63,7 @@ const validatePasswordChangeInputs = (body) => {
 };
 
 const verifyAndBuildPasswordFields = async (userId, currentPassword, newPassword) => {
-    const userDoc = await User.findById(userId).select('password');
+    const userDoc = await User.findById(userId).select('password tokenVersion');
     if (!userDoc) return { error: { status: 404, body: { message: 'User not found' } } };
 
     if (!(await bcrypt.compare(currentPassword, userDoc.password))) {
@@ -76,7 +76,8 @@ const verifyAndBuildPasswordFields = async (userId, currentPassword, newPassword
         fields: {
             password: await bcrypt.hash(newPassword, 10),
             mustChangePassword: false,
-            passwordChangedAt: new Date(Date.now() - 1000),
+            passwordChangedAt: new Date(),
+            tokenVersion: (userDoc.tokenVersion || 0) + 1,
         },
     };
 };

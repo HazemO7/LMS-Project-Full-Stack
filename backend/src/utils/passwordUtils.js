@@ -12,9 +12,12 @@ const crypto = require('crypto');
  * @param {string} password 
  * @returns {boolean} true if valid, false otherwise
  */
+const MAX_BCRYPT_BYTES = 72;
+
 const validatePasswordPolicy = (password) => {
-    if (!password || password.length < 8) return false;
-    
+    if (typeof password !== 'string' || password.length < 8) return false;
+    if (Buffer.byteLength(password, 'utf8') > MAX_BCRYPT_BYTES) return false;
+
     const hasUppercase = /[A-Z]/.test(password);
     const hasLowercase = /[a-z]/.test(password);
     const hasNumber = /\d/.test(password);

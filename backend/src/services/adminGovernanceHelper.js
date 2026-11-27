@@ -9,7 +9,7 @@ const { recordAudit } = require("./auditService");
 const logger = require("../utils/logger");
 
 const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
-const USER_SAFE_PROJECTION = "-password -resetPasswordToken -resetPasswordExpire -resetPasswordTokenCreatedAt";
+const USER_SAFE_PROJECTION = "-password -tokenVersion -resetPasswordToken -resetPasswordExpire -resetPasswordTokenCreatedAt";
 const PRIVILEGED_ROLES = new Set(["admin", "super_admin"]);
 const COURSE_OWNER_ROLES = new Set(["instructor", "admin", "super_admin"]);
 const SETTINGS_KEYS = ["allowPublicRegistration", "maxVideoSizeMB", "maxDocumentSizeMB", "maxImageSizeMB"];
@@ -40,6 +40,7 @@ const parsePagination = (query, defaultLimit = 10) => {
 const sanitizeUser = (userDoc) => {
     const obj = userDoc.toObject ? userDoc.toObject() : { ...userDoc };
     delete obj.password;
+    delete obj.tokenVersion;
     delete obj.resetPasswordToken;
     delete obj.resetPasswordExpire;
     delete obj.resetPasswordTokenCreatedAt;
@@ -357,6 +358,9 @@ const dispatchOnboardingEmail = async (newUser, plainTempPassword, sendEmail) =>
 
 const createStaffAccountRecord = async (req) => {
     const { name, email, role, temporaryPassword, specialty = "", bio = "" } = req.body;
+    if (temporaryPassword && Buffer.byteLength(temporaryPassword, "utf8") > 72) {
+        return { error: failOutcome(400, "Password must not exceed 72 bytes.") };
+    }
     const normalizedEmail = email.trim().toLowerCase();
     const plainTempPassword = temporaryPassword || generateTemporaryPassword(12);
     const hashedPassword = await bcrypt.hash(plainTempPassword, 10);

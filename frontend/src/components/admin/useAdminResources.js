@@ -54,6 +54,16 @@ const applyUsersPageResult = (res, usersPage, setters) => {
   setters.setUsers(res.data || []);
 };
 
+const applyCoursesPageResult = (res, coursesPage, setters) => {
+  const totalPages = Math.max(1, res.totalPages || 1);
+  setters.setCoursesTotalPages(totalPages);
+  if (coursesPage > totalPages) {
+    setters.setCoursesPage(totalPages);
+    return;
+  }
+  setters.setCourses(res.data || []);
+};
+
 const toggleSetItem = (prev, id) => {
   const next = new Set(prev);
   if (next.has(id)) next.delete(id);
@@ -88,18 +98,18 @@ const persistSettingsUpdate = async ({ patch, reqIdRef, baselineRef, setters, on
 export const useAdminStats = (onError) => {
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const reqIdRef = useRef(0);
 
-  const fetchStats = useCallback(async () => {
-    setStatsLoading(true);
-    try {
+  const fetchStats = useCallback(() => runGuardedFetch({
+    reqIdRef,
+    setLoading: setStatsLoading,
+    onError,
+    fallbackError: 'Failed to load platform stats',
+    task: async (isCurrent) => {
       const res = await adminAPI.getStats();
-      setStats(res.data);
-    } catch (err) {
-      onError(err.message || 'Failed to load platform stats');
-    } finally {
-      setStatsLoading(false);
-    }
-  }, [onError]);
+      if (isCurrent()) setStats(res.data);
+    },
+  }), [onError]);
 
   useEffect(() => {
     fetchStats();
@@ -153,6 +163,7 @@ export const useAdminCourses = (activeTab, onError) => {
   const [coursesTotalPages, setCoursesTotalPages] = useState(1);
   const [courseSearchInput, setCourseSearchInput] = useState('');
   const [courseSearch, setCourseSearch] = useState('');
+  const [coursesRefreshTick, setCoursesRefreshTick] = useState(0);
   const reqIdRef = useRef(0);
 
   const fetchCourses = useCallback(() => runGuardedFetch({
@@ -162,19 +173,19 @@ export const useAdminCourses = (activeTab, onError) => {
     fallbackError: 'Failed to load courses',
     task: async (isCurrent) => {
       const res = await adminAPI.getCourses({ page: coursesPage, limit: 10, search: courseSearch });
-      if (!isCurrent()) return;
-      setCourses(res.data || []);
-      setCoursesTotalPages(res.totalPages || 1);
+      if (isCurrent()) applyCoursesPageResult(res, coursesPage, { setCoursesTotalPages, setCoursesPage, setCourses });
     },
   }), [coursesPage, courseSearch, onError]);
 
   useEffect(() => {
-    if (activeTab === 'courses') fetchCourses();
-  }, [activeTab, fetchCourses]);
+    if (activeTab === 'courses' && coursesRefreshTick >= 0) fetchCourses();
+  }, [activeTab, fetchCourses, coursesRefreshTick]);
+
+  const refreshCourses = useCallback(() => setCoursesRefreshTick((n) => n + 1), []);
 
   return {
     courses, setCourses, coursesLoading, coursesPage, coursesTotalPages,
-    courseSearchInput, setCoursesPage, setCourseSearchInput, setCourseSearch, fetchCourses,
+    courseSearchInput, setCoursesPage, setCourseSearchInput, setCourseSearch, fetchCourses, refreshCourses,
   };
 };
 

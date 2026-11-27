@@ -3,6 +3,9 @@ const { validatePasswordPolicy } = require("../utils/passwordUtils");
 
 const optionalPasswordMethod = (value, helpers) => {
     if (!value) return value;
+    if (Buffer.byteLength(value, "utf8") > 72) {
+        return helpers.message("Password must not exceed 72 bytes.");
+    }
     if (!validatePasswordPolicy(value)) {
         return helpers.message(
             "Password must be at least 8 characters long, include uppercase, lowercase, number, and a special character."
