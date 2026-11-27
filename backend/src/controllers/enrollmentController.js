@@ -2,6 +2,7 @@ const Enrollment = require('../models/Enrollment');
 const Course = require('../models/Course');
 const User = require('../models/User');
 const { withSuperAdminLock } = require('../services/governanceLockService');
+const { PUBLIC_INSTRUCTOR_FIELDS } = require('../services/curriculumService');
 const logger = require('../utils/logger');
 
 const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
@@ -67,7 +68,10 @@ const enrollCourse = async (req, res) => {
 
 const getMyCourses = async (req, res) => {
     try {
-        const enrollments = await Enrollment.find({ user: req.user._id }).populate('course');
+        const enrollments = await Enrollment.find({ user: req.user._id }).populate({
+            path: 'course',
+            populate: { path: 'instructor', select: PUBLIC_INSTRUCTOR_FIELDS },
+        });
         res.status(200).json({ status: 'success', data: enrollments });
     } catch (error) {
         logger.error('Failed to load user courses', { error: error?.message, userId: req.user?._id, requestId: req.id });

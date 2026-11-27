@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Modal } from './ui/Modal';
 import { AlertBanner } from './ui/AlertBanner';
-import { lessonsAPI, modulesAPI } from '../services/api';
+import { lessonsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 
 export const CreateLessonModal = ({
   show,
   onHide,
   moduleId,
-  existingLessons = [],
   onLessonCreated,
 }) => {
   const { t, tServer } = useLanguage();
@@ -40,14 +39,6 @@ export const CreateLessonModal = ({
       const payload = { ...lessonData, module: moduleId };
       const newLessonRes = await lessonsAPI.create(payload);
       const newLesson = newLessonRes.data || newLessonRes;
-      const lessonId = newLesson._id || newLesson.id || newLesson;
-
-      const updatedLessons = existingLessons
-        ? existingLessons.map((l) => l._id || l.id || l)
-        : [];
-      if (lessonId) updatedLessons.push(lessonId);
-
-      await modulesAPI.update(moduleId, { lesson: updatedLessons });
 
       onLessonCreated(newLesson, moduleId);
       onHide();

@@ -59,14 +59,18 @@ const executeLessonCreate = async (req) => {
     const authErr = await authorizeLessonParentModule(module, actor);
     if (authErr) return authErr;
 
+    const parentModuleId = module || null;
     const lesson = await Lesson.create({
-        module: module || null,
+        module: parentModuleId,
         title,
         description,
         content,
         videoUrl,
         order: order ?? 0,
     });
+    if (parentModuleId) {
+        await Module.updateOne({ _id: parentModuleId }, { $addToSet: { lesson: lesson._id } });
+    }
     return { status: 201, lesson };
 };
 

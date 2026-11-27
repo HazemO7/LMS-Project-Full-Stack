@@ -228,7 +228,7 @@ const getAdminCourses = async (req, res) => {
 
         const [totalCourses, courses] = await Promise.all([
             Course.countDocuments(filter),
-            Course.find(filter).populate("instructor", "name email role specialty isActive").sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Course.find(filter).populate("instructor", "name email role specialty isActive").sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),
         ]);
 
         const enriched = await enrichCoursesWithCounts(courses);
@@ -399,7 +399,7 @@ const getAuditLogs = async (req, res) => {
 
         const [totalLogs, logs] = await Promise.all([
             AuditLog.countDocuments(filter),
-            AuditLog.find(filter).populate("actor", "name email role").sort({ createdAt: -1 }).skip(skip).limit(limit),
+            AuditLog.find(filter).populate("actor", "name email role").sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),
         ]);
 
         return res.status(200).json({

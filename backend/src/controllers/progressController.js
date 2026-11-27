@@ -22,9 +22,10 @@ const collectLessonModules = async (lesson) => {
 const lessonBelongsToCourse = async (lesson, courseId) => {
     const holderMods = await collectLessonModules(lesson);
     if (holderMods.length === 0) return false;
-    if (holderMods.some((m) => m.course && m.course.toString() === courseId)) return true;
+    const canonicalCourseId = courseId.toLowerCase();
+    if (holderMods.some((m) => m.course && m.course.toString() === canonicalCourseId)) return true;
     const modIds = holderMods.map((m) => m._id);
-    return Boolean(await Course.exists({ _id: courseId, modules: { $in: modIds } }));
+    return Boolean(await Course.exists({ _id: canonicalCourseId, modules: { $in: modIds } }));
 };
 
 const verifyLessonCourseMembership = async (lessonId, courseId) => {
@@ -76,15 +77,19 @@ const completeLesson = async (req, res) => {
         if (!isValidObjectId(lessonId) || !isValidObjectId(courseId)) {
             return res.status(400).json({ message: "Invalid lesson or course ID" });
         }
+        const normalizedLessonId = lessonId.toLowerCase();
+        const normalizedCourseId = courseId.toLowerCase();
 
-        const outcome = await withSuperAdminLock(() => executeLessonCompletion(req, lessonId, courseId));
+        const outcome = await withSuperAdminLock(() =>
+            executeLessonCompletion(req, normalizedLessonId, normalizedCourseId)
+        );
         if (outcome.status !== 200) {
             return res.status(outcome.status).json({ message: outcome.message });
         }
 
         const { progress } = outcome;
         logger.info(`Lesson progress toggled to ${progress.completed ? 'complete' : 'incomplete'}`, {
-            lessonId, courseId, userId: req.user._id, completed: progress.completed, requestId: req.id,
+            lessonId: normalizedLessonId, courseId: normalizedCourseId, userId: req.user._id, completed: progress.completed, requestId: req.id,
         });
 
         return res.status(200).json({ status: "success", data: progress });

@@ -16,7 +16,7 @@ const PlatformSettings = require("../models/PlatformSettings");
 const AuditLog = require("../models/AuditLog");
 const GovernanceLock = require("../models/GovernanceLock");
 const { createHash } = require("node:crypto");
-const { withGovernanceLock } = require("../services/governanceLockService");
+const { withGovernanceLock, withSuperAdminLock, afterTransactionCommit } = require("../services/governanceLockService");
 const { recordAudit } = require("../services/auditService");
 const logger = require("../utils/logger");
 const seedAdmin = require("../seed/adminSeeder");
@@ -1099,5 +1099,44 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         const { token: instToken } = await createAndLoginUser({ name: "Admin H", email: "admin-h@example.com", role: "admin" });
         expect((await request(app).put(`/api/modules/${mod._id}`).set("Authorization", `Bearer ${instToken}`).send({ lesson: [] })).statusCode).toBe(200);
         expect(await Progress.countDocuments({ user: stu._id, lesson: les._id })).toBe(0);
+    });
+
+    it("attaches new lessons atomically, populates enrolled instructors, normalizes courseId, reports 72-byte limit, and isolates post-commit errors", async () => {
+        const { user: inst, token: instToken } = await createAndLoginUser({ name: "Inst R", email: "inst-r@example.com", role: "instructor" });
+        const { user: stu, token: stuToken } = await createAndLoginUser({ name: "Stu R", email: "stu-r@example.com", role: "student" });
+        const course = await Course.create({ title: "CR", description: "d", instructor: inst._id });
+        const mod = await Module.create({ title: "MR", description: "d", content: "c", course: course._id });
+        await Enrollment.create({ user: stu._id, course: course._id });
+
+        const lesRes = await request(app).post("/api/lessons").set("Authorization", `Bearer ${instToken}`)
+            .send({ title: "LR", description: "d", content: "c", module: mod._id.toString() });
+        expect(lesRes.statusCode).toBe(201);
+        expect((await Module.findById(mod._id)).lesson.map(String)).toContain(lesRes.body._id);
+
+        const myRes = await request(app).get("/api/my-courses").set("Authorization", `Bearer ${stuToken}`);
+        expect(myRes.statusCode).toBe(200);
+        expect(myRes.body.data[0].course.instructor.name).toBe("Inst R");
+        expect(myRes.body.data[0].course.instructor.password).toBeUndefined();
+        expect(myRes.body.data[0].course.instructor.email).toBeUndefined();
+
+        const compRes = await request(app).post(`/api/lessons/${lesRes.body._id}/complete`)
+            .set("Authorization", `Bearer ${stuToken}`).send({ courseId: course._id.toString().toUpperCase() });
+        expect(compRes.statusCode).toBe(200);
+
+        const longRes = await request(app).patch("/api/users/me").set("Authorization", `Bearer ${stuToken}`)
+            .send({ currentPassword: "Password123!", password: `Aa1!${"a".repeat(69)}` });
+        expect(longRes.statusCode).toBe(400);
+        expect(longRes.body.message).toBe("Password must not exceed 72 bytes.");
+
+        const spy = jest.spyOn(logger, "error").mockImplementation(() => {});
+        let ranSecond = false;
+        const val = await withSuperAdminLock(async () => {
+            afterTransactionCommit(() => { throw new Error("boom"); });
+            afterTransactionCommit(() => { ranSecond = true; });
+            return "ok";
+        });
+        expect(val).toBe("ok");
+        expect(ranSecond).toBe(true);
+        spy.mockRestore();
     });
 });

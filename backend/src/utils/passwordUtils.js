@@ -14,9 +14,12 @@ const crypto = require('crypto');
  */
 const MAX_BCRYPT_BYTES = 72;
 
+const isPasswordOverByteLimit = (password) =>
+    typeof password === 'string' && Buffer.byteLength(password, 'utf8') > MAX_BCRYPT_BYTES;
+
 const validatePasswordPolicy = (password) => {
     if (typeof password !== 'string' || password.length < 8) return false;
-    if (Buffer.byteLength(password, 'utf8') > MAX_BCRYPT_BYTES) return false;
+    if (isPasswordOverByteLimit(password)) return false;
 
     const hasUppercase = /[A-Z]/.test(password);
     const hasLowercase = /[a-z]/.test(password);
@@ -56,6 +59,8 @@ const generateTemporaryPassword = (length = 12) => {
 };
 
 module.exports = {
+    MAX_BCRYPT_BYTES,
+    isPasswordOverByteLimit,
     validatePasswordPolicy,
     generateTemporaryPassword
 };

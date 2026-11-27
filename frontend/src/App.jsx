@@ -78,11 +78,18 @@ const NotFound = () => {
   );
 };
 
+const isPasswordRotationExemptPath = (pathname) =>
+  pathname === '/profile' ||
+  pathname === '/forgot-password' ||
+  pathname === '/reset-password' ||
+  pathname.startsWith('/reset-password/');
+
 const AppShell = () => {
   const { t } = useLanguage();
   const { currentUser } = useAuth();
   const location = useLocation();
-  const mustRotatePw = Boolean(currentUser?.mustChangePassword) && location.pathname !== '/profile';
+  const mustRotatePw =
+    Boolean(currentUser?.mustChangePassword) && !isPasswordRotationExemptPath(location.pathname);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F0FDFA] text-[#0D2E2F]">

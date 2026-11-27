@@ -506,6 +506,7 @@ export const TRANSLATIONS = {
     'admin.hideDetails': 'Hide',
     'admin.toggleDetailsAria': 'Toggle full audit metadata for {{action}}',
     'admin.noAuditLogs': 'No audit events recorded yet.',
+    'admin.deletedActor': 'Deleted account',
 
     // Authoring Modals
     'modal.addModuleTitle': 'Add module',
@@ -1042,6 +1043,7 @@ export const TRANSLATIONS = {
     'admin.hideDetails': 'إخفاء',
     'admin.toggleDetailsAria': 'تبديل عرض تفاصيل سجل العملية {{action}}',
     'admin.noAuditLogs': 'لا توجد عمليات مسجلة حتى الآن.',
+    'admin.deletedActor': 'حساب محذوف',
 
     // Authoring Modals
     'modal.addModuleTitle': 'إضافة وحدة جديدة',
@@ -1159,6 +1161,7 @@ const SERVER_MESSAGE_AR = {
     'لا يمكن إيقاف آخر مدير عام نشط في المنصة.',
   'You cannot suspend your own account.':
     'لا يمكنك تجميد حسابك الشخصي.',
+  'Password must not exceed 72 bytes.': 'يجب ألا تتجاوز كلمة المرور 72 بايت.',
   'This user owns active courses. Please transfer or delete their courses before permanent deletion.':
     'هذا المستخدم يملك كورسات حالية. يرجى نقل ملكيتها أو حذفها قبل الحذف النهائي.',
   'Not authorized to modify this course curriculum':

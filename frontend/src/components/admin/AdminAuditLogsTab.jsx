@@ -11,7 +11,7 @@ const AdminAuditRow = ({ log, isExpanded, onToggleDetails, t }) => {
         {new Date(log.createdAt).toLocaleString()}
       </td>
       <td className="px-4 py-2.5 align-top">
-        <span className="font-semibold text-[#0D2E2F]">{log.actor?.name || 'System'}</span>
+        <span className="font-semibold text-[#0D2E2F]">{log.actor?.name || t('admin.deletedActor')}</span>
         {log.actor?.email && (
           <span dir="ltr" className="block text-[11px] text-[#52797A]">{log.actor.email}</span>
         )}

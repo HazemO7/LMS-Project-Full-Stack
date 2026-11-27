@@ -888,9 +888,6 @@ export const CourseDetails = () => {
           setActiveModuleId(null);
         }}
         moduleId={activeModuleId}
-        existingLessons={
-          modules.find((m) => (m._id || m.id) === activeModuleId)?.lesson || []
-        }
         onLessonCreated={handleLessonCreated}
       />
 

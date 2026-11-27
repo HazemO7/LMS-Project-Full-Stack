@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const crypto = require("crypto");
 const GovernanceLock = require("../models/GovernanceLock");
 const AppError = require("../utils/AppError");
+const logger = require("../utils/logger");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const postCommitStorage = new AsyncLocalStorage();
@@ -61,6 +62,20 @@ const releaseLock = async (key, ownerToken, released) => {
     ).catch(() => {});
 };
 
+const runPostCommitCallbacks = (callbacks) => {
+    for (const cb of callbacks) {
+        try {
+            cb();
+        } catch (err) {
+            try {
+                logger.error("Post-commit callback failed", { error: err?.message });
+            } catch {
+                // Never allow reporting failures to escape after commit.
+            }
+        }
+    }
+};
+
 const runFencedTransaction = async (key, ownerToken, fn, released) => {
     const postCommitCallbacks = [];
     const result = await postCommitStorage.run(postCommitCallbacks, () =>
@@ -78,7 +93,7 @@ const runFencedTransaction = async (key, ownerToken, fn, released) => {
             return value;
         })
     );
-    for (const cb of postCommitCallbacks) cb();
+    runPostCommitCallbacks(postCommitCallbacks);
     return result;
 };
 

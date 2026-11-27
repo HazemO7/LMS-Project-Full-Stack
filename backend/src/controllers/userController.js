@@ -1,12 +1,16 @@
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
-const { validatePasswordPolicy } = require('../utils/passwordUtils');
+const { validatePasswordPolicy, isPasswordOverByteLimit } = require('../utils/passwordUtils');
 const { USER_SAFE_PROJECTION, sanitizeUser } = require('../services/adminGovernanceHelper');
 const { buildTokenVersionFilter } = require('../services/authService');
 const { updateUserRole } = require('./adminController');
 const logger = require('../utils/logger');
 
 const EMAIL_TAKEN_RESPONSE = { status: 400, body: { message: 'Account Already Exist' } };
+const PASSWORD_MAX_BYTES_RESPONSE = {
+    status: 400,
+    body: { message: 'Password must not exceed 72 bytes.' },
+};
 const PASSWORD_POLICY_RESPONSE = {
     status: 400,
     body: {
@@ -65,6 +69,9 @@ const applyStaffFields = (body, currentUser, updateData) => {
 const validatePasswordChangeInputs = (body) => {
     if (!body.currentPassword || typeof body.currentPassword !== 'string') {
         return CURRENT_PASSWORD_REQUIRED_RESPONSE;
+    }
+    if (isPasswordOverByteLimit(body.password)) {
+        return PASSWORD_MAX_BYTES_RESPONSE;
     }
     if (typeof body.password !== 'string' || !validatePasswordPolicy(body.password)) {
         return PASSWORD_POLICY_RESPONSE;
