@@ -187,6 +187,13 @@ const forgotPassword = catchAsync(async (req, res, next) => {
 
 
 
+const buildTokenVersionFilter = (userId, expectedVersion) => {
+    const versionMatch = expectedVersion === 0
+        ? { $or: [{ tokenVersion: 0 }, { tokenVersion: { $exists: false } }] }
+        : { tokenVersion: expectedVersion };
+    return { _id: userId, ...versionMatch };
+};
+
 // PUT /api/auth/reset-password/:token
 const resetPassword = catchAsync(async (req, res, next) => {
     const { token } = req.params;
@@ -212,8 +219,7 @@ const resetPassword = catchAsync(async (req, res, next) => {
     const hash = await bcrypt.hash(password, 10);
     const updated = await User.findOneAndUpdate(
         {
-            _id: user._id,
-            tokenVersion: expectedTokenVersion,
+            ...buildTokenVersionFilter(user._id, expectedTokenVersion),
             resetPasswordToken: hashedToken,
             resetPasswordExpire: { $gt: Date.now() },
         },
@@ -265,7 +271,7 @@ const changePassword = catchAsync(async (req, res, next) => {
     const expectedTokenVersion = user.tokenVersion ?? 0;
     const hash = await bcrypt.hash(newPassword, 10);
     const updated = await User.findOneAndUpdate(
-        { _id: user._id, tokenVersion: expectedTokenVersion },
+        buildTokenVersionFilter(user._id, expectedTokenVersion),
         {
             $set: {
                 password: hash,

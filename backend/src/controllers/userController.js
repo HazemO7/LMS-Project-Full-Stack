@@ -127,12 +127,19 @@ const buildProfileUpdateData = async (body, currentUser) => {
     };
 };
 
+const buildTokenVersionFilter = (userId, expectedVersion) => {
+    const versionMatch = expectedVersion === 0
+        ? { $or: [{ tokenVersion: 0 }, { tokenVersion: { $exists: false } }] }
+        : { tokenVersion: expectedVersion };
+    return { _id: userId, ...versionMatch };
+};
+
 const persistProfileUpdate = (userId, updateData, expectedTokenVersion) => {
     if (expectedTokenVersion === undefined) {
         return User.findByIdAndUpdate(userId, updateData, { returnDocument: "after" }).select(USER_SAFE_PROJECTION);
     }
     return User.findOneAndUpdate(
-        { _id: userId, tokenVersion: expectedTokenVersion },
+        buildTokenVersionFilter(userId, expectedTokenVersion),
         { $set: updateData, $inc: { tokenVersion: 1 } },
         { returnDocument: "after" }
     ).select(USER_SAFE_PROJECTION);

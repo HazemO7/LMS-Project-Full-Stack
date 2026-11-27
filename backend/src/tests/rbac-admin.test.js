@@ -1069,4 +1069,35 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect(createdModRes.statusCode).toBe(201);
         expect((await Course.findById(courseA._id)).modules.map(String)).toContain(createdModRes.body._id);
     });
+
+    it("handles legacy missing tokenVersion, lesson-course completion check, holder reads, and detached lesson progress", async () => {
+        const { user: legacyUser, token: legacyToken } = await createAndLoginUser({ name: "Legacy", email: "legacy-tv@example.com", role: "student" });
+        await User.collection.updateOne({ _id: legacyUser._id }, { $unset: { tokenVersion: "" } });
+        expect((await request(app).patch("/api/users/me").set("Authorization", `Bearer ${legacyToken}`)
+            .send({ currentPassword: "Password123!", password: "NewPassword123!" })).statusCode).toBe(200);
+
+        const { user: inst } = await createAndLoginUser({ name: "Inst H", email: "inst-holder@example.com", role: "instructor" });
+        const { user: stu, token: stuToken } = await createAndLoginUser({ name: "Stu H", email: "stu-holder@example.com", role: "student" });
+        const cA = await Course.create({ title: "CA", description: "d", instructor: inst._id });
+        const cB = await Course.create({ title: "CB", description: "d", instructor: inst._id });
+        const mod = await Module.create({ title: "MH", description: "d", content: "c", course: cA._id });
+        const les = await Lesson.create({ title: "LH", description: "d", content: "c", module: mod._id });
+        await Module.updateOne({ _id: mod._id }, { $set: { lesson: [les._id] } });
+        await Course.updateOne({ _id: cB._id }, { $set: { modules: [mod._id] } });
+        await Enrollment.create({ user: stu._id, course: cB._id });
+
+        expect((await request(app).get(`/api/modules/${mod._id}`).set("Authorization", `Bearer ${stuToken}`)).statusCode).toBe(200);
+        expect((await request(app).get(`/api/lessons/${les._id}`).set("Authorization", `Bearer ${stuToken}`)).statusCode).toBe(200);
+
+        const cOther = await Course.create({ title: "Other", description: "d", instructor: inst._id });
+        await Enrollment.create({ user: stu._id, course: cOther._id });
+        expect((await request(app).post(`/api/lessons/${les._id}/complete`).set("Authorization", `Bearer ${stuToken}`)
+            .send({ courseId: cOther._id.toString() })).statusCode).toBe(400);
+
+        expect((await request(app).post(`/api/lessons/${les._id}/complete`).set("Authorization", `Bearer ${stuToken}`)
+            .send({ courseId: cB._id.toString() })).statusCode).toBe(200);
+        const { token: instToken } = await createAndLoginUser({ name: "Admin H", email: "admin-h@example.com", role: "admin" });
+        expect((await request(app).put(`/api/modules/${mod._id}`).set("Authorization", `Bearer ${instToken}`).send({ lesson: [] })).statusCode).toBe(200);
+        expect(await Progress.countDocuments({ user: stu._id, lesson: les._id })).toBe(0);
+    });
 });

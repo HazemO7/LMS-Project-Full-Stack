@@ -1,9 +1,40 @@
 const Progress = require('../models/Progress');
 const Course = require('../models/Course');
+const Module = require('../models/Module');
+const Lesson = require('../models/Lesson');
 const Enrollment = require('../models/Enrollment');
 const User = require('../models/User');
 const { withSuperAdminLock } = require('../services/governanceLockService');
 const logger = require('../utils/logger');
+
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+const isValidObjectId = (id) => typeof id === 'string' && OBJECT_ID_REGEX.test(id);
+
+const collectLessonModules = async (lesson) => {
+    const listed = await Module.find({ lesson: lesson._id }).select('_id course');
+    if (!lesson.module) return listed;
+    const pointedId = lesson.module.toString();
+    if (listed.some((m) => m._id.toString() === pointedId)) return listed;
+    const pointed = await Module.findById(lesson.module).select('_id course');
+    return pointed ? [...listed, pointed] : listed;
+};
+
+const lessonBelongsToCourse = async (lesson, courseId) => {
+    const holderMods = await collectLessonModules(lesson);
+    if (holderMods.length === 0) return false;
+    if (holderMods.some((m) => m.course && m.course.toString() === courseId)) return true;
+    const modIds = holderMods.map((m) => m._id);
+    return Boolean(await Course.exists({ _id: courseId, modules: { $in: modIds } }));
+};
+
+const verifyLessonCourseMembership = async (lessonId, courseId) => {
+    const lesson = await Lesson.findById(lessonId).select('_id module');
+    if (!lesson) return { status: 404, message: 'Lesson not found' };
+    if (!(await lessonBelongsToCourse(lesson, courseId))) {
+        return { status: 400, message: 'Lesson does not belong to the specified course' };
+    }
+    return null;
+};
 
 const executeLessonCompletion = async (req, lessonId, courseId) => {
     const actor = await User.findById(req.user._id).select('_id role isActive');
@@ -11,6 +42,9 @@ const executeLessonCompletion = async (req, lessonId, courseId) => {
     if (actor.isActive === false) {
         return { status: 403, message: 'Your account has been suspended. Please contact administration.' };
     }
+
+    const membershipErr = await verifyLessonCourseMembership(lessonId, courseId);
+    if (membershipErr) return membershipErr;
 
     const enrollment = await Enrollment.findOne({ user: actor._id, course: courseId });
     if (!enrollment && actor.role === 'student') {
@@ -39,6 +73,9 @@ const completeLesson = async (req, res) => {
         const { courseId } = req.body;
 
         if (!courseId) return res.status(400).json({ message: "courseId is required in request body" });
+        if (!isValidObjectId(lessonId) || !isValidObjectId(courseId)) {
+            return res.status(400).json({ message: "Invalid lesson or course ID" });
+        }
 
         const outcome = await withSuperAdminLock(() => executeLessonCompletion(req, lessonId, courseId));
         if (outcome.status !== 200) {

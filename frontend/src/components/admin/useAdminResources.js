@@ -109,6 +109,17 @@ export const useAdminStats = (onError) => {
   return { stats, statsLoading, fetchStats };
 };
 
+const findSoonestLockExpiryMs = (users) => {
+  const now = Date.now();
+  let soonest = Infinity;
+  for (const u of users) {
+    if (!u.lockUntil) continue;
+    const ts = new Date(u.lockUntil).getTime();
+    if (ts > now && ts < soonest) soonest = ts;
+  }
+  return soonest === Infinity ? null : Math.max(50, soonest - now + 50);
+};
+
 export const useAdminUsers = (activeTab, onError) => {
   const [users, setUsers] = useState([]);
   const [fetchedAt, setFetchedAt] = useState(() => Date.now());
@@ -147,6 +158,13 @@ export const useAdminUsers = (activeTab, onError) => {
   useEffect(() => {
     if (activeTab === 'users' && usersRefreshTick >= 0) fetchUsers();
   }, [activeTab, fetchUsers, usersRefreshTick]);
+
+  useEffect(() => {
+    const delay = findSoonestLockExpiryMs(users);
+    if (delay === null) return undefined;
+    const timer = window.setTimeout(() => setFetchedAt(Date.now()), delay);
+    return () => window.clearTimeout(timer);
+  }, [users, fetchedAt]);
 
   const refreshUsers = useCallback(() => setUsersRefreshTick((n) => n + 1), []);
 

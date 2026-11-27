@@ -136,12 +136,12 @@ const detachRemovedModules = async (courseId, uniqueModuleIds, previousModuleIds
     );
 };
 
-const unlinkModulesFromOtherCourses = async (updatedCourseId, uniqueModuleIds, isAdmin) => {
+const unlinkModulesFromOtherCourses = async ({ updatedCourseId, uniqueModuleIds, previousParentCourseIds, isAdmin }) => {
     if (!isAdmin || uniqueModuleIds.length === 0) return;
     const movedSet = new Set(uniqueModuleIds.map(String));
     const affectedCourses = await Course.find({
         _id: { $ne: updatedCourseId },
-        modules: { $in: uniqueModuleIds },
+        $or: [{ modules: { $in: uniqueModuleIds } }, { _id: { $in: previousParentCourseIds } }],
     }).select("_id modules");
 
     for (const other of affectedCourses) {
@@ -154,13 +154,24 @@ const unlinkModulesFromOtherCourses = async (updatedCourseId, uniqueModuleIds, i
     );
 };
 
+const collectPreviousParentCourseIds = async (uniqueModuleIds, updatedCourseId) => {
+    if (uniqueModuleIds.length === 0) return [];
+    const prevModules = await Module.find({ _id: { $in: uniqueModuleIds } }).select("course");
+    const targetIdStr = updatedCourseId.toString();
+    const ids = prevModules
+        .map((m) => (m.course ? m.course.toString() : null))
+        .filter((id) => id && id !== targetIdStr);
+    return Array.from(new Set(ids));
+};
+
 const syncCourseModules = async ({ courseId, updatedCourseId, uniqueModuleIds, previousModuleIds, isAdmin }) => {
     if (uniqueModuleIds === null) return;
+    const previousParentCourseIds = await collectPreviousParentCourseIds(uniqueModuleIds, updatedCourseId);
     if (uniqueModuleIds.length > 0) {
         await Module.updateMany({ _id: { $in: uniqueModuleIds } }, { $set: { course: updatedCourseId } });
     }
     await detachRemovedModules(courseId, uniqueModuleIds, previousModuleIds);
-    await unlinkModulesFromOtherCourses(updatedCourseId, uniqueModuleIds, isAdmin);
+    await unlinkModulesFromOtherCourses({ updatedCourseId, uniqueModuleIds, previousParentCourseIds, isAdmin });
 };
 
 const canModifyCourse = (course, user) => {
@@ -372,8 +383,31 @@ const clearCrossCourseLessonProgress = async (existingModule, uniqueLessonIds) =
     await Progress.deleteMany(filter);
 };
 
+const clearOrphanedLessonProgressInCourse = async (course, removedLessonIds) => {
+    const courseModules = await Module.find({
+        $or: [{ course: course._id }, { _id: { $in: course.modules || [] } }],
+    }).select("_id");
+    const courseModuleIds = courseModules.map((m) => m._id);
+    const remainingLessonIds = await collectModuleLessonIds(courseModuleIds);
+    const remainingSet = new Set(remainingLessonIds.map(String));
+    const orphanedIds = removedLessonIds.filter((id) => !remainingSet.has(String(id)));
+    if (orphanedIds.length > 0) {
+        await Progress.deleteMany({ course: course._id, lesson: { $in: orphanedIds } });
+    }
+};
+
+const clearRemovedLessonProgressForModule = async (existingModule, removedLessonIds) => {
+    if (removedLessonIds.length === 0) return;
+    const holderCourses = await resolveHolderCoursesForModule(existingModule);
+    for (const course of holderCourses) {
+        await clearOrphanedLessonProgressInCourse(course, removedLessonIds);
+    }
+};
+
 const syncModuleLessons = async ({ existingModule, updatedModuleId, uniqueLessonIds, previousLessonIds }) => {
     if (uniqueLessonIds === null) return;
+    const newLessonSet = new Set(uniqueLessonIds);
+    const removedLessonIds = previousLessonIds.filter((id) => !newLessonSet.has(id));
     if (uniqueLessonIds.length > 0) {
         await clearCrossCourseLessonProgress(existingModule, uniqueLessonIds);
         await Lesson.updateMany({ _id: { $in: uniqueLessonIds } }, { $set: { module: updatedModuleId } });
@@ -383,6 +417,7 @@ const syncModuleLessons = async ({ existingModule, updatedModuleId, uniqueLesson
         );
     }
     await detachRemovedLessons(existingModule._id, uniqueLessonIds, previousLessonIds);
+    await clearRemovedLessonProgressForModule(existingModule, removedLessonIds);
 };
 
 const MODULE_FORBIDDEN = { status: 403, body: { message: "Not authorized to modify this course curriculum" } };

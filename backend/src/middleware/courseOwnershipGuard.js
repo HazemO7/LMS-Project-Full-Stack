@@ -167,16 +167,38 @@ const courseOwnershipGuard = (resourceType) => {
     };
 };
 
+const collectLessonHolderModules = async (lessonDoc) => {
+    const listed = await Module.find({ lesson: lessonDoc._id });
+    if (!lessonDoc.module) return listed;
+    const pointedId = lessonDoc.module.toString();
+    if (listed.some((m) => m._id.toString() === pointedId)) return listed;
+    const pointed = await Module.findById(lessonDoc.module);
+    return pointed ? [...listed, pointed] : listed;
+};
+
+const resolveHolderCoursesForLesson = async (lessonDoc) => {
+    if (!lessonDoc) return [];
+    const holderMods = await collectLessonHolderModules(lessonDoc);
+    const byId = new Map();
+    for (const mod of holderMods) {
+        const courses = await resolveHolderCoursesForModule(mod);
+        for (const course of courses) {
+            byId.set(course._id.toString(), course);
+        }
+    }
+    return Array.from(byId.values());
+};
+
 const resolveReadableModule = async (id) => {
     const mod = await Module.findById(id);
-    if (!mod) return { notFoundMessage: "Module not found", course: null };
-    return { course: await resolveCourseFromModule(mod) };
+    if (!mod) return { notFoundMessage: "Module not found", courses: [] };
+    return { courses: await resolveHolderCoursesForModule(mod) };
 };
 
 const resolveReadableLesson = async (id) => {
     const lesson = await Lesson.findById(id);
-    if (!lesson) return { notFoundMessage: "Lesson not found", course: null };
-    return { course: await resolveCourseFromLesson(lesson) };
+    if (!lesson) return { notFoundMessage: "Lesson not found", courses: [] };
+    return { courses: await resolveHolderCoursesForLesson(lesson) };
 };
 
 const READABLE_RESOLVERS = {
@@ -186,25 +208,26 @@ const READABLE_RESOLVERS = {
 
 const resolveReadableCourse = async (resourceType, id) => {
     const resolver = READABLE_RESOLVERS[resourceType];
-    if (!resolver) return { course: null };
+    if (!resolver) return { courses: [] };
     return resolver(id);
 };
 
-const checkStudentReadAccess = async (userId, courseId) => {
-    const enrolled = await Enrollment.findOne({ user: userId, course: courseId });
+const checkStudentReadAccess = async (userId, courses) => {
+    const courseIds = courses.map((c) => c._id);
+    const enrolled = await Enrollment.exists({ user: userId, course: { $in: courseIds } });
     if (enrolled) return { allowed: true };
     return { allowed: false, message: "You must be enrolled to access this course content" };
 };
 
-const checkReadAccess = async (user, course) => {
-    if (!course) return { allowed: false, message: "Access denied" };
+const checkReadAccess = async (user, courses) => {
+    if (!courses || courses.length === 0) return { allowed: false, message: "Access denied" };
     if (user.role === "instructor") {
-        return isCourseOwner(course, user._id)
+        return courses.some((course) => isCourseOwner(course, user._id))
             ? { allowed: true }
             : { allowed: false, message: "Access denied" };
     }
     if (user.role === "student") {
-        return checkStudentReadAccess(user._id, course._id);
+        return checkStudentReadAccess(user._id, courses);
     }
     return { allowed: false, message: "Access denied" };
 };
@@ -221,12 +244,12 @@ const curriculumReadGuard = (resourceType) => {
             }
             if (isAdminRole(req.user.role)) return next();
 
-            const { notFoundMessage, course } = await resolveReadableCourse(resourceType, req.params.id);
+            const { notFoundMessage, courses } = await resolveReadableCourse(resourceType, req.params.id);
             if (notFoundMessage) {
                 return res.status(404).json({ message: notFoundMessage });
             }
 
-            const access = await checkReadAccess(req.user, course);
+            const access = await checkReadAccess(req.user, courses);
             if (!access.allowed) {
                 return res.status(403).json({ message: access.message });
             }
