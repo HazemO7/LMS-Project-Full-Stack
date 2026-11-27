@@ -332,6 +332,27 @@ const handleOrphanProgressCleanup = async (req, courseId, userId) => {
     return { status: 200, body: { status: "success", message: "Enrollment removed successfully" } };
 };
 
+const executeManualUnenroll = async (req, courseId, userId) => {
+    const { error: actorError } = await resolveActiveActor(req);
+    if (actorError) return actorError;
+
+    const existingEnrollment = await Enrollment.findOne({ course: courseId, user: userId });
+    if (!existingEnrollment) {
+        return handleOrphanProgressCleanup(req, courseId, userId);
+    }
+
+    await Progress.deleteMany({ course: courseId, user: userId });
+    await Enrollment.deleteOne({ _id: existingEnrollment._id });
+    await recordAudit({
+        req,
+        action: "ENROLLMENT_REMOVED",
+        targetType: "Enrollment",
+        targetId: existingEnrollment._id,
+        metadata: { courseId, userId },
+    });
+    return { status: 200, body: { status: "success", message: "Enrollment removed successfully" } };
+};
+
 const manualUnenrollUser = async (req, res) => {
     try {
         const { id: courseId, userId } = req.params;
@@ -339,22 +360,8 @@ const manualUnenrollUser = async (req, res) => {
             return res.status(400).json({ status: "fail", message: "Invalid course or user ID" });
         }
 
-        const existingEnrollment = await Enrollment.findOne({ course: courseId, user: userId });
-        if (!existingEnrollment) {
-            const cleanupRes = await handleOrphanProgressCleanup(req, courseId, userId);
-            return res.status(cleanupRes.status).json(cleanupRes.body);
-        }
-
-        await Progress.deleteMany({ course: courseId, user: userId });
-        await Enrollment.deleteOne({ _id: existingEnrollment._id });
-        await recordAudit({
-            req,
-            action: "ENROLLMENT_REMOVED",
-            targetType: "Enrollment",
-            targetId: existingEnrollment._id,
-            metadata: { courseId, userId },
-        });
-        return res.status(200).json({ status: "success", message: "Enrollment removed successfully" });
+        const outcome = await withSuperAdminLock(() => executeManualUnenroll(req, courseId, userId));
+        return res.status(outcome.status).json(outcome.body);
     } catch (error) {
         return handleServerError(req, res, "manualUnenrollUser", error);
     }

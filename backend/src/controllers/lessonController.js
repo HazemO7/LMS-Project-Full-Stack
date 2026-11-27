@@ -4,7 +4,7 @@ const Module = require('../models/Module');
 const Progress = require('../models/Progress');
 const { withSuperAdminLock } = require("../services/governanceLockService");
 const { resolveCurriculumActor } = require("../services/curriculumService");
-const { resolveCourseFromModule } = require("../middleware/courseOwnershipGuard");
+const { resolveCourseFromModule, resolveHolderCoursesForModule } = require("../middleware/courseOwnershipGuard");
 const { isAdminRole } = require("../middleware/authmiddleware");
 const logger = require('../utils/logger');
 
@@ -152,13 +152,18 @@ const collectLessonHolderModules = async (lesson) => {
     return pointedMod ? [...listedModules, pointedMod] : listedModules;
 };
 
+const moduleCoursesAllOwned = async (mod, actorId) => {
+    const courses = await resolveHolderCoursesForModule(mod);
+    if (courses.length === 0) return false;
+    return courses.every((course) => isOwnedCourse(course, actorId));
+};
+
 const assertCallerCanMutateLesson = async (actor, lesson) => {
     if (isAdminRole(actor.role)) return true;
     const holders = await collectLessonHolderModules(lesson);
     if (holders.length === 0) return false;
     for (const mod of holders) {
-        const course = await resolveCourseFromModule(mod);
-        if (!isOwnedCourse(course, actor._id)) return false;
+        if (!(await moduleCoursesAllOwned(mod, actor._id))) return false;
     }
     return true;
 };

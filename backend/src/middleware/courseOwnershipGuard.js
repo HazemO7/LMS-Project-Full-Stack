@@ -24,6 +24,16 @@ const assertCanMutateCourse = (course, user) => {
     return isCourseOwner(course, user._id);
 };
 
+const resolveHolderCoursesForModule = async (moduleDoc) => {
+    if (!moduleDoc) return [];
+    const listingCourses = await Course.find({ modules: moduleDoc._id });
+    if (!moduleDoc.course) return listingCourses;
+    const pointedId = moduleDoc.course.toString();
+    if (listingCourses.some((c) => c._id.toString() === pointedId)) return listingCourses;
+    const pointedCourse = await Course.findById(moduleDoc.course);
+    return pointedCourse ? [...listingCourses, pointedCourse] : listingCourses;
+};
+
 const resolveCourseFromModule = async (moduleDoc) => {
     if (!moduleDoc) return null;
     if (moduleDoc.course) {
@@ -232,5 +242,6 @@ module.exports = {
     courseOwnershipGuard,
     curriculumReadGuard,
     resolveCourseFromModule,
+    resolveHolderCoursesForModule,
     resolveCourseFromLesson,
 };

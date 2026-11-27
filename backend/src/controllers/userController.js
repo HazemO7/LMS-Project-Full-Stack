@@ -24,6 +24,14 @@ const SAME_PASSWORD_RESPONSE = {
     status: 400,
     body: { message: 'New password cannot be the same as the current password.' },
 };
+const PROFILE_FIELD_REQUIRED_RESPONSE = {
+    status: 400,
+    body: { message: 'Name and email are required.' },
+};
+const CONCURRENT_PASSWORD_RESPONSE = {
+    status: 409,
+    body: { message: 'Password was changed concurrently. Please retry.' },
+};
 
 const getMe = async (req, res) => {
     try {
@@ -36,6 +44,7 @@ const getMe = async (req, res) => {
 
 const resolveUpdatedEmail = async (rawEmail, currentUser) => {
     const normalizedEmail = String(rawEmail).trim().toLowerCase();
+    if (!normalizedEmail) return { error: PROFILE_FIELD_REQUIRED_RESPONSE };
     if (normalizedEmail === currentUser.email) {
         return { email: normalizedEmail };
     }
@@ -73,11 +82,11 @@ const verifyAndBuildPasswordFields = async (userId, currentPassword, newPassword
         return { error: SAME_PASSWORD_RESPONSE };
     }
     return {
+        expectedTokenVersion: userDoc.tokenVersion ?? 0,
         fields: {
             password: await bcrypt.hash(newPassword, 10),
             mustChangePassword: false,
             passwordChangedAt: new Date(),
-            tokenVersion: (userDoc.tokenVersion || 0) + 1,
         },
     };
 };
@@ -89,9 +98,18 @@ const resolvePasswordUpdate = async (body, userId) => {
     return verifyAndBuildPasswordFields(userId, body.currentPassword, body.password);
 };
 
+const applyNameUpdate = (rawName, updateData) => {
+    if (rawName === undefined) return null;
+    const name = String(rawName).trim();
+    if (!name) return PROFILE_FIELD_REQUIRED_RESPONSE;
+    updateData.name = name;
+    return null;
+};
+
 const buildProfileUpdateData = async (body, currentUser) => {
     const updateData = {};
-    if (body.name !== undefined) updateData.name = String(body.name).trim();
+    const nameErr = applyNameUpdate(body.name, updateData);
+    if (nameErr) return { error: nameErr };
     applyStaffFields(body, currentUser, updateData);
 
     if (body.email !== undefined) {
@@ -103,26 +121,39 @@ const buildProfileUpdateData = async (body, currentUser) => {
     const passwordResult = await resolvePasswordUpdate(body, currentUser._id);
     if (passwordResult.error) return { error: passwordResult.error };
 
-    return { updateData: { ...updateData, ...passwordResult.fields } };
+    return {
+        expectedTokenVersion: passwordResult.expectedTokenVersion,
+        updateData: { ...updateData, ...passwordResult.fields },
+    };
+};
+
+const persistProfileUpdate = (userId, updateData, expectedTokenVersion) => {
+    if (expectedTokenVersion === undefined) {
+        return User.findByIdAndUpdate(userId, updateData, { returnDocument: "after" }).select(USER_SAFE_PROJECTION);
+    }
+    return User.findOneAndUpdate(
+        { _id: userId, tokenVersion: expectedTokenVersion },
+        { $set: updateData, $inc: { tokenVersion: 1 } },
+        { returnDocument: "after" }
+    ).select(USER_SAFE_PROJECTION);
 };
 
 const updateMe = async (req, res) => {
     try {
-        const { error, updateData } = await buildProfileUpdateData(req.body, req.user);
+        const { error, updateData, expectedTokenVersion } = await buildProfileUpdateData(req.body, req.user);
         if (error) {
             return res.status(error.status).json(error.body);
         }
 
-        const updatedUser = await User.findByIdAndUpdate(
-            req.user._id,
-            updateData,
-            { returnDocument: "after" }
-        ).select(USER_SAFE_PROJECTION);
+        const updatedUser = await persistProfileUpdate(req.user._id, updateData, expectedTokenVersion);
+        if (!updatedUser) {
+            return res.status(CONCURRENT_PASSWORD_RESPONSE.status).json(CONCURRENT_PASSWORD_RESPONSE.body);
+        }
 
-        res.status(200).json({ status: "success", data: updatedUser });
+        return res.status(200).json({ status: "success", data: updatedUser });
     } catch (error) {
         logger.error("Failed to update profile", { error: error.message, userId: req.user?._id, requestId: req.id });
-        res.status(500).json({ message: "Failed to update profile" });
+        return res.status(500).json({ message: "Failed to update profile" });
     }
 };
 

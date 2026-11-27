@@ -1034,4 +1034,39 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect(afterRes.body.percentage).toBe(0);
         expect(await Progress.countDocuments({ user: stu._id, course: course._id })).toBe(0);
     });
+
+    it("rejects blank profile fields, concurrent password races, and shared-module mutations", async () => {
+        const { user: stu, token: stuToken } = await createAndLoginUser({ name: "Race Stu", email: "race-stu@example.com", role: "student" });
+        expect((await request(app).patch("/api/users/me").set("Authorization", `Bearer ${stuToken}`).send({ name: "   " })).statusCode).toBe(400);
+        expect((await request(app).patch("/api/users/me").set("Authorization", `Bearer ${stuToken}`).send({ email: "   " })).statusCode).toBe(400);
+
+        const origCompare = bcrypt.compare;
+        const raceSpy = jest.spyOn(bcrypt, "compare").mockImplementationOnce(async (pw, hash) => {
+            await User.updateOne({ _id: stu._id }, { $inc: { tokenVersion: 1 } });
+            return origCompare(pw, hash);
+        });
+        try {
+            const raceRes = await request(app).patch("/api/users/me").set("Authorization", `Bearer ${stuToken}`)
+                .send({ currentPassword: "Password123!", password: "NewPassword123!" });
+            expect(raceRes.statusCode).toBe(409);
+        } finally {
+            raceSpy.mockRestore();
+        }
+
+        const { user: instA, token: tokenA } = await createAndLoginUser({ name: "Inst Shared A", email: "shared-a@example.com", role: "instructor" });
+        const { user: instB } = await createAndLoginUser({ name: "Inst Shared B", email: "shared-b@example.com", role: "instructor" });
+        const courseA = await Course.create({ title: "Shared CA", description: "d", instructor: instA._id });
+        const mod = await Module.create({ title: "Shared M", description: "d", content: "c", course: courseA._id });
+        const lesson = await Lesson.create({ title: "Shared L", description: "d", content: "c", module: mod._id });
+        await Course.create({ title: "Shared CB", description: "d", instructor: instB._id, modules: [mod._id] });
+
+        expect((await request(app).put(`/api/modules/${mod._id}`).set("Authorization", `Bearer ${tokenA}`).send({ title: "Hijack" })).statusCode).toBe(403);
+        expect((await request(app).put(`/api/lessons/${lesson._id}`).set("Authorization", `Bearer ${tokenA}`).send({ title: "Hijack" })).statusCode).toBe(403);
+
+        // Atomic create-and-attach appends module to Course.modules
+        const createdModRes = await request(app).post("/api/modules").set("Authorization", `Bearer ${tokenA}`)
+            .send({ title: "Attached", description: "d", content: "c", course: courseA._id.toString() });
+        expect(createdModRes.statusCode).toBe(201);
+        expect((await Course.findById(courseA._id)).modules.map(String)).toContain(createdModRes.body._id);
+    });
 });

@@ -218,6 +218,7 @@ const AdminDashboardModals = ({
       onRetryStaff={staffState.fetchStaffPool}
       onTransferred={(updated) => {
         coursesState.setCourses((prev) => prev.map((c) => (c._id === updated._id ? { ...c, ...updated } : c)));
+        coursesState.refreshCourses();
         setSuccessMsg(t('admin.courseTransferredMsg', { title: updated.title }));
       }}
     />

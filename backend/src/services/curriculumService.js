@@ -6,7 +6,10 @@ const Enrollment = require("../models/Enrollment");
 const Progress = require("../models/Progress");
 const User = require("../models/User");
 const { isAdminRole } = require("../middleware/authmiddleware");
-const { resolveCourseFromModule } = require("../middleware/courseOwnershipGuard");
+const {
+    resolveCourseFromModule,
+    resolveHolderCoursesForModule,
+} = require("../middleware/courseOwnershipGuard");
 
 const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 const PUBLIC_INSTRUCTOR_FIELDS = "name specialty bio";
@@ -280,11 +283,11 @@ const callerOwnsModuleDoc = async (modDoc, userId, courseCache) => {
     if (!modDoc) return false;
     const modKey = modDoc._id.toString();
     if (!courseCache.has(modKey)) {
-        courseCache.set(modKey, await resolveCourseFromModule(modDoc));
+        courseCache.set(modKey, await resolveHolderCoursesForModule(modDoc));
     }
-    const course = courseCache.get(modKey);
-    if (!course || !course.instructor) return false;
-    return course.instructor.toString() === userId.toString();
+    const courses = courseCache.get(modKey);
+    if (!courses || courses.length === 0) return false;
+    return courses.every((course) => course.instructor && course.instructor.toString() === userId.toString());
 };
 
 const checkPointedModuleOwnership = async (pointedModId, ctx) => {
@@ -360,16 +363,26 @@ const detachRemovedLessons = async (existingModuleId, uniqueLessonIds, previousL
     );
 };
 
-const syncModuleLessons = async ({ existingModuleId, updatedModuleId, uniqueLessonIds, previousLessonIds }) => {
+const clearCrossCourseLessonProgress = async (existingModule, uniqueLessonIds) => {
+    const holderCourses = await resolveHolderCoursesForModule(existingModule);
+    const holderCourseIds = holderCourses.map((c) => c._id);
+    const filter = holderCourseIds.length > 0
+        ? { lesson: { $in: uniqueLessonIds }, course: { $nin: holderCourseIds } }
+        : { lesson: { $in: uniqueLessonIds } };
+    await Progress.deleteMany(filter);
+};
+
+const syncModuleLessons = async ({ existingModule, updatedModuleId, uniqueLessonIds, previousLessonIds }) => {
     if (uniqueLessonIds === null) return;
     if (uniqueLessonIds.length > 0) {
+        await clearCrossCourseLessonProgress(existingModule, uniqueLessonIds);
         await Lesson.updateMany({ _id: { $in: uniqueLessonIds } }, { $set: { module: updatedModuleId } });
         await Module.updateMany(
-            { _id: { $ne: existingModuleId }, lesson: { $in: uniqueLessonIds } },
+            { _id: { $ne: existingModule._id }, lesson: { $in: uniqueLessonIds } },
             { $pull: { lesson: { $in: uniqueLessonIds } } }
         );
     }
-    await detachRemovedLessons(existingModuleId, uniqueLessonIds, previousLessonIds);
+    await detachRemovedLessons(existingModule._id, uniqueLessonIds, previousLessonIds);
 };
 
 const MODULE_FORBIDDEN = { status: 403, body: { message: "Not authorized to modify this course curriculum" } };
@@ -379,6 +392,13 @@ const moduleOwnershipError = (course, user) => {
     if (!course) return MODULE_FORBIDDEN;
     if (canModifyCourse(course, user)) return null;
     return MODULE_FORBIDDEN;
+};
+
+const canActorMutateModule = async (moduleDoc, actor) => {
+    if (isAdminRole(actor.role)) return null;
+    const courses = await resolveHolderCoursesForModule(moduleDoc);
+    if (courses.length === 0) return MODULE_FORBIDDEN;
+    return courses.every((c) => canModifyCourse(c, actor)) ? null : MODULE_FORBIDDEN;
 };
 
 const authorizeModuleCourseOnCreate = async (courseId, user) => {
@@ -405,6 +425,9 @@ const executeModuleCreate = async (req) => {
         course: course || null,
         order: order ?? 0,
     });
+    if (course) {
+        await Course.updateOne({ _id: course }, { $addToSet: { modules: moduleDoc._id } });
+    }
     return { status: 201, module: moduleDoc };
 };
 
@@ -415,8 +438,7 @@ const executeModuleUpdate = async (req, updateFields, uniqueLessonIds) => {
     const existingModule = await Module.findById(req.params.id);
     if (!existingModule) return { status: 404, body: { message: "Module not found" } };
 
-    const course = await resolveCourseFromModule(existingModule);
-    const ownershipError = moduleOwnershipError(course, actor);
+    const ownershipError = await canActorMutateModule(existingModule, actor);
     if (ownershipError) return ownershipError;
 
     const previousLessonIds = (existingModule.lesson || []).map((id) => id.toString());
@@ -427,7 +449,7 @@ const executeModuleUpdate = async (req, updateFields, uniqueLessonIds) => {
     if (!updatedModule) return { status: 404, body: { message: "Module not found" } };
 
     await syncModuleLessons({
-        existingModuleId: existingModule._id,
+        existingModule,
         updatedModuleId: updatedModule._id,
         uniqueLessonIds,
         previousLessonIds,

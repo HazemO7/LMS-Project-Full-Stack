@@ -208,17 +208,33 @@ const resetPassword = catchAsync(async (req, res, next) => {
         return next(new AppError("New password cannot be the same as the current password.", 400));
     }
 
+    const expectedTokenVersion = user.tokenVersion ?? 0;
     const hash = await bcrypt.hash(password, 10);
-    user.password = hash;
-    user.passwordChangedAt = new Date();
-    user.tokenVersion = (user.tokenVersion || 0) + 1;
-    user.mustChangePassword = false;
-    
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    user.resetPasswordTokenCreatedAt = undefined;
-    
-    await user.save();
+    const updated = await User.findOneAndUpdate(
+        {
+            _id: user._id,
+            tokenVersion: expectedTokenVersion,
+            resetPasswordToken: hashedToken,
+            resetPasswordExpire: { $gt: Date.now() },
+        },
+        {
+            $set: {
+                password: hash,
+                passwordChangedAt: new Date(),
+                mustChangePassword: false,
+            },
+            $unset: {
+                resetPasswordToken: 1,
+                resetPasswordExpire: 1,
+                resetPasswordTokenCreatedAt: 1,
+            },
+            $inc: { tokenVersion: 1 },
+        },
+        { returnDocument: "after" }
+    );
+    if (!updated) {
+        return next(new AppError("Invalid or expired reset token.", 400));
+    }
 
     logger.info("Password reset completed successfully", { userId: user._id, requestId: req.id });
     res.status(200).json({ message: "Password reset successfully." });
@@ -246,12 +262,23 @@ const changePassword = catchAsync(async (req, res, next) => {
         return next(new AppError("New password cannot be the same as the current password.", 400));
     }
 
+    const expectedTokenVersion = user.tokenVersion ?? 0;
     const hash = await bcrypt.hash(newPassword, 10);
-    user.password = hash;
-    user.passwordChangedAt = new Date();
-    user.tokenVersion = (user.tokenVersion || 0) + 1;
-    user.mustChangePassword = false;
-    await user.save();
+    const updated = await User.findOneAndUpdate(
+        { _id: user._id, tokenVersion: expectedTokenVersion },
+        {
+            $set: {
+                password: hash,
+                passwordChangedAt: new Date(),
+                mustChangePassword: false,
+            },
+            $inc: { tokenVersion: 1 },
+        },
+        { returnDocument: "after" }
+    );
+    if (!updated) {
+        return next(new AppError("Password was changed concurrently. Please retry.", 409));
+    }
 
     logger.info("Password changed successfully", { userId: user._id, requestId: req.id });
     res.status(200).json({ message: "Password changed successfully." });
