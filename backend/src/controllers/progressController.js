@@ -61,12 +61,19 @@ const getCourseProgress = async (req, res) => {
 
         if (!course) return res.status(404).json({ message: "Course not found" });
 
-        let totalLessons = 0;
-        course.modules.forEach(m => {
-            if (m.lesson) totalLessons += m.lesson.length;
-        });
+        const currentLessonIds = course.modules.flatMap((m) =>
+            Array.isArray(m.lesson) ? m.lesson.map((l) => l._id) : []
+        );
+        const totalLessons = currentLessonIds.length;
 
-        const completedDocs = await Progress.find({ user: req.user._id, course: courseId, completed: true });
+        const completedDocs = totalLessons === 0
+            ? []
+            : await Progress.find({
+                user: req.user._id,
+                course: courseId,
+                completed: true,
+                lesson: { $in: currentLessonIds },
+            });
 
         const completedCount = completedDocs.length;
         const percentage = totalLessons === 0 ? 0 : Math.round((completedCount / totalLessons) * 100);

@@ -1006,4 +1006,32 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect((await request(app).post(`/api/courses/${courseA._id}/enroll`).set("Authorization", `Bearer ${stuToken}`)).statusCode).toBe(201);
         expect(await Enrollment.countDocuments({ user: stu._id, course: courseA._id })).toBe(1);
     });
+
+    it("reconciles course progress when a module with completed lessons is removed", async () => {
+        const { user: inst, token: instToken } = await createAndLoginUser({ name: "Inst Prog", email: "inst-prog@example.com", role: "instructor" });
+        const { user: stu, token: stuToken } = await createAndLoginUser({ name: "Stu Prog", email: "stu-prog@example.com", role: "student" });
+        const course = await Course.create({ title: "Prog Course", description: "d", instructor: inst._id });
+        const mod1 = await Module.create({ title: "M1", description: "d", content: "c", course: course._id });
+        const mod2 = await Module.create({ title: "M2", description: "d", content: "c", course: course._id });
+        const les1 = await Lesson.create({ title: "L1", description: "d", content: "c", module: mod1._id });
+        const les2 = await Lesson.create({ title: "L2", description: "d", content: "c", module: mod2._id });
+        await Module.updateOne({ _id: mod1._id }, { $set: { lesson: [les1._id] } });
+        await Module.updateOne({ _id: mod2._id }, { $set: { lesson: [les2._id] } });
+        await Course.updateOne({ _id: course._id }, { $set: { modules: [mod1._id, mod2._id] } });
+        await Enrollment.create({ user: stu._id, course: course._id });
+        await Progress.create({ user: stu._id, course: course._id, lesson: les1._id, completed: true });
+
+        const beforeRes = await request(app).get(`/api/courses/${course._id}/progress`).set("Authorization", `Bearer ${stuToken}`);
+        expect(beforeRes.statusCode).toBe(200);
+        expect(beforeRes.body.percentage).toBe(50);
+
+        expect((await request(app).put(`/api/courses/${course._id}`).set("Authorization", `Bearer ${instToken}`).send({ modules: [mod2._id.toString()] })).statusCode).toBe(200);
+
+        const afterRes = await request(app).get(`/api/courses/${course._id}/progress`).set("Authorization", `Bearer ${stuToken}`);
+        expect(afterRes.statusCode).toBe(200);
+        expect(afterRes.body.completedCount).toBe(0);
+        expect(afterRes.body.totalLessons).toBe(1);
+        expect(afterRes.body.percentage).toBe(0);
+        expect(await Progress.countDocuments({ user: stu._id, course: course._id })).toBe(0);
+    });
 });

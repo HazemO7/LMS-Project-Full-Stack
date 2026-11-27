@@ -100,11 +100,25 @@ const assertCallerCanAttachModules = async (course, uniqueModuleIds, previousMod
     return null;
 };
 
+const clearRemovedModuleProgress = async (courseFilter, moduleIds) => {
+    if (moduleIds.length === 0) return;
+    const modules = await Module.find({ _id: { $in: moduleIds } }).select("_id lesson");
+    const listedIds = modules.flatMap((m) => m.lesson || []);
+    const lessons = await Lesson.find({
+        $or: [{ module: { $in: moduleIds } }, { _id: { $in: listedIds } }],
+    }).select("_id");
+    const lessonIds = lessons.map((l) => l._id);
+    if (lessonIds.length > 0) {
+        await Progress.deleteMany({ course: courseFilter, lesson: { $in: lessonIds } });
+    }
+};
+
 const detachRemovedModules = async (courseId, uniqueModuleIds, previousModuleIds) => {
     const newModuleSet = new Set(uniqueModuleIds);
     const removedModuleIds = previousModuleIds.filter((id) => !newModuleSet.has(id));
     if (removedModuleIds.length === 0) return;
 
+    await clearRemovedModuleProgress(courseId, removedModuleIds);
     await Module.updateMany(
         { _id: { $in: removedModuleIds }, course: courseId },
         { $set: { course: null } }
@@ -113,6 +127,7 @@ const detachRemovedModules = async (courseId, uniqueModuleIds, previousModuleIds
 
 const unlinkModulesFromOtherCourses = async (updatedCourseId, uniqueModuleIds, isAdmin) => {
     if (!isAdmin || uniqueModuleIds.length === 0) return;
+    await clearRemovedModuleProgress({ $ne: updatedCourseId }, uniqueModuleIds);
     await Course.updateMany(
         { _id: { $ne: updatedCourseId }, modules: { $in: uniqueModuleIds } },
         { $pull: { modules: { $in: uniqueModuleIds } } }
