@@ -43,25 +43,14 @@ const deduplicateUsersById = (lists) => {
   return merged;
 };
 
-const applyUsersPageResult = (res, usersPage, setters) => {
+const applyPagedListResult = (res, currentPage, handlers) => {
   const totalPages = Math.max(1, res.totalPages || 1);
-  setters.setUsersTotalPages(totalPages);
-  if (usersPage > totalPages) {
-    setters.setUsersPage(totalPages);
+  handlers.setTotalPages(totalPages);
+  if (currentPage > totalPages) {
+    handlers.setPage(totalPages);
     return;
   }
-  setters.setFetchedAt(Date.now());
-  setters.setUsers(res.data || []);
-};
-
-const applyCoursesPageResult = (res, coursesPage, setters) => {
-  const totalPages = Math.max(1, res.totalPages || 1);
-  setters.setCoursesTotalPages(totalPages);
-  if (coursesPage > totalPages) {
-    setters.setCoursesPage(totalPages);
-    return;
-  }
-  setters.setCourses(res.data || []);
+  handlers.onItems(res.data || []);
 };
 
 const toggleSetItem = (prev, id) => {
@@ -140,7 +129,16 @@ export const useAdminUsers = (activeTab, onError) => {
       const res = await adminAPI.getUsers({
         page: usersPage, limit: 10, role: roleFilter, status: statusFilter, search: userSearch,
       });
-      if (isCurrent()) applyUsersPageResult(res, usersPage, { setUsersTotalPages, setUsersPage, setFetchedAt, setUsers });
+      if (isCurrent()) {
+        applyPagedListResult(res, usersPage, {
+          setTotalPages: setUsersTotalPages,
+          setPage: setUsersPage,
+          onItems: (data) => {
+            setFetchedAt(Date.now());
+            setUsers(data);
+          },
+        });
+      }
     },
   }), [usersPage, roleFilter, statusFilter, userSearch, onError]);
 
@@ -173,7 +171,13 @@ export const useAdminCourses = (activeTab, onError) => {
     fallbackError: 'Failed to load courses',
     task: async (isCurrent) => {
       const res = await adminAPI.getCourses({ page: coursesPage, limit: 10, search: courseSearch });
-      if (isCurrent()) applyCoursesPageResult(res, coursesPage, { setCoursesTotalPages, setCoursesPage, setCourses });
+      if (isCurrent()) {
+        applyPagedListResult(res, coursesPage, {
+          setTotalPages: setCoursesTotalPages,
+          setPage: setCoursesPage,
+          onItems: setCourses,
+        });
+      }
     },
   }), [coursesPage, courseSearch, onError]);
 

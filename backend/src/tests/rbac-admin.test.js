@@ -405,14 +405,6 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect(delSuperRes.statusCode).toBe(400);
         expect(delSuperRes.body.message).toBe("You cannot delete your own account.");
 
-        // Sole active super_admin self-demotion hits the active-count guard independently
-        const selfDemoteRes = await request(app)
-            .patch(`/api/admin/users/${superUser._id}/role`)
-            .set("Authorization", `Bearer ${superToken}`)
-            .send({ role: "admin" });
-        expect(selfDemoteRes.statusCode).toBe(400);
-        expect(selfDemoteRes.body.message).toBe("Cannot demote the last active Super Admin.");
-
         // Suspend instA -> rejects existing JWT and login
         const suspendRes = await request(app)
             .patch(`/api/admin/users/${instA._id}/status`)
@@ -946,14 +938,15 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect(meRes.body.data.tokenVersion).toBeUndefined();
     });
 
-    it("protects shared lessons, rechecks in-lock actor roles, and enforces email/bcrypt/audit invariants", async () => {
-        const { token: superToken } = await createAndLoginUser({ name: "Super", email: "super-inv@example.com", role: "super_admin" });
-        const { user: adminUser, token: adminToken } = await createAndLoginUser({ name: "Demoted Admin", email: "admin-inv@example.com", role: "admin" });
+    it("blocks sole active super_admin self-demotion, shared-lesson edits, and email/bcrypt abuse", async () => {
+        const { user: soleSuper, token: superToken } = await createAndLoginUser({ name: "Super", email: "super-inv@example.com", role: "super_admin" });
+        const selfDemoteRes = await request(app).patch(`/api/admin/users/${soleSuper._id}/role`)
+            .set("Authorization", `Bearer ${superToken}`).send({ role: "admin" });
+        expect(selfDemoteRes.statusCode).toBe(400);
+        expect(selfDemoteRes.body.message).toBe("Cannot demote the last active Super Admin.");
+
         const { user: instA, token: tokenA } = await createAndLoginUser({ name: "Inst A", email: "insta-inv@example.com", role: "instructor" });
         const { user: instB } = await createAndLoginUser({ name: "Inst B", email: "instb-inv@example.com", role: "instructor" });
-        const { user: stu, token: stuToken } = await createAndLoginUser({ name: "Stu", email: "stu-inv@example.com", role: "student" });
-
-        // Shared lesson listed by another instructor's module cannot be mutated or deleted by A
         const courseA = await Course.create({ title: "Course A", description: "d", instructor: instA._id });
         const courseB = await Course.create({ title: "Course B", description: "d", instructor: instB._id });
         const modA = await Module.create({ title: "MA", description: "d", content: "c", course: courseA._id });
@@ -962,7 +955,6 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect((await request(app).put(`/api/lessons/${sharedLesson._id}`).set("Authorization", `Bearer ${tokenA}`).send({ title: "Edit" })).statusCode).toBe(403);
         expect((await request(app).delete(`/api/lessons/${sharedLesson._id}`).set("Authorization", `Bearer ${tokenA}`)).statusCode).toBe(403);
 
-        // Exact email comparison catches case collision; >72 UTF-8 byte password rejected
         await User.create({ name: "Upper", email: "Case@example.com", password: "hashed", role: "student" });
         await User.create({ name: "Lower", email: "case@example.com", password: "hashed", role: "student" });
         const upperDoc = await User.findOne({ email: "Case@example.com" });
@@ -972,8 +964,14 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         const over72 = `${"a".repeat(70)}!1A`;
         expect((await request(app).post("/api/admin/users").set("Authorization", `Bearer ${superToken}`)
             .send({ name: "Long Pw", email: "longpw@example.com", role: "instructor", temporaryPassword: over72, sendEmail: false })).statusCode).toBe(400);
+    });
 
-        // In-lock actor demotion blocks queued admin bypass on curriculum & manualEnroll
+    it("rechecks in-lock actor roles, defers audit logs until commit, and serializes self-enroll", async () => {
+        const { user: adminUser, token: adminToken } = await createAndLoginUser({ name: "Demoted Admin", email: "admin-inv@example.com", role: "admin" });
+        const { user: instA } = await createAndLoginUser({ name: "Inst A2", email: "insta2@example.com", role: "instructor" });
+        const { user: stu, token: stuToken } = await createAndLoginUser({ name: "Stu", email: "stu-inv@example.com", role: "student" });
+        const courseA = await Course.create({ title: "Course Lock", description: "d", instructor: instA._id });
+
         const origAcquire = GovernanceLock.findOneAndUpdate;
         const mockLockDemote = () => jest.spyOn(GovernanceLock, "findOneAndUpdate").mockImplementationOnce(async function (filter, ...args) {
             await User.updateOne({ _id: adminUser._id }, { $set: { role: "student" } });
@@ -993,7 +991,6 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
             demoteHook.mockRestore();
         }
 
-        // Rollback on lease expiry writes no AuditLog doc and emits no Audit: info log
         const infoSpy = jest.spyOn(logger, "info").mockImplementation(() => {});
         try {
             await expect(withGovernanceLock("audit-rollback-test", async () => {
@@ -1006,7 +1003,6 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
             infoSpy.mockRestore();
         }
 
-        // Student self-enrollment serializes cleanly with user deletion
         expect((await request(app).post(`/api/courses/${courseA._id}/enroll`).set("Authorization", `Bearer ${stuToken}`)).statusCode).toBe(201);
         expect(await Enrollment.countDocuments({ user: stu._id, course: courseA._id })).toBe(1);
     });
