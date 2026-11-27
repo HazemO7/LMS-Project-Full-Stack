@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ShieldCheck, UserPlus } from '@phosphor-icons/react';
 import { adminAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -171,14 +171,14 @@ const AdminTabContent = ({
 };
 
 const AdminDashboardModals = ({
-  callerRole, showCreateStaff, setShowCreateStaff, transferTarget, setTransferTarget,
-  enrollmentsTarget, setEnrollmentsTarget, deleteUserTarget, setDeleteUserTarget,
+  callerRole, showCreateStaff, closeCreateStaff, transferTarget, closeTransfer,
+  enrollmentsTarget, closeEnrollments, deleteUserTarget, closeDeleteConfirm,
   deletingUser, onDeleteConfirm, staffState, coursesState, usersState, fetchStats, setSuccessMsg, t,
 }) => (
   <>
     <CreateStaffModal
       open={showCreateStaff}
-      onClose={() => setShowCreateStaff(false)}
+      onClose={closeCreateStaff}
       callerRole={callerRole}
       onCreated={() => {
         usersState.fetchUsers();
@@ -187,7 +187,7 @@ const AdminDashboardModals = ({
     />
     <TransferCourseModal
       open={Boolean(transferTarget)}
-      onClose={() => setTransferTarget(null)}
+      onClose={closeTransfer}
       course={transferTarget}
       instructors={staffState.staffPool}
       staffLoading={staffState.staffPoolLoading}
@@ -200,7 +200,7 @@ const AdminDashboardModals = ({
     />
     <CourseEnrollmentsModal
       open={Boolean(enrollmentsTarget)}
-      onClose={() => setEnrollmentsTarget(null)}
+      onClose={closeEnrollments}
       course={enrollmentsTarget}
       onChanged={() => {
         coursesState.fetchCourses();
@@ -209,7 +209,7 @@ const AdminDashboardModals = ({
     />
     <ConfirmDialog
       open={Boolean(deleteUserTarget)}
-      onClose={() => !deletingUser && setDeleteUserTarget(null)}
+      onClose={closeDeleteConfirm}
       onConfirm={onDeleteConfirm}
       loading={deletingUser}
       title={t('admin.deleteUserTitle')}
@@ -331,6 +331,13 @@ export const AdminDashboard = () => {
     setDeletingUser(false);
   };
 
+  const closeCreateStaff = useCallback(() => setShowCreateStaff(false), []);
+  const closeTransfer = useCallback(() => setTransferTarget(null), []);
+  const closeEnrollments = useCallback(() => setEnrollmentsTarget(null), []);
+  const closeDeleteConfirm = useCallback(() => {
+    if (!deletingUser) setDeleteUserTarget(null);
+  }, [deletingUser]);
+
   const handlers = createDashboardHandlers({
     coursesState, usersState, settingsState, auditState, successMsg, setSuccessMsg,
     setActiveTab, setShowCreateStaff, setEnrollmentsTarget, setTransferTarget,
@@ -362,13 +369,13 @@ export const AdminDashboard = () => {
       <AdminDashboardModals
         callerRole={currentUser?.role}
         showCreateStaff={showCreateStaff}
-        setShowCreateStaff={setShowCreateStaff}
+        closeCreateStaff={closeCreateStaff}
         transferTarget={transferTarget}
-        setTransferTarget={setTransferTarget}
+        closeTransfer={closeTransfer}
         enrollmentsTarget={enrollmentsTarget}
-        setEnrollmentsTarget={setEnrollmentsTarget}
+        closeEnrollments={closeEnrollments}
         deleteUserTarget={deleteUserTarget}
-        setDeleteUserTarget={setDeleteUserTarget}
+        closeDeleteConfirm={closeDeleteConfirm}
         deletingUser={deletingUser}
         onDeleteConfirm={handleDeleteUserConfirm}
         staffState={staffState}

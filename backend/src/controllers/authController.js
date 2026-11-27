@@ -8,6 +8,7 @@ const AppError = require("../utils/AppError");
 const logger = require("../utils/logger");
 const { generateResetToken, hashToken } = require("../services/authService");
 const { sendPasswordResetEmail } = require("../services/emailService");
+const { sanitizeUser } = require("../services/adminGovernanceHelper");
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOCK_TIME = 5 * 60 * 1000; // 5 minutes
@@ -51,7 +52,7 @@ const register = catchAsync(async (req, res, next) => {
 
     res.status(201).json({
         msg: "Done Created User",
-        data: user,
+        data: sanitizeUser(user),
     });
 });
 

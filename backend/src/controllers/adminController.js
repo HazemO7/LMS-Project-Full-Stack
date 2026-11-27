@@ -136,16 +136,17 @@ const createStaffUser = async (req, res) => {
             if (existing) {
                 return { error: { status: 400, body: { status: "fail", message: "Account Already Exist" } } };
             }
-            return createStaffAccountRecord(req);
+            const created = await createStaffAccountRecord(req);
+            await recordAudit({
+                req,
+                action: "USER_CREATED",
+                targetType: "User",
+                targetId: created.newUser._id,
+                metadata: { email: created.newUser.email, role: created.newUser.role },
+            });
+            return created;
         });
         if (error) return res.status(error.status).json(error.body);
-        await recordAudit({
-            req,
-            action: "USER_CREATED",
-            targetType: "User",
-            targetId: newUser._id,
-            metadata: { email: newUser.email, role: newUser.role },
-        });
         const emailSent = await dispatchOnboardingEmail(newUser, plainTempPassword, sendEmail);
 
         return res.status(201).json({
@@ -284,20 +285,26 @@ const resolveEnrollmentTargets = async (req) => {
 
 const manualEnrollUser = async (req, res) => {
     try {
-        const { error, enrollment, course, student } = await withSuperAdminLock(async () => {
+        const { error, enrollment } = await withSuperAdminLock(async () => {
             const targets = await resolveEnrollmentTargets(req);
             if (targets.error) return { error: targets.error };
-            return createManualEnrollment(targets.course, targets.student);
+            const created = await createManualEnrollment(targets.course, targets.student);
+            if (created.error) return created;
+            await recordAudit({
+                req,
+                action: "ENROLLMENT_ADDED",
+                targetType: "Enrollment",
+                targetId: created.enrollment._id,
+                metadata: {
+                    courseId: created.course._id.toString(),
+                    courseTitle: created.course.title,
+                    studentEmail: created.student.email,
+                },
+            });
+            return created;
         });
         if (error) return res.status(error.status).json(error.body);
 
-        await recordAudit({
-            req,
-            action: "ENROLLMENT_ADDED",
-            targetType: "Enrollment",
-            targetId: enrollment._id,
-            metadata: { courseId: course._id.toString(), courseTitle: course.title, studentEmail: student.email },
-        });
         return res.status(201).json({ status: "success", data: enrollment });
     } catch (error) {
         if (error && error.code === 11000) {

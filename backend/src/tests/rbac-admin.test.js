@@ -833,4 +833,78 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect((await request(app).get(`/api/modules/${modA._id}`).set("Authorization", `Bearer ${studentToken}`)).statusCode).toBe(200);
         expect((await request(app).get(`/api/lessons/${lessonA._id}`).set("Authorization", `Bearer ${studentToken}`)).statusCode).toBe(200);
     });
+
+    it("requires currentPassword on PATCH /api/users/me password change and redacts sensitive fields", async () => {
+        const regRes = await request(app).post("/api/auth/register").send({
+            name: "Reg Student",
+            email: "reg-redact@example.com",
+            password: "Password123!",
+        });
+        expect(regRes.statusCode).toBe(201);
+        expect(regRes.body.data.password).toBeUndefined();
+        expect(regRes.body.data.resetPasswordToken).toBeUndefined();
+
+        const { user, token } = await createAndLoginUser({
+            name: "Self User",
+            email: "self-me@example.com",
+            password: "OldPassword123!",
+            role: "student",
+        });
+        await User.updateOne(
+            { _id: user._id },
+            { $set: { resetPasswordToken: "secret-hash", resetPasswordExpire: new Date(Date.now() + 60000), resetPasswordTokenCreatedAt: new Date() } }
+        );
+
+        const meRes = await request(app).get("/api/users/me").set("Authorization", `Bearer ${token}`);
+        expect(meRes.statusCode).toBe(200);
+        expect(meRes.body.data.resetPasswordToken).toBeUndefined();
+        expect(meRes.body.data.resetPasswordExpire).toBeUndefined();
+        expect(meRes.body.data.resetPasswordTokenCreatedAt).toBeUndefined();
+
+        const nameUpdateRes = await request(app).patch("/api/users/me").set("Authorization", `Bearer ${token}`).send({ name: "Renamed" });
+        expect(nameUpdateRes.statusCode).toBe(200);
+        expect(nameUpdateRes.body.data.resetPasswordToken).toBeUndefined();
+
+        expect((await request(app).patch("/api/users/me").set("Authorization", `Bearer ${token}`).send({ password: "NewPassword123!" })).statusCode).toBe(400);
+        expect((await request(app).patch("/api/users/me").set("Authorization", `Bearer ${token}`).send({ currentPassword: "WrongPassword123!", password: "NewPassword123!" })).statusCode).toBe(401);
+        expect((await request(app).patch("/api/users/me").set("Authorization", `Bearer ${token}`).send({ currentPassword: "OldPassword123!", password: "OldPassword123!" })).statusCode).toBe(400);
+
+        const okPwRes = await request(app).patch("/api/users/me").set("Authorization", `Bearer ${token}`)
+            .send({ currentPassword: "OldPassword123!", password: "NewPassword123!" });
+        expect(okPwRes.statusCode).toBe(200);
+        expect(okPwRes.body.data.password).toBeUndefined();
+        expect(okPwRes.body.data.resetPasswordToken).toBeUndefined();
+    });
+
+    it("rejects invalid course IDs in enrollmentGuard and denies lesson edit after lock-competing transfer", async () => {
+        const { token: superToken } = await createAndLoginUser({ name: "Super", email: "super-guard@example.com", role: "super_admin" });
+        const { user: oldOwner, token: oldToken } = await createAndLoginUser({ name: "Old", email: "old-les@example.com", role: "instructor" });
+        const { user: newOwner } = await createAndLoginUser({ name: "New", email: "new-les@example.com", role: "instructor" });
+
+        const badIdRes = await request(app).get("/api/courses/invalid-id/full").set("Authorization", `Bearer ${oldToken}`);
+        expect(badIdRes.statusCode).toBe(400);
+        expect(badIdRes.body.error).toBeUndefined();
+
+        const course = await Course.create({ title: "Lesson Lock", description: "d", instructor: oldOwner._id });
+        const mod = await Module.create({ title: "M1", description: "d", content: "c", course: course._id });
+        const lesson = await Lesson.create({ title: "Original Lesson", description: "d", content: "c", module: mod._id });
+
+        const originalAcquire = GovernanceLock.findOneAndUpdate;
+        const acquire = jest.spyOn(GovernanceLock, "findOneAndUpdate").mockImplementationOnce(async function (filter, ...args) {
+            const transfer = await request(app).patch(`/api/admin/courses/${course._id}/transfer`)
+                .set("Authorization", `Bearer ${superToken}`).send({ newInstructorId: newOwner._id.toString() });
+            expect(transfer.statusCode).toBe(200);
+            expect(filter._id).toBe(acquire.mock.calls[1][0]._id);
+            return originalAcquire.call(this, filter, ...args);
+        });
+
+        try {
+            const updateRes = await request(app).put(`/api/lessons/${lesson._id}`)
+                .set("Authorization", `Bearer ${oldToken}`).send({ title: "Hijacked Lesson" });
+            expect(updateRes.statusCode).toBe(403);
+            expect((await Lesson.findById(lesson._id)).title).toBe("Original Lesson");
+        } finally {
+            acquire.mockRestore();
+        }
+    });
 });

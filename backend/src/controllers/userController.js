@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const bcrypt = require('bcrypt');
 const { validatePasswordPolicy } = require('../utils/passwordUtils');
+const { USER_SAFE_PROJECTION } = require('../services/adminGovernanceHelper');
 const { updateUserRole } = require('./adminController');
 const logger = require('../utils/logger');
 
@@ -10,6 +11,18 @@ const PASSWORD_POLICY_RESPONSE = {
     body: {
         message: 'Password must be at least 8 characters long, include uppercase, lowercase, number, and a special character.',
     },
+};
+const CURRENT_PASSWORD_REQUIRED_RESPONSE = {
+    status: 400,
+    body: { message: 'Current password is required to set a new password.' },
+};
+const INCORRECT_CURRENT_PASSWORD_RESPONSE = {
+    status: 401,
+    body: { message: 'Incorrect current password.' },
+};
+const SAME_PASSWORD_RESPONSE = {
+    status: 400,
+    body: { message: 'New password cannot be the same as the current password.' },
 };
 
 const getMe = async (req, res) => {
@@ -39,15 +52,40 @@ const applyStaffFields = (body, currentUser, updateData) => {
     if (body.bio !== undefined) updateData.bio = String(body.bio).trim();
 };
 
-const applyPasswordUpdate = async (password, updateData) => {
-    if (!password) return null;
-    if (!validatePasswordPolicy(password)) {
+const validatePasswordChangeInputs = (body) => {
+    if (!body.currentPassword || typeof body.currentPassword !== 'string') {
+        return CURRENT_PASSWORD_REQUIRED_RESPONSE;
+    }
+    if (typeof body.password !== 'string' || !validatePasswordPolicy(body.password)) {
         return PASSWORD_POLICY_RESPONSE;
     }
-    updateData.password = await bcrypt.hash(password, 10);
-    updateData.mustChangePassword = false;
-    updateData.passwordChangedAt = new Date(Date.now() - 1000);
     return null;
+};
+
+const verifyAndBuildPasswordFields = async (userId, currentPassword, newPassword) => {
+    const userDoc = await User.findById(userId).select('password');
+    if (!userDoc) return { error: { status: 404, body: { message: 'User not found' } } };
+
+    if (!(await bcrypt.compare(currentPassword, userDoc.password))) {
+        return { error: INCORRECT_CURRENT_PASSWORD_RESPONSE };
+    }
+    if (await bcrypt.compare(newPassword, userDoc.password)) {
+        return { error: SAME_PASSWORD_RESPONSE };
+    }
+    return {
+        fields: {
+            password: await bcrypt.hash(newPassword, 10),
+            mustChangePassword: false,
+            passwordChangedAt: new Date(Date.now() - 1000),
+        },
+    };
+};
+
+const resolvePasswordUpdate = async (body, userId) => {
+    if (body.password === undefined) return { fields: {} };
+    const inputErr = validatePasswordChangeInputs(body);
+    if (inputErr) return { error: inputErr };
+    return verifyAndBuildPasswordFields(userId, body.currentPassword, body.password);
 };
 
 const buildProfileUpdateData = async (body, currentUser) => {
@@ -61,10 +99,10 @@ const buildProfileUpdateData = async (body, currentUser) => {
         updateData.email = emailResult.email;
     }
 
-    const passwordErr = await applyPasswordUpdate(body.password, updateData);
-    if (passwordErr) return { error: passwordErr };
+    const passwordResult = await resolvePasswordUpdate(body, currentUser._id);
+    if (passwordResult.error) return { error: passwordResult.error };
 
-    return { updateData };
+    return { updateData: { ...updateData, ...passwordResult.fields } };
 };
 
 const updateMe = async (req, res) => {
@@ -78,7 +116,7 @@ const updateMe = async (req, res) => {
             req.user._id,
             updateData,
             { returnDocument: "after" }
-        ).select("-password");
+        ).select(USER_SAFE_PROJECTION);
 
         res.status(200).json({ status: "success", data: updatedUser });
     } catch (error) {

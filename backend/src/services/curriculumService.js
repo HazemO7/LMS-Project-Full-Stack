@@ -315,6 +315,30 @@ const moduleOwnershipError = (course, user) => {
     return MODULE_FORBIDDEN;
 };
 
+const authorizeModuleCourseOnCreate = async (courseId, user) => {
+    if (!courseId) return isAdminRole(user.role) ? null : MODULE_FORBIDDEN;
+    if (!isValidObjectId(courseId)) return { status: 400, body: { message: "Invalid course ID" } };
+
+    const course = await Course.findById(courseId);
+    if (!course) return { status: 404, body: { message: "Course not found" } };
+    return moduleOwnershipError(course, user);
+};
+
+const executeModuleCreate = async (req) => {
+    const { title, description, content, course, order } = req.body;
+    const authErr = await authorizeModuleCourseOnCreate(course, req.user);
+    if (authErr) return authErr;
+
+    const moduleDoc = await Module.create({
+        title,
+        description,
+        content,
+        course: course || null,
+        order: order ?? 0,
+    });
+    return { status: 201, module: moduleDoc };
+};
+
 const executeModuleUpdate = async (req, updateFields, uniqueLessonIds) => {
     const existingModule = await Module.findById(req.params.id);
     if (!existingModule) return { status: 404, body: { message: "Module not found" } };
@@ -379,6 +403,7 @@ module.exports = {
     parseIdList,
     executeCourseUpdate,
     executeCourseDelete,
+    executeModuleCreate,
     executeModuleUpdate,
     executeModuleDelete,
 };

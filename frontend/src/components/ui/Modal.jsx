@@ -5,6 +5,38 @@ import { useLanguage } from '../../context/LanguageContext';
 const FOCUSABLE_SELECTOR =
   'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const focusFirstElement = (panel) => {
+  const focusable = panel.querySelectorAll(FOCUSABLE_SELECTOR);
+  if (focusable.length > 0) {
+    focusable[0].focus();
+  } else {
+    panel.focus();
+  }
+};
+
+const trapTabNavigation = (e, panel) => {
+  if (!panel) return;
+  const focusable = Array.from(panel.querySelectorAll(FOCUSABLE_SELECTOR));
+  if (focusable.length === 0) {
+    e.preventDefault();
+    panel.focus();
+    return;
+  }
+
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+
+  if (e.shiftKey) {
+    if (document.activeElement === first || document.activeElement === panel) {
+      e.preventDefault();
+      last.focus();
+    }
+  } else if (document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  }
+};
+
 export const Modal = ({
   open,
   onClose,
@@ -25,15 +57,20 @@ export const Modal = ({
     document.body.style.overflow = 'hidden';
 
     const focusTimer = window.setTimeout(() => {
-      const panel = panelRef.current;
-      if (!panel) return;
-      const focusable = panel.querySelectorAll(FOCUSABLE_SELECTOR);
-      if (focusable.length > 0) {
-        focusable[0].focus();
-      } else {
-        panel.focus();
-      }
+      if (panelRef.current) focusFirstElement(panelRef.current);
     }, 0);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.body.style.overflow = prevOverflow;
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        previouslyFocused.focus();
+      }
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
@@ -41,44 +78,13 @@ export const Modal = ({
         onClose();
         return;
       }
-
-      if (e.key === 'Tab' && panelRef.current) {
-        const focusable = Array.from(
-          panelRef.current.querySelectorAll(FOCUSABLE_SELECTOR)
-        );
-        if (focusable.length === 0) {
-          e.preventDefault();
-          panelRef.current.focus();
-          return;
-        }
-
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-
-        if (e.shiftKey) {
-          if (
-            document.activeElement === first ||
-            document.activeElement === panelRef.current
-          ) {
-            e.preventDefault();
-            last.focus();
-          }
-        } else if (document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
+      if (e.key === 'Tab') {
+        trapTabNavigation(e, panelRef.current);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.clearTimeout(focusTimer);
-      window.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = prevOverflow;
-      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
-        previouslyFocused.focus();
-      }
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
   if (!open) return null;

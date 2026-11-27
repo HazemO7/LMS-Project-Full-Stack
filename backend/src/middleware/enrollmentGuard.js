@@ -1,10 +1,16 @@
 const Enrollment = require('../models/Enrollment');
 const Course = require('../models/Course');
 const { isAdminRole } = require('./authmiddleware');
+const logger = require('../utils/logger');
+
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
 const enrollmentGuard = async (req, res, next) => {
     try {
         const courseId = req.params.id;
+        if (typeof courseId !== 'string' || !OBJECT_ID_REGEX.test(courseId)) {
+            return res.status(400).json({ message: "Invalid course ID" });
+        }
 
         // Super admins and admins have immediate access
         if (isAdminRole(req.user.role)) return next();
@@ -28,7 +34,13 @@ const enrollmentGuard = async (req, res, next) => {
 
         return res.status(403).json({ message: "Access denied" });
     } catch (error) {
-        return res.status(500).json({ message: "Server Error during enrollment check", error: error.message });
+        logger.error("Enrollment check error", {
+            error: error.message,
+            courseId: req.params.id,
+            userId: req.user?._id,
+            requestId: req.id,
+        });
+        return res.status(500).json({ message: "Server Error during enrollment check" });
     }
 };
 

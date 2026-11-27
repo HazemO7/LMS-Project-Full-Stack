@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ArrowsLeftRight } from '@phosphor-icons/react';
 import { Modal } from '../ui/Modal';
 import { AlertBanner } from '../ui/AlertBanner';
@@ -206,9 +206,9 @@ export const TransferCourseModal = ({
 }) => {
   const { t, tServer } = useLanguage();
   const [saving, setSaving] = useState(false);
-  const requestClose = () => {
+  const requestClose = useCallback(() => {
     if (!saving) onClose();
-  };
+  }, [saving, onClose]);
 
   return (
     <Modal

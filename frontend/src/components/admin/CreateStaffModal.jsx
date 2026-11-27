@@ -352,9 +352,10 @@ const useStaffFormState = (open, onCreated, t) => {
 export const CreateStaffModal = ({ open, onClose, callerRole, onCreated }) => {
   const { t, tServer } = useLanguage();
   const state = useStaffFormState(open, onCreated, t);
-  const requestClose = () => {
-    if (!state.submitting) onClose();
-  };
+  const { submitting } = state;
+  const requestClose = useCallback(() => {
+    if (!submitting) onClose();
+  }, [submitting, onClose]);
 
   return (
     <Modal

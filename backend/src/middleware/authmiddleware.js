@@ -8,6 +8,8 @@ const isAdminRole = (role) => {
     return role === "super_admin";
 };
 
+const USER_SAFE_PROJECTION = "-password -resetPasswordToken -resetPasswordExpire -resetPasswordTokenCreatedAt";
+
 const PASSWORD_ROTATION_ALLOWLIST = new Set([
     "GET /api/users/me",
     "PUT /api/auth/change-password",
@@ -70,7 +72,7 @@ const validateAuthenticatedUser = (user, decoded, req) => {
 
 const authenticateToken = async (token, req) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select("-password");
+    const user = await User.findById(decoded.id).select(USER_SAFE_PROJECTION);
     const rejection = validateAuthenticatedUser(user, decoded, req);
     return { user, rejection };
 };

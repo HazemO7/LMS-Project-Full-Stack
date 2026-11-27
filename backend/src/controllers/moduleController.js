@@ -3,31 +3,35 @@ const { withSuperAdminLock } = require("../services/governanceLockService");
 const {
     isValidObjectId,
     parseIdList,
+    executeModuleCreate,
     executeModuleUpdate,
     executeModuleDelete,
 } = require("../services/curriculumService");
 const logger = require("../utils/logger");
 
+const handleCreateModuleError = (res, req, error) => {
+    if (error && error.name === "ValidationError") {
+        return res.status(400).json({ message: error.message });
+    }
+    if (error && error.isOperational) {
+        return res.status(error.statusCode).json({ message: error.message });
+    }
+    logger.error("Create module error", { error: error?.message, requestId: req.id });
+    return res.status(500).json({ message: "Failed to create module" });
+};
+
 // Create Module
 const createModule = async (req, res) => {
     try {
-        const { title, description, content, course, order } = req.body;
-        const moduleDoc = await Module.create({
-            title,
-            description,
-            content,
-            course: course || null,
-            order: order ?? 0,
-        });
-
-        logger.info("Module created successfully", { moduleId: moduleDoc._id, requestId: req.id });
-        return res.status(201).json(moduleDoc);
-    } catch (error) {
-        if (error.name === "ValidationError") {
-            return res.status(400).json({ message: error.message });
+        const outcome = await withSuperAdminLock(() => executeModuleCreate(req));
+        if (outcome.status !== 201) {
+            return res.status(outcome.status).json(outcome.body);
         }
-        logger.error("Create module error", { error: error.message, requestId: req.id });
-        return res.status(500).json({ message: "Failed to create module" });
+
+        logger.info("Module created successfully", { moduleId: outcome.module._id, requestId: req.id });
+        return res.status(201).json(outcome.module);
+    } catch (error) {
+        return handleCreateModuleError(res, req, error);
     }
 };
 
