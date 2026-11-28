@@ -21,6 +21,7 @@ const { recordAudit } = require("../services/auditService");
 const logger = require("../utils/logger");
 const seedAdmin = require("../seed/adminSeeder");
 const { escapeHtml } = require("../services/emailService");
+const seedCourses = require("../seed/courseSeeder");
 
 let mongoServer;
 
@@ -1138,5 +1139,53 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect(val).toBe("ok");
         expect(ranSecond).toBe(true);
         spy.mockRestore();
+    });
+
+    it("falls back for standalone MongoDB in non-production and still rejects in production", async () => {
+        const prevEnv = process.env.NODE_ENV;
+        const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => {});
+        const txSpy = jest.spyOn(mongoose.connection, "transaction")
+            .mockRejectedValue(new Error("Transaction numbers are only allowed on a replica set member or mongos"));
+        try {
+            process.env.NODE_ENV = "development";
+            let postCommitRan = false;
+            const res = await withSuperAdminLock(async () => {
+                afterTransactionCommit(() => { postCommitRan = true; });
+                return "standalone-ok";
+            });
+            expect(res).toBe("standalone-ok");
+            expect(postCommitRan).toBe(true);
+            expect((await GovernanceLock.findById("super_admin_mutation"))?.ownerToken).toBeNull();
+
+            process.env.NODE_ENV = "production";
+            await expect(withSuperAdminLock(async () => "nope")).rejects.toThrow("Transaction numbers");
+            expect((await GovernanceLock.findById("super_admin_mutation"))?.ownerToken).toBeNull();
+        } finally {
+            process.env.NODE_ENV = prevEnv;
+            txSpy.mockRestore();
+            warnSpy.mockRestore();
+        }
+    });
+
+    it("repairs incomplete seeded module and lesson links on retry without duplicating courses", async () => {
+        const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+        try {
+            await seedCourses();
+            expect(await Course.countDocuments()).toBe(7);
+
+            await Module.updateMany({}, { $set: { course: null } });
+            await Lesson.updateMany({}, { $set: { module: null } });
+
+            await seedCourses();
+            expect(await Course.countDocuments()).toBe(7);
+            expect(await Module.countDocuments({ course: null })).toBe(0);
+            expect(await Lesson.countDocuments({ module: null })).toBe(0);
+
+            await seedCourses();
+            expect(await Course.countDocuments()).toBe(7);
+            expect(logSpy).toHaveBeenCalledWith("Courses already seeded.");
+        } finally {
+            logSpy.mockRestore();
+        }
     });
 });

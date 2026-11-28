@@ -3,23 +3,63 @@ const Course = require("../models/Course");
 const Module = require("../models/Module");
 const Lesson = require("../models/Lesson");
 const User = require("../models/User");
+const { runOptionalTransaction } = require("../services/governanceLockService");
 
-mongoose.set("transactionAsyncLocalStorage", true);
+const missingRefFilter = (field) => ({ $or: [{ [field]: null }, { [field]: { $exists: false } }] });
+
+const repairModuleLessons = async (mod) => {
+    if (!Array.isArray(mod.lesson) || mod.lesson.length === 0) return 0;
+    const res = await Lesson.updateMany(
+        { _id: { $in: mod.lesson }, ...missingRefFilter("module") },
+        { $set: { module: mod._id } }
+    );
+    return res.modifiedCount || 0;
+};
+
+const repairCourseLinks = async (course) => {
+    if (!Array.isArray(course.modules) || course.modules.length === 0) return 0;
+    const modRes = await Module.updateMany(
+        { _id: { $in: course.modules }, ...missingRefFilter("course") },
+        { $set: { course: course._id } }
+    );
+    let repaired = modRes.modifiedCount || 0;
+    const mods = await Module.find({ _id: { $in: course.modules } }).select("_id lesson");
+    for (const mod of mods) {
+        repaired += await repairModuleLessons(mod);
+    }
+    return repaired;
+};
+
+const repairIncompleteSeedLinks = async () => {
+    const courses = await Course.find({ "modules.0": { $exists: true } }).select("_id modules");
+    let repaired = 0;
+    for (const course of courses) {
+        repaired += await repairCourseLinks(course);
+    }
+    return repaired;
+};
 
 const insertDemoCurriculum = async (coursesData) => {
+    const firstCourseId = new mongoose.Types.ObjectId();
+    const module1Id = new mongoose.Types.ObjectId();
+    const module2Id = new mongoose.Types.ObjectId();
+
     const lesson1 = await Lesson.create({
+        module: module1Id,
         title: "Introduction to HTML",
         description: "Learn the basic structure of HTML documents.",
         content: "HTML stands for HyperText Markup Language. It is the standard markup language for creating web pages.",
         videoUrl: "https://www.youtube.com/watch?v=placeholder1"
     });
     const lesson2 = await Lesson.create({
+        module: module1Id,
         title: "CSS Styling Basics",
         description: "Learn how to style your HTML elements using CSS.",
         content: "CSS stands for Cascading Style Sheets. It describes how HTML elements should be displayed on screen.",
         videoUrl: "https://www.youtube.com/watch?v=placeholder2"
     });
     const lesson3 = await Lesson.create({
+        module: module2Id,
         title: "JavaScript Fundamentals",
         description: "Introduction to programming with JavaScript.",
         content: "JavaScript is a scripting language that enables you to create dynamically updating content.",
@@ -27,6 +67,8 @@ const insertDemoCurriculum = async (coursesData) => {
     });
 
     const module1 = await Module.create({
+        _id: module1Id,
+        course: firstCourseId,
         title: "Module 1: The Basics",
         description: "Getting started with web development fundamentals.",
         content: "This module covers HTML and CSS basics.",
@@ -34,31 +76,26 @@ const insertDemoCurriculum = async (coursesData) => {
     });
 
     const module2 = await Module.create({
+        _id: module2Id,
+        course: firstCourseId,
         title: "Module 2: Interactivity",
         description: "Adding logic and interactivity with JavaScript.",
         content: "This module introduces JavaScript programming.",
         lesson: [lesson3._id]
     });
 
+    coursesData[0]._id = firstCourseId;
     coursesData[0].modules = [module1._id, module2._id];
-    const insertedCourses = await Course.insertMany(coursesData);
-    const firstCourse = insertedCourses[0];
-    if (firstCourse) {
-        await Module.updateMany(
-            { _id: { $in: [module1._id, module2._id] } },
-            { $set: { course: firstCourse._id } }
-        );
-    }
-    await Lesson.updateMany({ _id: { $in: [lesson1._id, lesson2._id] } }, { $set: { module: module1._id } });
-    await Lesson.updateMany({ _id: { $in: [lesson3._id] } }, { $set: { module: module2._id } });
+    await Course.insertMany(coursesData);
 };
 
 const seedCourses = async () => {
     try {
-        await mongoose.connection.transaction(async () => {
+        await runOptionalTransaction(async () => {
             const count = await Course.countDocuments();
             if (count > 0) {
-                console.log("Courses already seeded.");
+                const repaired = await repairIncompleteSeedLinks();
+                console.log(repaired > 0 ? "Repaired incomplete seeded course links." : "Courses already seeded.");
                 return;
             }
 
