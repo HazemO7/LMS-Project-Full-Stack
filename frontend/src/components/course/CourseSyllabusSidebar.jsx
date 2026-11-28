@@ -1,5 +1,6 @@
 import React from 'react';
-import { CheckCircle, Circle, FilmSlate, PencilSimple, Play, Plus, Trash } from '@phosphor-icons/react';
+import { PencilSimple, Plus, Trash } from '@phosphor-icons/react';
+import { ModuleLessonsList } from './SyllabusLessonList';
 
 const getVisibilityClass = (focusMode, mobileSyllabusOpen) => {
   const mobileDisplay = mobileSyllabusOpen ? 'block' : 'hidden';
@@ -9,75 +10,10 @@ const getVisibilityClass = (focusMode, mobileSyllabusOpen) => {
   return `${mobileDisplay} lg:sticky lg:top-20 lg:col-span-4 lg:block`;
 };
 
-const LessonStatusIcon = ({ done, active }) => {
-  if (done) {
-    return (
-      <CheckCircle
-        size={17}
-        weight="fill"
-        aria-hidden="true"
-        className="mt-0.5 shrink-0 text-[#059669]"
-      />
-    );
-  }
-  if (active) {
-    return (
-      <Play
-        size={16}
-        weight="fill"
-        aria-hidden="true"
-        className="mt-0.5 shrink-0 text-[#D97706]"
-      />
-    );
-  }
-  return (
-    <Circle
-      size={16}
-      aria-hidden="true"
-      className="mt-0.5 shrink-0 text-[#5EEAD4]"
-    />
-  );
-};
+const getEntityId = (entity, fallback) => entity._id || entity.id || fallback;
 
-const LessonListItem = ({ lessonObj, selectedLessonId, isLessonCompleted, onSelectLesson, t }) => {
-  if (typeof lessonObj === 'string') {
-    return (
-      <li className="px-4 py-2.5 text-xs text-[#4A6F70]">
-        Lesson ID: {lessonObj}
-      </li>
-    );
-  }
-
-  const lId = lessonObj._id || lessonObj.id;
-  const active = lId === selectedLessonId;
-  const done = isLessonCompleted(lId);
-  const buttonStyle = active
-    ? 'border-s-4 border-s-[#0F766E] bg-[#CCFBF1]/60 text-[#0B3B3C]'
-    : 'bg-white text-[#335C5D] hover:bg-[#F0FDFA]';
-
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={() => onSelectLesson(lId)}
-        className={`flex min-h-[48px] w-full items-start gap-2.5 px-4 py-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D9488] ${buttonStyle}`}
-      >
-        <LessonStatusIcon done={done} active={active} />
-        <div className="min-w-0 flex-1 text-start">
-          <p className={`text-sm leading-snug ${active ? 'font-semibold text-[#0B3B3C]' : 'font-medium'}`}>
-            <bdi>{lessonObj.title}</bdi>
-          </p>
-          {lessonObj.videoUrl && (
-            <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-[#4A6F70]">
-              <FilmSlate size={12} aria-hidden="true" className="text-[#0D9488]" />
-              {t('player.videoIncluded')}
-            </span>
-          )}
-        </div>
-      </button>
-    </li>
-  );
-};
+const countCompletedInModule = (lessons, isLessonCompleted) =>
+  lessons.filter((l) => typeof l === 'object' && isLessonCompleted(l._id || l.id)).length;
 
 const ModuleActions = ({ mod, mId, onEditModule, onDeleteModule, t }) => (
   <div className="flex shrink-0 items-center gap-2">
@@ -103,7 +39,6 @@ const ModuleActions = ({ mod, mId, onEditModule, onDeleteModule, t }) => (
 );
 
 const ModuleProgressBar = ({ doneInMod, total }) => {
-  if (!total) return null;
   const modPct = Math.round((doneInMod / total) * 100);
   const barColor = doneInMod === total ? 'bg-[#059669]' : 'bg-[#0F766E]';
 
@@ -117,44 +52,66 @@ const ModuleProgressBar = ({ doneInMod, total }) => {
   );
 };
 
-const ModuleLessonsList = ({
-  lessons,
-  selectedLessonId,
-  isLessonCompleted,
-  onSelectLesson,
+const ModuleHeaderTop = ({
+  mod,
+  mIdx,
+  mId,
+  showProgress,
+  doneInMod,
+  totalLessons,
+  canManage,
+  onEditModule,
+  onDeleteModule,
   t,
-}) => {
-  if (lessons.length === 0) {
-    return (
-      <p className="px-4 py-3 text-xs text-[#4A6F70]">
-        {t('player.noLessonsInModule')}
+}) => (
+  <div className="flex items-start justify-between gap-2">
+    <div className="min-w-0 flex-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-block rounded bg-[#FEF3C7] px-2 py-0.5 font-mono-tabular text-[11px] font-semibold text-[#92400E]">
+          {t('player.moduleLabel', { num: String(mIdx + 1).padStart(2, '0') })}
+        </span>
+        {showProgress && (
+          <span className="font-mono-tabular text-[11px] font-semibold text-[#0F766E]">
+            {doneInMod}/{totalLessons}
+          </span>
+        )}
+      </div>
+      <h3 className="mt-1.5 font-display text-sm font-semibold text-[#0D2E2F]">
+        <bdi>{mod.title}</bdi>
+      </h3>
+    </div>
+
+    {canManage && (
+      <ModuleActions
+        mod={mod}
+        mId={mId}
+        onEditModule={onEditModule}
+        onDeleteModule={onDeleteModule}
+        t={t}
+      />
+    )}
+  </div>
+);
+
+const ModuleHeaderDetails = ({ description, mId, canManage, onAddLesson, t }) => (
+  <>
+    {description && (
+      <p className="mt-1.5 text-xs leading-relaxed text-[#335C5D]">
+        <bdi>{description}</bdi>
       </p>
-    );
-  }
-
-  return (
-    <ul className="divide-y divide-[#CCFBF1]">
-      {lessons.map((lessonObj, lIdx) => {
-        const key = typeof lessonObj === 'string'
-          ? lessonObj
-          : lessonObj._id || lessonObj.id || lIdx;
-        return (
-          <LessonListItem
-            key={key}
-            lessonObj={lessonObj}
-            selectedLessonId={selectedLessonId}
-            isLessonCompleted={isLessonCompleted}
-            onSelectLesson={onSelectLesson}
-            t={t}
-          />
-        );
-      })}
-    </ul>
-  );
-};
-
-const countCompletedInModule = (lessons, isLessonCompleted) =>
-  lessons.filter((l) => typeof l === 'object' && isLessonCompleted(l._id || l.id)).length;
+    )}
+    {canManage && (
+      <button
+        type="button"
+        onClick={() => onAddLesson(mId)}
+        className="mt-2 inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-[#0F766E] hover:bg-white/70 hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+      >
+        <Plus size={14} weight="bold" aria-hidden="true" />
+        {t('player.addLesson')}
+      </button>
+    )}
+  </>
+);
 
 const ModuleCard = ({
   mod,
@@ -177,7 +134,7 @@ const ModuleCard = ({
     );
   }
 
-  const mId = mod._id || mod.id || mIdx;
+  const mId = getEntityId(mod, mIdx);
   const lessons = Array.isArray(mod.lesson) ? mod.lesson : [];
   const showProgress = showModuleProgress && lessons.length > 0;
   const doneInMod = showProgress ? countCompletedInModule(lessons, isLessonCompleted) : 0;
@@ -185,52 +142,26 @@ const ModuleCard = ({
   return (
     <div className="overflow-hidden rounded-xl border border-[#99F6E4] bg-white shadow-xs">
       <div className="border-b border-[#CCFBF1] bg-[#E6F7F5] px-4 py-3 text-start">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-block rounded bg-[#FEF3C7] px-2 py-0.5 font-mono-tabular text-[11px] font-semibold text-[#92400E]">
-                {t('player.moduleLabel', { num: String(mIdx + 1).padStart(2, '0') })}
-              </span>
-              {showProgress && (
-                <span className="font-mono-tabular text-[11px] font-semibold text-[#0F766E]">
-                  {doneInMod}/{lessons.length}
-                </span>
-              )}
-            </div>
-            <h3 className="mt-1.5 font-display text-sm font-semibold text-[#0D2E2F]">
-              <bdi>{mod.title}</bdi>
-            </h3>
-          </div>
-
-          {canManage && (
-            <ModuleActions
-              mod={mod}
-              mId={mId}
-              onEditModule={onEditModule}
-              onDeleteModule={onDeleteModule}
-              t={t}
-            />
-          )}
-        </div>
-
+        <ModuleHeaderTop
+          mod={mod}
+          mIdx={mIdx}
+          mId={mId}
+          showProgress={showProgress}
+          doneInMod={doneInMod}
+          totalLessons={lessons.length}
+          canManage={canManage}
+          onEditModule={onEditModule}
+          onDeleteModule={onDeleteModule}
+          t={t}
+        />
         {showProgress && <ModuleProgressBar doneInMod={doneInMod} total={lessons.length} />}
-
-        {mod.description && (
-          <p className="mt-1.5 text-xs leading-relaxed text-[#335C5D]">
-            <bdi>{mod.description}</bdi>
-          </p>
-        )}
-
-        {canManage && (
-          <button
-            type="button"
-            onClick={() => onAddLesson(mId)}
-            className="mt-2 inline-flex min-h-[36px] items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-[#0F766E] hover:bg-white/70 hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
-          >
-            <Plus size={14} weight="bold" aria-hidden="true" />
-            {t('player.addLesson')}
-          </button>
-        )}
+        <ModuleHeaderDetails
+          description={mod.description}
+          mId={mId}
+          canManage={canManage}
+          onAddLesson={onAddLesson}
+          t={t}
+        />
       </div>
 
       <ModuleLessonsList
@@ -303,25 +234,22 @@ export const CourseSyllabusSidebar = ({
         {modules.length === 0 ? (
           <EmptyModulesState canManage={canManage} onAddModule={onAddModule} t={t} />
         ) : (
-          modules.map((mod, mIdx) => {
-            const key = typeof mod === 'string' ? mod : mod._id || mod.id || mIdx;
-            return (
-              <ModuleCard
-                key={key}
-                mod={mod}
-                mIdx={mIdx}
-                showModuleProgress={showModuleProgress}
-                canManage={canManage}
-                selectedLessonId={selectedLessonId}
-                isLessonCompleted={isLessonCompleted}
-                onSelectLesson={onSelectLesson}
-                onEditModule={onEditModule}
-                onDeleteModule={onDeleteModule}
-                onAddLesson={onAddLesson}
-                t={t}
-              />
-            );
-          })
+          modules.map((mod, mIdx) => (
+            <ModuleCard
+              key={typeof mod === 'string' ? mod : getEntityId(mod, mIdx)}
+              mod={mod}
+              mIdx={mIdx}
+              showModuleProgress={showModuleProgress}
+              canManage={canManage}
+              selectedLessonId={selectedLessonId}
+              isLessonCompleted={isLessonCompleted}
+              onSelectLesson={onSelectLesson}
+              onEditModule={onEditModule}
+              onDeleteModule={onDeleteModule}
+              onAddLesson={onAddLesson}
+              t={t}
+            />
+          ))
         )}
       </div>
     </aside>
