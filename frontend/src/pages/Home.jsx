@@ -142,7 +142,7 @@ export const Home = () => {
           </div>
           <Link
             to="/courses"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[#CCFBF1] px-3.5 py-2 text-sm font-semibold text-[#0F766E] transition-colors hover:bg-[#99F6E4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg bg-[#CCFBF1] px-4 py-2 text-sm font-semibold text-[#0F766E] transition-colors hover:bg-[#99F6E4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
           >
             {t('home.viewFullCatalog')}
             <ArrowRight size={15} weight="bold" aria-hidden="true" className="rtl:rotate-180" />
@@ -177,25 +177,19 @@ export const Home = () => {
                       >
                         {formatCount(moduleCount, 'module')}
                       </span>
-                      <h3
-                        dir="auto"
-                        className="mt-3 font-display text-lg font-semibold leading-snug text-[#0D2E2F]"
-                      >
-                        {course.title}
+                      <h3 className="mt-3 text-start font-display text-lg font-semibold leading-snug text-[#0D2E2F]">
+                        <bdi>{course.title}</bdi>
                       </h3>
-                      <p
-                        dir="auto"
-                        className="mt-2 line-clamp-3 text-sm leading-relaxed text-[#335C5D]"
-                      >
-                        {course.description}
+                      <p className="mt-2 line-clamp-3 text-start text-sm leading-relaxed text-[#335C5D]">
+                        <bdi>{course.description}</bdi>
                       </p>
                     </div>
                   </div>
 
-                  <div className="border-t border-[#CCFBF1] bg-[#F0FDFA]/50 px-6 py-3.5">
+                  <div className="border-t border-[#CCFBF1] bg-[#F0FDFA]/50 px-6 py-3">
                     <Link
                       to={`/course/${id}`}
-                      className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0F766E] hover:text-[#0B3B3C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+                      className="inline-flex min-h-[40px] items-center gap-1.5 py-1.5 text-sm font-semibold text-[#0F766E] hover:text-[#0B3B3C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
                     >
                       {userToken ? t('home.openCourse') : t('home.signInToView')}
                       <ArrowRight size={14} weight="bold" aria-hidden="true" className="rtl:rotate-180" />
@@ -210,7 +204,7 @@ export const Home = () => {
             <p className="text-sm text-[#335C5D]">{t('home.offlineNote')}</p>
             <Link
               to="/courses"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E]"
+              className="mt-4 inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-[#0F766E] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#115E59]"
             >
               {t('home.openCatalog')}
             </Link>

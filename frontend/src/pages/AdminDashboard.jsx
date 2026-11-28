@@ -3,6 +3,7 @@ import { ShieldCheck, UserPlus } from '@phosphor-icons/react';
 import { adminAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useToast } from '../context/ToastContext';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { CreateStaffModal } from '../components/admin/CreateStaffModal';
@@ -57,8 +58,11 @@ const AdminHeroHeader = ({ callerRole, isSuperAdmin, onAddStaff, t }) => (
 );
 
 const getNextTabIndex = (key, idx, count) => {
-  if (key === 'ArrowRight') return (idx + 1) % count;
-  if (key === 'ArrowLeft') return (idx - 1 + count) % count;
+  const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+  const forwardKey = isRtl ? 'ArrowLeft' : 'ArrowRight';
+  const backwardKey = isRtl ? 'ArrowRight' : 'ArrowLeft';
+  if (key === forwardKey) return (idx + 1) % count;
+  if (key === backwardKey) return (idx - 1 + count) % count;
   if (key === 'Home') return 0;
   if (key === 'End') return count - 1;
   return -1;
@@ -83,7 +87,7 @@ const AdminTabBar = ({ tabs, activeTab, onSelectTab, t }) => {
       {tabs.map((tab, idx) => {
         const Icon = tab.icon;
         const active = activeTab === tab.id;
-        const tabStyle = active ? 'bg-[#0D9488] text-white' : 'text-[#335C5D] hover:bg-[#F0FDFA] hover:text-[#0B3B3C]';
+        const tabStyle = active ? 'bg-[#0F766E] text-white' : 'text-[#335C5D] hover:bg-[#F0FDFA] hover:text-[#0B3B3C]';
         return (
           <button
             key={tab.id}
@@ -132,7 +136,6 @@ const AdminTabContent = ({
         totalPages={usersState.usersTotalPages}
         currentUserId={currentUserId}
         isSuperAdmin={isSuperAdmin}
-        onOpenCreateStaff={() => handlers.setShowCreateStaff(true)}
         onPageChange={usersState.setUsersPage}
         filters={handlers.userFilters}
         actions={handlers.userActions}
@@ -148,9 +151,11 @@ const AdminTabContent = ({
         page={coursesState.coursesPage}
         totalPages={coursesState.coursesTotalPages}
         searchInput={coursesState.courseSearchInput}
+        activeSearch={coursesState.courseSearch}
         isSuperAdmin={isSuperAdmin}
         onSearchInputChange={coursesState.setCourseSearchInput}
         onSearchSubmit={handlers.onCourseSearchSubmit}
+        onClearSearch={handlers.onClearCourseSearch}
         onPageChange={coursesState.setCoursesPage}
         onOpenEnrollments={handlers.setEnrollmentsTarget}
         onOpenTransfer={handlers.setTransferTarget}
@@ -261,6 +266,11 @@ const createDashboardHandlers = ({
     coursesState.setCoursesPage(1);
     coursesState.setCourseSearch(coursesState.courseSearchInput.trim());
   },
+  onClearCourseSearch: () => {
+    coursesState.setCourseSearchInput('');
+    coursesState.setCourseSearch('');
+    coursesState.setCoursesPage(1);
+  },
   onSettingsFieldChange: (field, value) => {
     if (successMsg) setSuccessMsg('');
     settingsState.setSettingsForm((p) => ({ ...p, [field]: value }));
@@ -271,6 +281,7 @@ const createDashboardHandlers = ({
   },
   userFilters: {
     searchInput: usersState.userSearchInput,
+    activeSearch: usersState.userSearch,
     roleFilter: usersState.roleFilter,
     statusFilter: usersState.statusFilter,
     onSearchInputChange: usersState.setUserSearchInput,
@@ -278,6 +289,18 @@ const createDashboardHandlers = ({
       e.preventDefault();
       usersState.setUsersPage(1);
       usersState.setUserSearch(usersState.userSearchInput.trim());
+    },
+    onClearSearch: () => {
+      usersState.setUserSearchInput('');
+      usersState.setUserSearch('');
+      usersState.setUsersPage(1);
+    },
+    onClearAll: () => {
+      usersState.setUserSearchInput('');
+      usersState.setUserSearch('');
+      usersState.setRoleFilter('all');
+      usersState.setStatusFilter('all');
+      usersState.setUsersPage(1);
     },
     onRoleFilterChange: (val) => {
       usersState.setUsersPage(1);
@@ -307,11 +330,20 @@ const createDashboardHandlers = ({
 export const AdminDashboard = () => {
   const { currentUser } = useAuth();
   const { t, tServer } = useLanguage();
+  const { addToast } = useToast();
   const isSuperAdmin = currentUser?.role === 'super_admin';
 
   const [activeTab, setActiveTab] = useState('overview');
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const notifySuccess = useCallback(
+    (msg) => {
+      setSuccessMsg(msg);
+      if (msg) addToast(msg, 'success');
+    },
+    [addToast]
+  );
   const [showCreateStaff, setShowCreateStaff] = useState(false);
   const [deleteUserTarget, setDeleteUserTarget] = useState(null);
   const [deletingUser, setDeletingUser] = useState(false);
@@ -322,7 +354,7 @@ export const AdminDashboard = () => {
   const usersState = useAdminUsers(activeTab, setError);
   const coursesState = useAdminCourses(activeTab, setError);
   const staffState = useAdminStaffPool(activeTab, isSuperAdmin);
-  const settingsState = useAdminSettings(activeTab, isSuperAdmin, setError, setSuccessMsg, t);
+  const settingsState = useAdminSettings(activeTab, isSuperAdmin, setError, notifySuccess, t);
   const auditState = useAdminAuditLogs(activeTab, isSuperAdmin, setError);
 
   const refreshGovernanceViews = () => {
@@ -336,7 +368,7 @@ export const AdminDashboard = () => {
     setSuccessMsg('');
     try {
       await fn();
-      setSuccessMsg(successText);
+      notifySuccess(successText);
       refreshGovernanceViews();
     } catch (err) {
       setError(err.message || fallbackError);
@@ -363,7 +395,7 @@ export const AdminDashboard = () => {
   }, [deletingUser]);
 
   const handlers = createDashboardHandlers({
-    coursesState, usersState, settingsState, auditState, successMsg, setSuccessMsg,
+    coursesState, usersState, settingsState, auditState, successMsg, setSuccessMsg: notifySuccess,
     setActiveTab, setShowCreateStaff, setEnrollmentsTarget, setTransferTarget,
     setDeleteUserTarget, runUserMutation, t,
   });
@@ -408,7 +440,7 @@ export const AdminDashboard = () => {
         coursesState={coursesState}
         usersState={usersState}
         fetchStats={fetchStats}
-        setSuccessMsg={setSuccessMsg}
+        setSuccessMsg={notifySuccess}
         t={t}
       />
     </div>

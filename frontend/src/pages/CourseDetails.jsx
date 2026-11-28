@@ -8,11 +8,7 @@ import {
   Circle,
   FilmSlate,
   List,
-  LockKey,
   PencilSimple,
-  Play,
-  Plus,
-  SealCheck,
   Trash,
   VideoCameraSlash,
   X,
@@ -20,24 +16,72 @@ import {
 import { coursesAPI, lessonsAPI, modulesAPI, progressAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useToast } from '../context/ToastContext';
 import { canManageCourse } from '../utils/roleUtils';
 import { CreateModuleModal } from '../components/CreateModuleModal';
 import { CreateLessonModal } from '../components/CreateLessonModal';
 import { EditCourseModal } from '../components/EditCourseModal';
 import { EditModuleModal } from '../components/EditModuleModal';
 import { EditLessonModal } from '../components/EditLessonModal';
+import { CourseHeader } from '../components/course/CourseHeader';
+import { CourseEnrollmentGate } from '../components/course/CourseEnrollmentGate';
+import { CourseSyllabusSidebar } from '../components/course/CourseSyllabusSidebar';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { getYouTubeEmbedUrl, isDemoPlaceholderVideo } from '../utils/youtube';
 
-const InstructorByline = ({ instructor, t }) => {
-  if (!instructor?.name) return null;
-  const specialtySuffix = instructor.specialty ? ` · ${instructor.specialty}` : '';
+const CourseDetailsSkeleton = () => (
+  <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8" role="status" aria-busy="true">
+    <div className="h-28 animate-pulse rounded-2xl border border-[#99F6E4] bg-white" />
+    <div className="mt-6 grid gap-6 lg:grid-cols-12">
+      <div className="h-96 animate-pulse rounded-2xl border border-[#99F6E4] bg-white lg:col-span-4" />
+      <div className="h-96 animate-pulse rounded-2xl border border-[#99F6E4] bg-white lg:col-span-8" />
+    </div>
+  </div>
+);
+
+const LessonVideoTheater = ({ videoUrl, lessonTitle, t }) => {
+  if (!videoUrl) return null;
+
+  if (isDemoPlaceholderVideo(videoUrl)) {
+    return (
+      <div className="mb-6 overflow-hidden rounded-xl border border-[#1E6466] bg-[#0B3B3C]">
+        <div className="flex aspect-video flex-col items-center justify-center px-6 text-center text-white">
+          <FilmSlate size={36} weight="duotone" aria-hidden="true" className="text-[#F59E0B]" />
+          <p className="mt-3 font-display text-base font-semibold">{t('player.placeholderTitle')}</p>
+          <p className="mt-1 max-w-md text-xs leading-relaxed text-[#CCFBF1]/80">
+            {t('player.placeholderBody', { url: videoUrl })}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const embedUrl = getYouTubeEmbedUrl(videoUrl);
+  if (embedUrl) {
+    return (
+      <div className="mb-6 overflow-hidden rounded-xl border border-[#1E6466] bg-[#0B3B3C]">
+        <div className="aspect-video w-full">
+          <iframe
+            src={embedUrl}
+            title={lessonTitle}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="h-full w-full border-0"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <p className="mt-1.5 text-xs font-semibold text-[#FBBF24]">
-      {t('courses.byInstructor', { name: instructor.name })}
-      {specialtySuffix}
-    </p>
+    <div className="mb-6 overflow-hidden rounded-xl border border-[#1E6466] bg-[#0B3B3C]">
+      <div className="flex aspect-video flex-col items-center justify-center px-6 text-center text-white">
+        <VideoCameraSlash size={34} weight="duotone" aria-hidden="true" className="text-[#99F6E4]" />
+        <p className="mt-3 text-sm font-medium">{t('player.unsupportedVideo')}</p>
+        <p className="mt-1 text-xs text-[#99F6E4]/80">{t('player.unsupportedVideoHint')}</p>
+      </div>
+    </div>
   );
 };
 
@@ -46,6 +90,7 @@ export const CourseDetails = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { currentUser, userLoading } = useAuth();
   const { t, formatCount, tServer } = useLanguage();
+  const { addToast } = useToast();
 
   const [course, setCourse] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +105,7 @@ export const CourseDetails = () => {
     () => searchParams.get('lesson') || null
   );
   const [mobileSyllabusOpen, setMobileSyllabusOpen] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
 
   const [showModuleModal, setShowModuleModal] = useState(false);
   const [showLessonModal, setShowLessonModal] = useState(false);
@@ -190,6 +236,7 @@ export const CourseDetails = () => {
     try {
       await coursesAPI.enroll(id);
       await fetchCourseData();
+      addToast(t('player.enrolledSuccess'), 'success');
     } catch (err) {
       setError(err.message || 'Failed to enroll in course');
     } finally {
@@ -231,11 +278,11 @@ export const CourseDetails = () => {
       await progressAPI.completeLesson(lessonId, courseId);
       const updatedP = await progressAPI.getCourseProgress(courseId);
       setProgressData(updatedP);
-      setStatusMessage(
-        wasCompleted
-          ? t('player.progressMarkedUndone', { title: lessonTitle })
-          : t('player.progressMarkedDone', { title: lessonTitle })
-      );
+      const msg = wasCompleted
+        ? t('player.progressMarkedUndone', { title: lessonTitle })
+        : t('player.progressMarkedDone', { title: lessonTitle });
+      setStatusMessage(msg);
+      addToast(msg, 'success');
     } catch (err) {
       setError(err.message || 'Could not update completion status.');
     } finally {
@@ -289,15 +336,7 @@ export const CourseDetails = () => {
     Boolean(progressData?.completedLessons?.includes(lessonId));
 
   if (loading || userLoading) {
-    return (
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="h-28 animate-pulse rounded-2xl border border-[#99F6E4] bg-white" />
-        <div className="mt-6 grid gap-6 lg:grid-cols-12">
-          <div className="h-96 animate-pulse rounded-2xl border border-[#99F6E4] bg-white lg:col-span-4" />
-          <div className="h-96 animate-pulse rounded-2xl border border-[#99F6E4] bg-white lg:col-span-8" />
-        </div>
-      </div>
-    );
+    return <CourseDetailsSkeleton />;
   }
 
   if (!course) {
@@ -308,7 +347,7 @@ export const CourseDetails = () => {
         </AlertBanner>
         <Link
           to="/courses"
-          className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+          className="mt-4 inline-flex min-h-[44px] items-center gap-1.5 py-2 text-sm font-semibold text-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
         >
           <ArrowLeft size={15} aria-hidden="true" className="rtl:rotate-180" />
           {t('player.returnCatalog')}
@@ -321,268 +360,26 @@ export const CourseDetails = () => {
   const totalLessons = progressData?.totalLessons ?? flattenedLessons.length;
   const percentage = progressData?.percentage ?? 0;
 
-  const renderSyllabusList = () => (
-    <div className="space-y-4">
-      {modules.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[#5EEAD4] bg-white p-5 text-center">
-          <p className="text-sm font-medium text-[#0D2E2F]">{t('player.noModulesTitle')}</p>
-          <p className="mt-1 text-xs text-[#335C5D]">
-            {canManage ? t('player.noModulesAdmin') : t('player.noModulesStudent')}
-          </p>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setShowModuleModal(true)}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[#0D9488] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
-            >
-              <Plus size={14} weight="bold" aria-hidden="true" />
-              {t('player.addModule')}
-            </button>
-          )}
-        </div>
-      ) : (
-        modules.map((mod, mIdx) => {
-          if (typeof mod === 'string') {
-            return (
-              <div
-                key={mod}
-                className="rounded-xl border border-[#99F6E4] bg-white p-3 text-xs text-[#335C5D]"
-              >
-                Module ID: {mod}
-              </div>
-            );
-          }
-
-          const mId = mod._id || mod.id || mIdx;
-          const lessons = Array.isArray(mod.lesson) ? mod.lesson : [];
-
-          return (
-            <div
-              key={mId}
-              className="overflow-hidden rounded-xl border border-[#99F6E4] bg-white shadow-xs"
-            >
-              <div className="border-b border-[#CCFBF1] bg-[#E6F7F5] px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="inline-block rounded bg-[#FEF3C7] px-2 py-0.5 font-mono-tabular text-[11px] font-semibold text-[#92400E]">
-                      {t('player.moduleLabel', { num: String(mIdx + 1).padStart(2, '0') })}
-                    </span>
-                    <h3 dir="auto" className="mt-1.5 font-display text-sm font-semibold text-[#0D2E2F]">
-                      {mod.title}
-                    </h3>
-                  </div>
-
-                  {canManage && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setEditingModule(mod)}
-                        aria-label={t('player.editModuleAria', { title: mod.title })}
-                        title={t('modal.editModuleTitle')}
-                        className="rounded p-1 text-[#335C5D] hover:bg-white hover:text-[#0B3B3C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
-                      >
-                        <PencilSimple size={15} aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setDeleteTarget({
-                            type: 'module',
-                            id: mId,
-                            title: mod.title,
-                          })
-                        }
-                        aria-label={t('player.deleteModuleAria', { title: mod.title })}
-                        title={t('player.deleteModuleTitle')}
-                        className="rounded p-1 text-[#335C5D] hover:bg-[#FEF2F2] hover:text-[#DC2626] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]"
-                      >
-                        <Trash size={15} aria-hidden="true" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {mod.description && (
-                  <p dir="auto" className="mt-1 text-xs leading-relaxed text-[#335C5D]">
-                    {mod.description}
-                  </p>
-                )}
-
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveModuleId(mId);
-                      setShowLessonModal(true);
-                    }}
-                    className="mt-2.5 inline-flex items-center gap-1 rounded text-xs font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
-                  >
-                    <Plus size={13} weight="bold" aria-hidden="true" />
-                    {t('player.addLesson')}
-                  </button>
-                )}
-              </div>
-
-              {lessons.length > 0 ? (
-                <ul className="divide-y divide-[#CCFBF1]">
-                  {lessons.map((lessonObj, lIdx) => {
-                    if (typeof lessonObj === 'string') {
-                      return (
-                        <li key={lessonObj} className="px-4 py-2.5 text-xs text-[#52797A]">
-                          Lesson ID: {lessonObj}
-                        </li>
-                      );
-                    }
-
-                    const lId = lessonObj._id || lessonObj.id || lIdx;
-                    const active = lId === selectedLessonId;
-                    const done = isLessonCompleted(lId);
-
-                    return (
-                      <li key={lId}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            selectLesson(lId);
-                            setMobileSyllabusOpen(false);
-                          }}
-                          className={`flex w-full items-start gap-2.5 px-4 py-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0D9488] ${
-                            active
-                              ? 'border-s-4 border-s-[#0D9488] bg-[#CCFBF1]/60 text-[#0B3B3C]'
-                              : 'bg-white text-[#335C5D] hover:bg-[#F0FDFA]'
-                          }`}
-                        >
-                          {done ? (
-                            <CheckCircle
-                              size={17}
-                              weight="fill"
-                              aria-hidden="true"
-                              className="mt-0.5 shrink-0 text-[#059669]"
-                            />
-                          ) : active ? (
-                            <Play
-                              size={16}
-                              weight="fill"
-                              aria-hidden="true"
-                              className="mt-0.5 shrink-0 text-[#D97706]"
-                            />
-                          ) : (
-                            <Circle
-                              size={16}
-                              aria-hidden="true"
-                              className="mt-0.5 shrink-0 text-[#5EEAD4]"
-                            />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p
-                              dir="auto"
-                              className={`text-sm leading-snug ${
-                                active ? 'font-semibold text-[#0B3B3C]' : 'font-medium'
-                              }`}
-                            >
-                              {lessonObj.title}
-                            </p>
-                            {lessonObj.videoUrl && (
-                              <span className="mt-1 inline-flex items-center gap-1 text-[11px] text-[#52797A]">
-                                <FilmSlate size={12} aria-hidden="true" className="text-[#0D9488]" />
-                                {t('player.videoIncluded')}
-                              </span>
-                            )}
-                          </div>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <p className="px-4 py-3 text-xs text-[#52797A]">
-                  {t('player.noLessonsInModule')}
-                </p>
-              )}
-            </div>
-          );
-        })
-      )}
-    </div>
-  );
-
   return (
     <div>
-      {/* Screen reader status announcements for progress updates */}
       <div className="sr-only" role="status" aria-live="polite">
         {statusMessage}
       </div>
 
-      {/* Top Ocean Course Header */}
-      <section className="ocean-grid-bg border-b border-[#1E6466] text-white">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <Link
-              to="/courses"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[#99F6E4] hover:text-[#FBBF24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
-            >
-              <ArrowLeft size={15} aria-hidden="true" className="rtl:rotate-180" />
-              {t('player.allCourses')}
-            </Link>
-
-            {canManage && (
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEditModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#2DD4BF]/50 bg-[#114B4D] px-3.5 py-2 text-xs font-semibold text-[#CCFBF1] hover:bg-[#155E61] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
-                >
-                  <PencilSimple size={15} aria-hidden="true" />
-                  {t('player.editCourse')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowModuleModal(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#F59E0B] px-3.5 py-2 text-xs font-bold text-[#0B3B3C] hover:bg-[#FBBF24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FBBF24]"
-                >
-                  <Plus size={15} weight="bold" aria-hidden="true" />
-                  {t('player.addModule')}
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-5 grid gap-6 lg:grid-cols-12 lg:items-end">
-            <div className="lg:col-span-8">
-              <h1 dir="auto" className="font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
-                {course.title}
-              </h1>
-              <InstructorByline instructor={course.instructor} t={t} />
-              <p dir="auto" className="mt-2 max-w-[68ch] text-sm leading-relaxed text-[#CCFBF1]/90 sm:text-base">
-                {course.description}
-              </p>
-            </div>
-
-            {!accessDenied && progressData && (
-              <div className="rounded-xl border border-[#1E6466] bg-[#114B4D] p-4 lg:col-span-4">
-                <div className="flex items-center justify-between gap-2 text-xs font-medium">
-                  <span className="text-[#99F6E4]">{t('player.progressLabel')}</span>
-                  <span className="font-mono-tabular font-semibold text-[#FBBF24]">
-                    {completedCount}/{totalLessons} ({percentage}%)
-                  </span>
-                </div>
-                <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-[#0B3B3C]">
-                  <div
-                    className="h-full rounded-full bg-[#2DD4BF] transition-all duration-300"
-                    style={{ width: `${percentage}%` }}
-                  />
-                </div>
-                {percentage === 100 && totalLessons > 0 && (
-                  <p className="mt-2.5 inline-flex items-center gap-1.5 text-xs font-semibold text-[#6EE7B7]">
-                    <SealCheck size={15} weight="fill" aria-hidden="true" />
-                    {t('player.allCompleted')}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+      <CourseHeader
+        course={course}
+        canManage={canManage}
+        accessDenied={accessDenied}
+        progressData={progressData}
+        completedCount={completedCount}
+        totalLessons={totalLessons}
+        percentage={percentage}
+        focusMode={focusMode}
+        onToggleFocusMode={() => setFocusMode((prev) => !prev)}
+        onEditCourse={() => setShowEditModal(true)}
+        onAddModule={() => setShowModuleModal(true)}
+        t={t}
+      />
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {error && (
@@ -591,34 +388,15 @@ export const CourseDetails = () => {
           </AlertBanner>
         )}
 
-        {/* Pre-Enrollment Gate or Active Workspace */}
         {accessDenied ? (
-          <div className="rounded-2xl border border-[#99F6E4] bg-white p-8 text-center shadow-xs sm:p-12">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#FEF3C7] text-[#D97706]">
-              <LockKey size={24} weight="duotone" aria-hidden="true" />
-            </div>
-            <h2 className="mt-4 font-display text-2xl font-bold text-[#0D2E2F]">
-              {t('player.enrollGateTitle')}
-            </h2>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#335C5D]">
-              {t('player.enrollGateBody')}
-            </p>
-            {isStudent ? (
-              <button
-                type="button"
-                onClick={handleEnroll}
-                disabled={enrolling}
-                className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[#0D9488] px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
-              >
-                {enrolling ? t('player.enrolling') : t('player.enrollBtn')}
-                <ArrowRight size={16} weight="bold" aria-hidden="true" className="rtl:rotate-180" />
-              </button>
-            ) : (
-              <p className="mt-5 text-xs font-medium text-[#52797A]">
-                {t('player.enrollStudentOnly')}
-              </p>
-            )}
-          </div>
+          <CourseEnrollmentGate
+            isStudent={isStudent}
+            enrolling={enrolling}
+            onEnroll={handleEnroll}
+            moduleCount={modules.length}
+            formatCount={formatCount}
+            t={t}
+          />
         ) : (
           <div>
             {!isPopulated && modules.length > 0 && (
@@ -627,23 +405,16 @@ export const CourseDetails = () => {
               </AlertBanner>
             )}
 
-            {/* Mobile Syllabus Trigger */}
             <div className="mb-4 flex items-center justify-between lg:hidden">
               <button
                 type="button"
                 aria-expanded={mobileSyllabusOpen}
                 aria-controls="course-curriculum-sidebar"
                 onClick={() => setMobileSyllabusOpen((prev) => !prev)}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#99F6E4] bg-white px-4 py-2 text-sm font-semibold text-[#0D2E2F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-[#99F6E4] bg-white px-4 py-2 text-sm font-semibold text-[#0D2E2F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
               >
-                {mobileSyllabusOpen ? (
-                  <X size={16} aria-hidden="true" />
-                ) : (
-                  <List size={16} aria-hidden="true" />
-                )}
-                {mobileSyllabusOpen
-                  ? t('player.hideCurriculum')
-                  : t('player.showCurriculum')}
+                {mobileSyllabusOpen ? <X size={16} aria-hidden="true" /> : <List size={16} aria-hidden="true" />}
+                {mobileSyllabusOpen ? t('player.hideCurriculum') : t('player.showCurriculum')}
               </button>
 
               <span className="font-mono-tabular rounded bg-[#CCFBF1] px-2.5 py-1 text-xs font-semibold text-[#0F766E]">
@@ -652,104 +423,59 @@ export const CourseDetails = () => {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
-              {/* Curriculum Sidebar */}
-              <aside
-                id="course-curriculum-sidebar"
-                aria-label={t('player.curriculum')}
-                className={`${
-                  mobileSyllabusOpen ? 'block' : 'hidden'
-                } lg:sticky lg:top-20 lg:col-span-4 lg:block`}
-              >
-                <div className="mb-3 hidden items-center justify-between lg:flex">
-                  <h2 className="font-display text-sm font-semibold text-[#0D2E2F]">
-                    {t('player.curriculum')}
-                  </h2>
-                  <span className="font-mono-tabular text-xs font-medium text-[#0F766E]">
-                    {formatCount(modules.length, 'module')} ·{' '}
-                    {formatCount(flattenedLessons.length, 'lesson')}
-                  </span>
-                </div>
-                {renderSyllabusList()}
-              </aside>
+              <CourseSyllabusSidebar
+                modules={modules}
+                flattenedCount={flattenedLessons.length}
+                canManage={canManage}
+                isStudent={isStudent}
+                hasProgress={Boolean(progressData)}
+                focusMode={focusMode}
+                selectedLessonId={selectedLessonId}
+                isLessonCompleted={isLessonCompleted}
+                mobileSyllabusOpen={mobileSyllabusOpen}
+                onSelectLesson={(lessonId) => {
+                  selectLesson(lessonId);
+                  setMobileSyllabusOpen(false);
+                }}
+                onAddModule={() => setShowModuleModal(true)}
+                onEditModule={(mod) => setEditingModule(mod)}
+                onDeleteModule={(moduleId, title) =>
+                  setDeleteTarget({ type: 'module', id: moduleId, title })
+                }
+                onAddLesson={(moduleId) => {
+                  setActiveModuleId(moduleId);
+                  setShowLessonModal(true);
+                }}
+                formatCount={formatCount}
+                t={t}
+              />
 
-              {/* Active Lesson Player Stage */}
               <section
                 aria-label={t('player.activeLessonAria')}
-                className="overflow-hidden rounded-2xl border border-[#99F6E4] bg-white shadow-xs lg:col-span-8"
+                className={`overflow-hidden rounded-2xl border border-[#99F6E4] border-t-4 border-t-[#0F766E] bg-white shadow-xs ${
+                  focusMode ? 'lg:col-span-12 mx-auto w-full max-w-4xl' : 'lg:col-span-8'
+                }`}
               >
-                <div className="h-1.5 w-full bg-gradient-to-r from-[#0D9488] to-[#F59E0B]" />
                 <div className="p-6 sm:p-8">
                   {activeEntry ? (
                     <div>
-                      {/* Deep Ocean Video Theater */}
-                      {activeEntry.lesson.videoUrl && (
-                        <div className="mb-6 overflow-hidden rounded-xl border border-[#1E6466] bg-[#0B3B3C]">
-                          {isDemoPlaceholderVideo(activeEntry.lesson.videoUrl) ? (
-                            <div className="flex aspect-video flex-col items-center justify-center px-6 text-center text-white">
-                              <FilmSlate
-                                size={36}
-                                weight="duotone"
-                                aria-hidden="true"
-                                className="text-[#F59E0B]"
-                              />
-                              <p className="mt-3 font-display text-base font-semibold">
-                                {t('player.placeholderTitle')}
-                              </p>
-                              <p className="mt-1 max-w-md text-xs leading-relaxed text-[#CCFBF1]/80">
-                                {t('player.placeholderBody', {
-                                  url: activeEntry.lesson.videoUrl,
-                                })}
-                              </p>
-                            </div>
-                          ) : (() => {
-                              const embedUrl = getYouTubeEmbedUrl(
-                                activeEntry.lesson.videoUrl
-                              );
-                              if (embedUrl) {
-                                return (
-                                  <div className="aspect-video w-full">
-                                    <iframe
-                                      src={embedUrl}
-                                      title={activeEntry.lesson.title}
-                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                      allowFullScreen
-                                      className="h-full w-full border-0"
-                                    />
-                                  </div>
-                                );
-                              }
-                              return (
-                                <div className="flex aspect-video flex-col items-center justify-center px-6 text-center text-white">
-                                  <VideoCameraSlash
-                                    size={34}
-                                    weight="duotone"
-                                    aria-hidden="true"
-                                    className="text-[#99F6E4]"
-                                  />
-                                  <p className="mt-3 text-sm font-medium">
-                                    {t('player.unsupportedVideo')}
-                                  </p>
-                                  <p className="mt-1 text-xs text-[#99F6E4]/80">
-                                    {t('player.unsupportedVideoHint')}
-                                  </p>
-                                </div>
-                              );
-                            })()}
-                        </div>
-                      )}
+                      <LessonVideoTheater
+                        videoUrl={activeEntry.lesson.videoUrl}
+                        lessonTitle={activeEntry.lesson.title}
+                        t={t}
+                      />
 
-                      {/* Lesson Header */}
                       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#CCFBF1] pb-5">
-                        <div>
-                          <span dir="auto" className="inline-block rounded-md bg-[#CCFBF1] px-2.5 py-0.5 text-xs font-semibold text-[#0F766E]">
-                            {activeEntry.moduleTitle}
+                        <div className="min-w-0 flex-1 text-start">
+                          <span className="inline-block rounded-md bg-[#CCFBF1] px-2.5 py-0.5 text-xs font-semibold text-[#0F766E]">
+                            <bdi>{activeEntry.moduleTitle}</bdi>
                           </span>
-                          <h2 dir="auto" className="mt-2 font-display text-2xl font-bold tracking-tight text-[#0D2E2F]">
-                            {activeEntry.lesson.title}
+                          <h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-[#0D2E2F]">
+                            <bdi>{activeEntry.lesson.title}</bdi>
                           </h2>
                           {activeEntry.lesson.description && (
-                            <p dir="auto" className="mt-1.5 text-sm text-[#335C5D]">
-                              {activeEntry.lesson.description}
+                            <p className="mt-1.5 text-sm text-[#335C5D]">
+                              <bdi>{activeEntry.lesson.description}</bdi>
                             </p>
                           )}
                         </div>
@@ -759,7 +485,7 @@ export const CourseDetails = () => {
                             <button
                               type="button"
                               onClick={() => setEditingLesson(activeEntry.lesson)}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-[#99F6E4] bg-[#F0FDFA] px-3 py-1.5 text-xs font-medium text-[#0D2E2F] hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+                              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#99F6E4] bg-[#F0FDFA] px-3.5 py-2 text-xs font-medium text-[#0D2E2F] hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
                             >
                               <PencilSimple size={14} aria-hidden="true" />
                               {t('player.editLesson')}
@@ -774,7 +500,7 @@ export const CourseDetails = () => {
                                   title: activeEntry.lesson.title,
                                 })
                               }
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-3 py-1.5 text-xs font-medium text-[#DC2626] hover:bg-[#FEE2E2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]"
+                              className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-[#FECACA] bg-[#FEF2F2] px-3.5 py-2 text-xs font-medium text-[#DC2626] hover:bg-[#FEE2E2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]"
                             >
                               <Trash size={14} aria-hidden="true" />
                               {t('common.delete')}
@@ -783,24 +509,20 @@ export const CourseDetails = () => {
                         )}
                       </div>
 
-                      {/* Reading Content */}
                       <div
                         dir="auto"
-                        className="mt-6 max-w-[70ch] text-base leading-relaxed whitespace-pre-line text-[#134E4A]"
+                        className="mt-6 max-w-[70ch] whitespace-pre-line text-start text-base leading-relaxed text-[#134E4A]"
                       >
                         {activeEntry.lesson.content}
                       </div>
 
-                      {/* Footer Controls */}
                       <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-[#CCFBF1] pt-6">
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
                             disabled={!prevEntry}
-                            onClick={() =>
-                              prevEntry && selectLesson(prevEntry.lessonId, true)
-                            }
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#99F6E4] bg-[#F0FDFA] px-3.5 py-2 text-sm font-medium text-[#0D2E2F] transition-colors hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] disabled:cursor-not-allowed disabled:opacity-40"
+                            onClick={() => prevEntry && selectLesson(prevEntry.lessonId, true)}
+                            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[#99F6E4] bg-[#F0FDFA] px-4 py-2 text-sm font-medium text-[#0D2E2F] transition-colors hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <ArrowLeft size={15} aria-hidden="true" className="rtl:rotate-180" />
                             {t('player.prevLesson')}
@@ -808,10 +530,8 @@ export const CourseDetails = () => {
                           <button
                             type="button"
                             disabled={!nextEntry}
-                            onClick={() =>
-                              nextEntry && selectLesson(nextEntry.lessonId, true)
-                            }
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-[#99F6E4] bg-[#F0FDFA] px-3.5 py-2 text-sm font-medium text-[#0D2E2F] transition-colors hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] disabled:cursor-not-allowed disabled:opacity-40"
+                            onClick={() => nextEntry && selectLesson(nextEntry.lessonId, true)}
+                            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-lg border border-[#99F6E4] bg-[#F0FDFA] px-4 py-2 text-sm font-medium text-[#0D2E2F] transition-colors hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {t('player.nextLesson')}
                             <ArrowRight size={15} aria-hidden="true" className="rtl:rotate-180" />
@@ -824,15 +544,12 @@ export const CourseDetails = () => {
                             aria-pressed={isLessonCompleted(activeEntry.lessonId)}
                             disabled={markingComplete}
                             onClick={() =>
-                              handleToggleComplete(
-                                activeEntry.lessonId,
-                                activeEntry.lesson.title
-                              )
+                              handleToggleComplete(activeEntry.lessonId, activeEntry.lesson.title)
                             }
-                            className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60 ${
+                            className={`inline-flex min-h-[44px] items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60 ${
                               isLessonCompleted(activeEntry.lessonId)
                                 ? 'bg-[#D1FAE5] text-[#065F46] ring-1 ring-[#6EE7B7] hover:bg-[#A7F3D0]'
-                                : 'bg-[#0D9488] text-white hover:bg-[#0F766E]'
+                                : 'bg-[#0F766E] text-white hover:bg-[#115E59]'
                             }`}
                           >
                             {isLessonCompleted(activeEntry.lessonId) ? (
@@ -852,7 +569,7 @@ export const CourseDetails = () => {
                     </div>
                   ) : (
                     <div className="py-12 text-center">
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#CCFBF1] text-[#0D9488]">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#CCFBF1] text-[#0F766E]">
                         <BookOpen size={24} weight="duotone" aria-hidden="true" />
                       </div>
                       <h2 className="mt-4 font-display text-lg font-semibold text-[#0D2E2F]">
@@ -872,7 +589,6 @@ export const CourseDetails = () => {
         )}
       </div>
 
-      {/* Modals */}
       <CreateModuleModal
         show={showModuleModal}
         onHide={() => setShowModuleModal(false)}

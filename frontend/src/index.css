@@ -4,6 +4,23 @@
   --font-display: "Space Grotesk", "IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "IBM Plex Sans", "IBM Plex Sans Arabic", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-canvas: #F0FDFA;
+  --color-surface: #FFFFFF;
+  --color-surface-subtle: #E6F7F5;
+  --color-ocean: #0B3B3C;
+  --color-ocean-elevated: #114B4D;
+  --color-ink-primary: #0D2E2F;
+  --color-ink-secondary: #335C5D;
+  --color-ink-muted: #4A6F70;
+  --color-primary: #0F766E;
+  --color-primary-accent: #0D9488;
+  --color-primary-hover: #115E59;
+  --color-accent: #F59E0B;
+  --color-accent-hover: #FBBF24;
+  --color-border: #99F6E4;
+  --color-border-subtle: #CCFBF1;
+  --color-danger: #DC2626;
 }
 
 :root {
@@ -14,9 +31,9 @@
   --bg-ocean-elevated: #114B4D;
   --ink-primary: #0D2E2F;
   --ink-secondary: #335C5D;
-  --ink-muted: #52797A;
-  --accent-primary: #0D9488;
-  --accent-hover: #0F766E;
+  --ink-muted: #4A6F70;
+  --accent-primary: #0F766E;
+  --accent-hover: #115E59;
   --accent-amber: #D97706;
   --accent-amber-bright: #F59E0B;
   --status-complete: #059669;
@@ -92,4 +109,129 @@ footer a:focus-visible {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Dark Study Mode (html.dark) — high-contrast deep ocean palette */
+html.dark {
+  color-scheme: dark;
+  background-color: #071e1f;
+  color: #f0fdfa;
+}
+
+html.dark body {
+  background-color: #071e1f;
+  color: #f0fdfa;
+}
+
+html.dark .bg-\[\#F0FDFA\]:not(footer):not(.ocean-grid-bg) {
+  background-color: #071e1f;
+}
+
+html.dark header {
+  background-color: rgba(11, 59, 60, 0.96);
+  border-color: #1e5255;
+}
+
+html.dark header .bg-white,
+html.dark main .bg-white,
+html.dark [role="dialog"].bg-white,
+html.dark section.bg-white {
+  background-color: #0d2c2e;
+}
+
+html.dark main [class*="bg-[#E6F7F5]"],
+html.dark main [class*="bg-[#F0FDFA]"],
+html.dark header [class*="bg-[#F0FDFA]"],
+html.dark [role="dialog"] [class*="bg-[#F0FDFA]"] {
+  background-color: #113739;
+}
+
+html.dark header [class*="bg-[#CCFBF1]"],
+html.dark main [class*="bg-[#CCFBF1]"],
+html.dark [role="dialog"] [class*="bg-[#CCFBF1]"] {
+  background-color: #164245;
+}
+
+html.dark main .bg-\[\#99F6E4\] {
+  background-color: #1e5255;
+}
+
+html.dark .border-\[\#99F6E4\],
+html.dark .border-\[\#CCFBF1\],
+html.dark .divide-\[\#CCFBF1\] > :not(:last-child) {
+  border-color: #1e5255;
+}
+
+html.dark main .text-\[\#0D2E2F\],
+html.dark main .text-\[\#134E4A\],
+html.dark main .text-\[\#0B3B3C\]:not(.bg-\[\#F59E0B\]):not(.bg-\[\#FDE68A\]):not(.bg-\[\#CCFBF1\]),
+html.dark header .text-\[\#0D2E2F\],
+html.dark header .text-\[\#0B3B3C\],
+html.dark [role="dialog"] .text-\[\#0D2E2F\],
+html.dark [role="dialog"] .text-\[\#134E4A\] {
+  color: #f0fdfa;
+}
+
+html.dark main .text-\[\#335C5D\],
+html.dark header .text-\[\#335C5D\],
+html.dark [role="dialog"] .text-\[\#335C5D\] {
+  color: #b2dfdb;
+}
+
+html.dark main .text-\[\#4A6F70\],
+html.dark main .text-\[\#52797A\],
+html.dark header .text-\[\#4A6F70\],
+html.dark [role="dialog"] .text-\[\#4A6F70\] {
+  color: #80cbc4;
+}
+
+html.dark main .text-\[\#0F766E\]:not(.bg-\[\#F59E0B\]):not(.bg-\[\#FDE68A\]),
+html.dark header .text-\[\#0F766E\],
+html.dark [role="dialog"] .text-\[\#0F766E\] {
+  color: #5eead4;
+}
+
+html.dark main .text-\[\#115E59\],
+html.dark header .text-\[\#115E59\],
+html.dark [role="dialog"] .text-\[\#115E59\] {
+  color: #99f6e4;
+}
+
+html.dark .ocean-grid-bg .text-\[\#F0FDFA\],
+html.dark .bg-\[\#0B3B3C\] .text-\[\#F0FDFA\],
+html.dark .bg-\[\#0F766E\],
+html.dark .bg-\[\#0F766E\] * {
+  color: #ffffff;
+}
+
+html.dark main .bg-\[\#F59E0B\],
+html.dark main .bg-\[\#F59E0B\] * {
+  color: #0b3b3c;
+}
+
+html.dark main input:not([type="checkbox"]):not([type="radio"]),
+html.dark main select,
+html.dark main textarea,
+html.dark [role="dialog"] input:not([type="checkbox"]):not([type="radio"]),
+html.dark [role="dialog"] select,
+html.dark [role="dialog"] textarea {
+  background-color: #092426;
+  color: #f0fdfa;
+  border-color: #1e5255;
+}
+
+html.dark main input::placeholder,
+html.dark main textarea::placeholder,
+html.dark [role="dialog"] input::placeholder,
+html.dark [role="dialog"] textarea::placeholder {
+  color: #80cbc4;
+}
+
+html.dark a:focus-visible,
+html.dark button:focus-visible,
+html.dark input:focus-visible,
+html.dark select:focus-visible,
+html.dark textarea:focus-visible {
+  outline: 2px solid #2dd4bf;
+  outline-offset: 2px;
 }

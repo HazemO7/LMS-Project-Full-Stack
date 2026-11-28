@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft,
   ArrowRight,
   BookOpen,
   CheckCircle,
@@ -16,6 +15,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { canAuthorCourses, canManageCourse } from '../utils/roleUtils';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { Pagination } from '../components/ui/Pagination';
 
 const InstructorCredit = ({ instructor, t }) => {
   if (!instructor?.name) return null;
@@ -124,15 +124,41 @@ export const Courses = () => {
     }
   }, [isStudent, activeTab, page, searchQuery, syncUrlParams]);
 
+  useEffect(() => {
+    if (activeTab !== 'all') return undefined;
+    const trimmed = searchInput.trim();
+    if (trimmed === searchQuery) return undefined;
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSearchQuery(trimmed);
+      syncUrlParams('all', 1, trimmed);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, searchInput, searchQuery, syncUrlParams]);
+
   const handleTabChange = (nextTab) => {
     setActiveTab(nextTab);
     syncUrlParams(nextTab, page, searchQuery);
   };
 
   const handleTabKeyDown = (e) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+    const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+    let targetTab = null;
+
+    if (e.key === 'Home') targetTab = 'all';
+    else if (e.key === 'End') targetTab = 'enrolled';
+    else if (e.key === 'ArrowLeft') {
+      if (isRtl && activeTab === 'all') targetTab = 'enrolled';
+      else if (!isRtl && activeTab === 'enrolled') targetTab = 'all';
+    } else if (e.key === 'ArrowRight') {
+      if (isRtl && activeTab === 'enrolled') targetTab = 'all';
+      else if (!isRtl && activeTab === 'all') targetTab = 'enrolled';
+    }
+
+    if (targetTab) {
       e.preventDefault();
-      handleTabChange(activeTab === 'all' ? 'enrolled' : 'all');
+      handleTabChange(targetTab);
+      document.getElementById(targetTab === 'all' ? 'tab-all' : 'tab-enrolled')?.focus();
     }
   };
 
@@ -201,7 +227,7 @@ export const Courses = () => {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               {activeTab === 'all' && (
                 <form onSubmit={handleSearch} className="flex items-center gap-2">
-                  <div className="relative min-w-[240px] flex-1">
+                  <div className="relative min-w-[220px] flex-1">
                     <MagnifyingGlass
                       size={16}
                       aria-hidden="true"
@@ -213,14 +239,14 @@ export const Courses = () => {
                       placeholder={t('courses.searchPlaceholder')}
                       value={searchInput}
                       onChange={(e) => setSearchInput(e.target.value)}
-                      className="w-full rounded-lg border border-[#2DD4BF]/40 bg-[#114B4D] py-2 ps-9 pe-9 text-sm text-white placeholder:text-[#99F6E4]/65 focus:border-[#F59E0B] focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/30"
+                      className="min-h-[44px] w-full rounded-lg border border-[#2DD4BF]/40 bg-[#114B4D] py-2.5 ps-9 pe-10 text-sm text-white placeholder:text-[#99F6E4]/65 focus:border-[#F59E0B] focus:outline-none focus:ring-2 focus:ring-[#F59E0B]/30"
                     />
                     {(searchInput || searchQuery) && (
                       <button
                         type="button"
                         onClick={clearSearch}
                         aria-label={t('courses.clearSearch')}
-                        className="absolute top-1/2 end-2.5 -translate-y-1/2 rounded p-0.5 text-[#99F6E4] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+                        className="absolute top-1/2 end-1.5 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-[#99F6E4] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
                       >
                         <X size={14} aria-hidden="true" />
                       </button>
@@ -228,7 +254,7 @@ export const Courses = () => {
                   </div>
                   <button
                     type="submit"
-                    className="rounded-lg border border-[#2DD4BF]/50 bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#14B8A6] hover:text-[#0B3B3C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-lg border border-[#2DD4BF]/50 bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#115E59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
                   >
                     {t('courses.searchBtn')}
                   </button>
@@ -238,7 +264,7 @@ export const Courses = () => {
               {canCreate && (
                 <Link
                   to="/course/new"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#F59E0B] px-4 py-2 text-sm font-bold text-[#0B3B3C] transition-colors hover:bg-[#FBBF24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FBBF24]"
+                  className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-[#F59E0B] px-4 py-2.5 text-sm font-bold text-[#0B3B3C] transition-colors hover:bg-[#FBBF24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FBBF24]"
                 >
                   <Plus size={16} weight="bold" aria-hidden="true" />
                   {t('nav.createCourse')}
@@ -266,9 +292,9 @@ export const Courses = () => {
                 aria-selected={activeTab === 'all'}
                 aria-controls="courses-tabpanel"
                 onClick={() => handleTabChange('all')}
-                className={`rounded-md px-3.5 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+                className={`min-h-[40px] rounded-md px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
                   activeTab === 'all'
-                    ? 'bg-[#0D9488] text-white'
+                    ? 'bg-[#0F766E] text-white'
                     : 'text-[#335C5D] hover:text-[#0B3B3C]'
                 }`}
               >
@@ -281,9 +307,9 @@ export const Courses = () => {
                 aria-selected={activeTab === 'enrolled'}
                 aria-controls="courses-tabpanel"
                 onClick={() => handleTabChange('enrolled')}
-                className={`inline-flex items-center gap-1.5 rounded-md px-3.5 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+                className={`inline-flex min-h-[40px] items-center gap-1.5 rounded-md px-3.5 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
                   activeTab === 'enrolled'
-                    ? 'bg-[#0D9488] text-white'
+                    ? 'bg-[#0F766E] text-white'
                     : 'text-[#335C5D] hover:text-[#0B3B3C]'
                 }`}
               >
@@ -316,6 +342,20 @@ export const Courses = () => {
               : catalogCountLabel}
           </p>
         </div>
+
+        {activeTab === 'all' && searchQuery && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-[#4A6F70]">{t('admin.activeFiltersLabel')}</span>
+            <button
+              type="button"
+              onClick={clearSearch}
+              className="inline-flex min-h-[34px] items-center gap-1.5 rounded-full border border-[#99F6E4] bg-white px-3 py-1 text-xs font-semibold text-[#0F766E] transition-colors hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+            >
+              <span>{t('common.activeSearch', { query: searchQuery })}</span>
+              <X size={13} weight="bold" aria-hidden="true" />
+            </button>
+          </div>
+        )}
 
         {error && (
           <AlertBanner variant="error" className="mt-6" onDismiss={() => setError('')}>
@@ -423,26 +463,20 @@ export const Courses = () => {
                           )}
                         </div>
 
-                        <h2
-                          dir="auto"
-                          className="mt-3 font-display text-lg font-semibold leading-snug text-[#0D2E2F]"
-                        >
-                          {course.title}
+                        <h2 className="mt-3 line-clamp-2 text-start font-display text-lg font-semibold leading-snug text-[#0D2E2F]">
+                          <bdi>{course.title}</bdi>
                         </h2>
                         <InstructorCredit instructor={course.instructor} t={t} />
-                        <p
-                          dir="auto"
-                          className="mt-2 line-clamp-3 text-sm leading-relaxed text-[#335C5D]"
-                        >
-                          {course.description}
+                        <p className="mt-2 line-clamp-3 text-start text-sm leading-relaxed text-[#335C5D]">
+                          <bdi>{course.description}</bdi>
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between gap-3 border-t border-[#CCFBF1] bg-[#F0FDFA]/55 px-6 py-3.5">
+                    <div className="flex items-center justify-between gap-3 border-t border-[#CCFBF1] bg-[#F0FDFA]/55 px-6 py-3">
                       <Link
                         to={`/course/${id}`}
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+                        className="inline-flex min-h-[40px] items-center gap-1.5 py-1.5 text-sm font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
                       >
                         {!userToken
                           ? t('home.signInToView')
@@ -465,7 +499,7 @@ export const Courses = () => {
                           onClick={() => setCourseToDelete(course)}
                           aria-label={t('courses.deleteLabel', { title: course.title })}
                           title={t('courses.deleteTitle')}
-                          className="rounded-lg p-1.5 text-[#52797A] transition-colors hover:bg-[#FEF2F2] hover:text-[#DC2626] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]"
+                          className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg p-2 text-[#4A6F70] transition-colors hover:bg-[#FEF2F2] hover:text-[#DC2626] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626]"
                         >
                           <Trash size={17} aria-hidden="true" />
                         </button>
@@ -479,35 +513,17 @@ export const Courses = () => {
         </div>
 
         {/* Pagination */}
-        {activeTab === 'all' && totalPages > 1 && (
-          <nav
-            aria-label={t('courses.paginationAria')}
-            className="mt-10 flex items-center justify-center gap-3"
-          >
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => handlePageChange(Math.max(1, page - 1))}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#99F6E4] bg-white px-3.5 py-2 text-sm font-medium text-[#0D2E2F] transition-colors hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              <ArrowLeft size={15} aria-hidden="true" className="rtl:rotate-180" />
-              {t('courses.prev')}
-            </button>
-
-            <span className="font-mono-tabular rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[#0F766E] ring-1 ring-[#99F6E4]">
-              {t('courses.pageOf', { page, total: totalPages })}
-            </span>
-
-            <button
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => handlePageChange(Math.min(totalPages, page + 1))}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#99F6E4] bg-white px-3.5 py-2 text-sm font-medium text-[#0D2E2F] transition-colors hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] disabled:cursor-not-allowed disabled:opacity-45"
-            >
-              {t('courses.next')}
-              <ArrowRight size={15} aria-hidden="true" className="rtl:rotate-180" />
-            </button>
-          </nav>
+        {activeTab === 'all' && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+            ariaLabel={t('courses.paginationAria')}
+            prevLabel={t('courses.prev')}
+            nextLabel={t('courses.next')}
+            pageOfLabel={t('courses.pageOf', { page, total: totalPages })}
+            className="mt-10"
+          />
         )}
 
         <ConfirmDialog

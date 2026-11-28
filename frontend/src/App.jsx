@@ -4,6 +4,8 @@ import { AuthProvider } from './context/AuthProvider';
 import { useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageProvider';
 import { useLanguage } from './context/LanguageContext';
+import { ThemeProvider } from './context/ThemeProvider';
+import { ToastProvider } from './context/ToastProvider';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -68,12 +70,20 @@ const NotFound = () => {
       <p className="mt-3 text-sm leading-relaxed text-[#335C5D]">
         {t('notFound.body')}
       </p>
-      <Link
-        to="/courses"
-        className="mt-6 rounded-lg bg-[#0D9488] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2"
-      >
-        {t('notFound.cta')}
-      </Link>
+      <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+        <Link
+          to="/courses"
+          className="inline-flex min-h-[44px] items-center rounded-lg bg-[#0F766E] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#115E59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2"
+        >
+          {t('notFound.cta')}
+        </Link>
+        <Link
+          to="/"
+          className="inline-flex min-h-[44px] items-center rounded-lg border border-[#99F6E4] bg-white px-5 py-2.5 text-sm font-semibold text-[#0D2E2F] transition-colors hover:bg-[#CCFBF1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+        >
+          {t('notFound.homeCta')}
+        </Link>
+      </div>
     </section>
   );
 };
@@ -161,13 +171,17 @@ const AppShell = () => {
 
 function App() {
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <Router>
-          <AppShell />
-        </Router>
-      </AuthProvider>
-    </LanguageProvider>
+    <ThemeProvider>
+      <LanguageProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <Router>
+              <AppShell />
+            </Router>
+          </AuthProvider>
+        </ToastProvider>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }
 

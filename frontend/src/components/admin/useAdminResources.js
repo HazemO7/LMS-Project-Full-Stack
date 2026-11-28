@@ -155,6 +155,17 @@ export const useAdminUsers = (activeTab, onError) => {
   }), [usersPage, roleFilter, statusFilter, userSearch, onError]);
 
   useEffect(() => {
+    if (activeTab !== 'users') return undefined;
+    const trimmed = userSearchInput.trim();
+    if (trimmed === userSearch) return undefined;
+    const timer = window.setTimeout(() => {
+      setUsersPage(1);
+      setUserSearch(trimmed);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, userSearchInput, userSearch]);
+
+  useEffect(() => {
     if (activeTab === 'users' && usersRefreshTick >= 0) fetchUsers();
   }, [activeTab, fetchUsers, usersRefreshTick]);
 
@@ -168,7 +179,7 @@ export const useAdminUsers = (activeTab, onError) => {
   const refreshUsers = useCallback(() => setUsersRefreshTick((n) => n + 1), []);
 
   return {
-    users, fetchedAt, usersLoading, usersPage, usersTotalPages, userSearchInput, roleFilter, statusFilter,
+    users, fetchedAt, usersLoading, usersPage, usersTotalPages, userSearchInput, userSearch, roleFilter, statusFilter,
     setUsersPage, setUserSearchInput, setUserSearch, setRoleFilter, setStatusFilter, fetchUsers, refreshUsers,
   };
 };
@@ -201,6 +212,17 @@ export const useAdminCourses = (activeTab, onError) => {
   }), [coursesPage, courseSearch, onError]);
 
   useEffect(() => {
+    if (activeTab !== 'courses') return undefined;
+    const trimmed = courseSearchInput.trim();
+    if (trimmed === courseSearch) return undefined;
+    const timer = window.setTimeout(() => {
+      setCoursesPage(1);
+      setCourseSearch(trimmed);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, courseSearchInput, courseSearch]);
+
+  useEffect(() => {
     if (activeTab === 'courses' && coursesRefreshTick >= 0) fetchCourses();
   }, [activeTab, fetchCourses, coursesRefreshTick]);
 
@@ -208,7 +230,7 @@ export const useAdminCourses = (activeTab, onError) => {
 
   return {
     courses, setCourses, coursesLoading, coursesPage, coursesTotalPages,
-    courseSearchInput, setCoursesPage, setCourseSearchInput, setCourseSearch, fetchCourses, refreshCourses,
+    courseSearchInput, courseSearch, setCoursesPage, setCourseSearchInput, setCourseSearch, fetchCourses, refreshCourses,
   };
 };
 

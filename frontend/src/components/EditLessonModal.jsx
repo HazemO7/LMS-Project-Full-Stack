@@ -16,7 +16,7 @@ export const EditLessonModal = ({ show, onHide, lessonData, onUpdate }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (lessonData) {
+    if (show && lessonData) {
       setFormData({
         title: lessonData.title || '',
         description: lessonData.description || '',
@@ -25,7 +25,7 @@ export const EditLessonModal = ({ show, onHide, lessonData, onUpdate }) => {
       });
       setError('');
     }
-  }, [lessonData]);
+  }, [show, lessonData]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -55,10 +55,11 @@ export const EditLessonModal = ({ show, onHide, lessonData, onUpdate }) => {
           <input
             id="edit-lesson-title"
             type="text"
+            dir="auto"
             required
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-            className="w-full rounded-lg border border-[#99F6E4] px-3.5 py-2 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+            className="min-h-[44px] w-full rounded-lg border border-[#99F6E4] px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
           />
         </div>
 
@@ -69,10 +70,11 @@ export const EditLessonModal = ({ show, onHide, lessonData, onUpdate }) => {
           <input
             id="edit-lesson-desc"
             type="text"
+            dir="auto"
             required
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            className="w-full rounded-lg border border-[#99F6E4] px-3.5 py-2 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+            className="min-h-[44px] w-full rounded-lg border border-[#99F6E4] px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
           />
         </div>
 
@@ -83,17 +85,18 @@ export const EditLessonModal = ({ show, onHide, lessonData, onUpdate }) => {
           <textarea
             id="edit-lesson-content"
             rows={4}
+            dir="auto"
             required
             value={formData.content}
             onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-            className="w-full rounded-lg border border-[#99F6E4] px-3.5 py-2 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+            className="w-full rounded-lg border border-[#99F6E4] px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
           />
         </div>
 
         <div>
           <label htmlFor="edit-lesson-video" className="mb-1.5 block text-sm font-medium text-[#0D2E2F]">
             {t('modal.lessonVideoLabel')}{' '}
-            <span className="font-normal text-[#52797A]">{t('modal.optional')}</span>
+            <span className="font-normal text-[#4A6F70]">{t('modal.optional')}</span>
           </label>
           <input
             id="edit-lesson-video"
@@ -102,7 +105,7 @@ export const EditLessonModal = ({ show, onHide, lessonData, onUpdate }) => {
             value={formData.videoUrl}
             onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
             placeholder="https://www.youtube.com/watch?v=..."
-            className="w-full rounded-lg border border-[#99F6E4] px-3.5 py-2 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+            className="min-h-[44px] w-full rounded-lg border border-[#99F6E4] px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
           />
         </div>
 
@@ -111,14 +114,14 @@ export const EditLessonModal = ({ show, onHide, lessonData, onUpdate }) => {
             type="button"
             onClick={onHide}
             disabled={loading}
-            className="rounded-lg border border-[#99F6E4] bg-white px-4 py-2 text-sm font-medium text-[#0D2E2F] hover:bg-[#F0FDFA]"
+            className="inline-flex min-h-[44px] items-center rounded-lg border border-[#99F6E4] bg-white px-4 py-2 text-sm font-medium text-[#0D2E2F] hover:bg-[#F0FDFA]"
           >
             {t('common.cancel')}
           </button>
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E] disabled:opacity-60"
+            className="inline-flex min-h-[44px] items-center rounded-lg bg-[#0F766E] px-4 py-2 text-sm font-semibold text-white hover:bg-[#115E59] disabled:opacity-60"
           >
             {loading ? t('common.saving') : t('modal.saveLesson')}
           </button>

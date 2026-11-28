@@ -75,6 +75,7 @@ export const ForgotPassword = () => {
               placeholder={t('auth.emailPlaceholder')}
               disabled={loading}
               aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? 'forgot-email-error' : undefined}
               {...register('email', {
                 required: t('auth.emailRequired'),
                 pattern: {
@@ -82,14 +83,14 @@ export const ForgotPassword = () => {
                   message: t('auth.emailInvalid'),
                 },
               })}
-              className={`w-full rounded-lg border px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
+              className={`min-h-[44px] w-full rounded-lg border px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#4A6F70]/75 rtl:placeholder:text-right focus:outline-none focus:ring-2 ${
                 errors.email
                   ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
                   : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
               }`}
             />
             {errors.email && (
-              <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
+              <p id="forgot-email-error" className="mt-1.5 text-xs font-medium text-[#DC2626]">
                 {errors.email.message}
               </p>
             )}
@@ -99,7 +100,7 @@ export const ForgotPassword = () => {
             type="submit"
             id="forgot-submit-btn"
             disabled={loading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
+            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#115E59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
           >
             <PaperPlaneTilt size={16} weight="bold" aria-hidden="true" className="rtl:-scale-x-100" />
             {loading ? t('forgot.submitting') : t('forgot.submit')}
@@ -109,7 +110,7 @@ export const ForgotPassword = () => {
             {t('forgot.remembered')}{' '}
             <Link
               to="/login"
-              className="font-semibold text-[#0F766E] hover:text-[#D97706]"
+              className="inline-block py-1.5 font-semibold text-[#0F766E] hover:text-[#D97706]"
             >
               {t('forgot.backSignIn')}
             </Link>

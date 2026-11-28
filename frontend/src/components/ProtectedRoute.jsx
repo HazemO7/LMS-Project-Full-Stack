@@ -20,6 +20,11 @@ const isRoleDenied = (allowedRoles, currentUser) => {
 
 const getRedirectTarget = ({ userToken, currentUser, allowedRoles, pathname, location }) => {
   if (!userToken) {
+    const justLoggedOut = sessionStorage.getItem('foundry_just_logged_out') === '1';
+    if (justLoggedOut) {
+      sessionStorage.removeItem('foundry_just_logged_out');
+      return { to: '/login', state: undefined };
+    }
     return { to: '/login', state: { from: location } };
   }
   if (currentUser?.mustChangePassword && pathname !== '/profile') {

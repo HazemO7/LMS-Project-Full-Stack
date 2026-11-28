@@ -13,7 +13,7 @@ const SettingsNumberField = ({ id, label, min, max, value, onChange }) => (
       max={max}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full rounded-lg border border-[#99F6E4] px-3 py-2 text-sm text-[#0D2E2F]"
+      className="min-h-[44px] w-full rounded-lg border border-[#99F6E4] px-3 py-2 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/25"
     />
   </div>
 );
@@ -81,7 +81,7 @@ const SettingsForm = ({ form, saving, onFieldChange, onSubmit, t }) => (
       <button
         type="submit"
         disabled={saving}
-        className="rounded-lg bg-[#0D9488] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#0F766E] disabled:opacity-60"
+        className="inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#0F766E] px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#115E59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] disabled:opacity-60"
       >
         {saving ? t('common.saving') : t('admin.saveSettingsBtn')}
       </button>

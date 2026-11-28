@@ -151,7 +151,7 @@ export const HeroWorkspacePreview = () => {
                         key={lesson.id}
                         type="button"
                         onClick={() => setActiveId(lesson.id)}
-                        className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-start text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+                        className={`flex min-h-[44px] w-full items-center gap-2 rounded-lg px-2.5 py-2 text-start text-xs transition-colors sm:min-h-[38px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
                           active
                             ? 'bg-white font-semibold text-[#0B3B3C] ring-1 ring-[#0D9488]'
                             : 'text-[#335C5D] hover:bg-white/80 hover:text-[#0B3B3C]'
@@ -218,10 +218,10 @@ export const HeroWorkspacePreview = () => {
               type="button"
               aria-pressed={isCompleted}
               onClick={() => toggleLesson(activeLesson.id)}
-              className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
+              className={`inline-flex min-h-[40px] shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] ${
                 isCompleted
                   ? 'bg-[#D1FAE5] text-[#065F46] ring-1 ring-[#6EE7B7]'
-                  : 'bg-[#0D9488] text-white hover:bg-[#0F766E]'
+                  : 'bg-[#0F766E] text-white hover:bg-[#115E59]'
               }`}
             >
               {isCompleted ? (

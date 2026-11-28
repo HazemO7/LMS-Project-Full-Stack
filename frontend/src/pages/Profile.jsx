@@ -66,13 +66,13 @@ export const Profile = () => {
 
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:py-10 lg:px-8">
         <ForcePasswordBanner show={mustRotatePw} t={t} />
-        <div className="grid gap-8 lg:grid-cols-12">
+        <div className="grid gap-8 lg:grid-cols-12 lg:items-start">
           <ProfileIdentitySection
             currentUser={currentUser}
             mustRotatePw={mustRotatePw}
             refreshUser={refreshUser}
           />
-          <ProfilePasswordSection logoutUser={logoutUser} />
+          <ProfilePasswordSection logoutUser={logoutUser} mustRotatePw={mustRotatePw} />
         </div>
       </div>
     </div>
