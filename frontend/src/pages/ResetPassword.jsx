@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ArrowLeft, Eye, EyeSlash, Key } from '@phosphor-icons/react';
+import { ArrowLeft, Key } from '@phosphor-icons/react';
 import { authAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { getPasswordRules } from '../utils/passwordRules';
 import { AuthShell } from '../components/AuthShell';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { FormErrorSummary } from '../components/ui/FormErrorSummary';
+import { PasswordInput } from '../components/ui/PasswordInput';
 import { PasswordStrengthMeter } from '../components/ui/PasswordStrengthMeter';
 
 export const ResetPassword = () => {
@@ -25,8 +26,6 @@ export const ResetPassword = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
 
   const watchedPassword = watch('password', '');
 
@@ -90,102 +89,41 @@ export const ResetPassword = () => {
 
       {!success ? (
         <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-5 space-y-5">
-          <div>
-            <label
-              htmlFor="reset-password"
-              className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
-            >
-              {t('reset.newLabel')}
-            </label>
-            <div className="relative" dir="ltr">
-              <input
-                id="reset-password"
-                type={showPassword ? 'text' : 'password'}
-                autoComplete="new-password"
-                placeholder={t('reset.newPlaceholder')}
-                disabled={loading}
-                aria-invalid={Boolean(errors.password)}
-                {...register('password', getPasswordRules(t))}
-                className={`w-full rounded-lg border py-2.5 pl-3.5 pr-11 text-left text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
-                  errors.password
-                    ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                    : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
-                }`}
-              />
-              <button
-                type="button"
-                id="toggle-password-visibility"
-                onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-[#335C5D] hover:text-[#0B3B3C]"
-              >
-                {showPassword ? (
-                  <EyeSlash size={18} aria-hidden="true" />
-                ) : (
-                  <Eye size={18} aria-hidden="true" />
-                )}
-              </button>
-            </div>
-            {errors.password && (
-              <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
-                {errors.password.message}
-              </p>
-            )}
+          <div className="space-y-3">
+            <PasswordInput
+              id="reset-password"
+              label={t('reset.newLabel')}
+              autoComplete="new-password"
+              placeholder={t('reset.newPlaceholder')}
+              disabled={loading}
+              error={errors.password}
+              registration={register('password', getPasswordRules(t))}
+              showLabel={t('auth.showPassword')}
+              hideLabel={t('auth.hidePassword')}
+            />
+            <PasswordStrengthMeter password={watchedPassword} />
           </div>
 
-          <div>
-            <label
-              htmlFor="reset-confirm-password"
-              className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
-            >
-              {t('reset.confirmLabel')}
-            </label>
-            <div className="relative" dir="ltr">
-              <input
-                id="reset-confirm-password"
-                type={showConfirm ? 'text' : 'password'}
-                autoComplete="new-password"
-                placeholder={t('reset.confirmPlaceholder')}
-                disabled={loading}
-                aria-invalid={Boolean(errors.confirmPassword)}
-                {...register('confirmPassword', {
-                  required: t('reset.confirmRequired'),
-                  validate: (v) => v === watchedPassword || t('reset.mismatch'),
-                })}
-                className={`w-full rounded-lg border py-2.5 pl-3.5 pr-11 text-left text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
-                  errors.confirmPassword
-                    ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                    : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
-                }`}
-              />
-              <button
-                type="button"
-                id="toggle-confirm-visibility"
-                onClick={() => setShowConfirm((v) => !v)}
-                aria-label={showConfirm ? t('auth.hidePassword') : t('auth.showPassword')}
-                className="absolute inset-y-0 right-0 flex items-center px-3 text-[#335C5D] hover:text-[#0B3B3C]"
-              >
-                {showConfirm ? (
-                  <EyeSlash size={18} aria-hidden="true" />
-                ) : (
-                  <Eye size={18} aria-hidden="true" />
-                )}
-              </button>
-            </div>
-            {errors.confirmPassword && (
-              <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
-                {errors.confirmPassword.message}
-              </p>
-            )}
-          </div>
-
-          <PasswordStrengthMeter password={watchedPassword} />
+          <PasswordInput
+            id="reset-confirm-password"
+            label={t('reset.confirmLabel')}
+            autoComplete="new-password"
+            placeholder={t('reset.confirmPlaceholder')}
+            disabled={loading}
+            error={errors.confirmPassword}
+            registration={register('confirmPassword', {
+              required: t('reset.confirmRequired'),
+              validate: (v) => v === watchedPassword || t('reset.mismatch'),
+            })}
+            showLabel={t('auth.showPassword')}
+            hideLabel={t('auth.hidePassword')}
+          />
 
           <button
             type="submit"
             id="reset-submit-btn"
             disabled={loading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
+            className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#115E59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
           >
             <Key size={16} weight="bold" aria-hidden="true" />
             {loading ? t('reset.submitting') : t('reset.submit')}
@@ -194,7 +132,7 @@ export const ResetPassword = () => {
           <div className="text-center">
             <Link
               to="/login"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-[#335C5D] hover:text-[#0D2E2F]"
+              className="inline-flex items-center gap-1.5 py-1.5 text-sm font-medium text-[#335C5D] hover:text-[#0D2E2F]"
             >
               <ArrowLeft size={14} aria-hidden="true" className="rtl:rotate-180" />
               {t('forgot.backSignIn')}

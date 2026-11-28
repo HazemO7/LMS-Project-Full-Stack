@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Eye, EyeSlash, UserPlus } from '@phosphor-icons/react';
+import { UserPlus } from '@phosphor-icons/react';
 import { authAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { getPasswordRules } from '../utils/passwordRules';
 import { AuthShell } from '../components/AuthShell';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { FormErrorSummary } from '../components/ui/FormErrorSummary';
+import { PasswordInput } from '../components/ui/PasswordInput';
 import { PasswordStrengthMeter } from '../components/ui/PasswordStrengthMeter';
 
 export const Register = () => {
@@ -22,7 +23,6 @@ export const Register = () => {
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
   const watchedPassword = watch('password', '');
 
@@ -91,19 +91,20 @@ export const Register = () => {
             placeholder={t('register.namePlaceholder')}
             disabled={loading}
             aria-invalid={Boolean(errors.name)}
+            aria-describedby={errors.name ? 'register-name-error' : undefined}
             {...register('name', {
               required: t('register.nameRequired'),
               validate: (value) => value.trim().length >= 3 || t('register.nameMin'),
               maxLength: { value: 50, message: t('register.nameMax') },
             })}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
+            className={`min-h-[44px] w-full rounded-lg border px-3.5 py-2.5 text-sm text-[#0D2E2F] placeholder:text-[#4A6F70]/75 focus:outline-none focus:ring-2 ${
               errors.name
                 ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
                 : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
             }`}
           />
           {errors.name && (
-            <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
+            <p id="register-name-error" className="mt-1.5 text-xs font-medium text-[#DC2626]">
               {errors.name.message}
             </p>
           )}
@@ -124,6 +125,7 @@ export const Register = () => {
             placeholder={t('auth.emailPlaceholder')}
             disabled={loading}
             aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? 'register-email-error' : undefined}
             {...register('email', {
               required: t('auth.emailRequired'),
               pattern: {
@@ -131,59 +133,31 @@ export const Register = () => {
                 message: t('auth.emailInvalid'),
               },
             })}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
+            className={`min-h-[44px] w-full rounded-lg border px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#4A6F70]/75 rtl:placeholder:text-right focus:outline-none focus:ring-2 ${
               errors.email
                 ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
                 : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
             }`}
           />
           {errors.email && (
-            <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
+            <p id="register-email-error" className="mt-1.5 text-xs font-medium text-[#DC2626]">
               {errors.email.message}
             </p>
           )}
         </div>
 
         <div>
-          <label
-            htmlFor="register-password"
-            className="mb-1.5 block text-sm font-medium text-[#0D2E2F]"
-          >
-            {t('auth.passwordLabel')}
-          </label>
-          <div className="relative" dir="ltr">
-            <input
-              id="register-password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="new-password"
-              placeholder={t('register.passwordPlaceholder')}
-              disabled={loading}
-              aria-invalid={Boolean(errors.password)}
-              {...register('password', getPasswordRules(t))}
-              className={`w-full rounded-lg border py-2.5 pl-3.5 pr-11 text-left text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
-                errors.password
-                  ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                  : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
-              }`}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-[#335C5D] hover:text-[#0B3B3C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
-            >
-              {showPassword ? (
-                <EyeSlash size={18} aria-hidden="true" />
-              ) : (
-                <Eye size={18} aria-hidden="true" />
-              )}
-            </button>
-          </div>
-          {errors.password && (
-            <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
-              {errors.password.message}
-            </p>
-          )}
+          <PasswordInput
+            id="register-password"
+            label={t('auth.passwordLabel')}
+            autoComplete="new-password"
+            placeholder={t('register.passwordPlaceholder')}
+            disabled={loading}
+            error={errors.password}
+            registration={register('password', getPasswordRules(t))}
+            showLabel={t('auth.showPassword')}
+            hideLabel={t('auth.hidePassword')}
+          />
 
           <div className="mt-3">
             <PasswordStrengthMeter password={watchedPassword} />
@@ -193,7 +167,7 @@ export const Register = () => {
         <button
           type="submit"
           disabled={loading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
+          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#115E59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           <UserPlus size={17} weight="bold" aria-hidden="true" />
           {loading ? t('register.submitting') : t('register.submit')}
@@ -203,7 +177,7 @@ export const Register = () => {
           {t('register.hasAccount')}{' '}
           <Link
             to="/login"
-            className="font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+            className="inline-block py-1.5 font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
           >
             {t('register.signInLink')}
           </Link>

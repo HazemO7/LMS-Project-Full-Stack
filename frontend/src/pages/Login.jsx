@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { Eye, EyeSlash, SignIn } from '@phosphor-icons/react';
+import { SignIn } from '@phosphor-icons/react';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import { authAPI } from '../services/api';
 import { AuthShell } from '../components/AuthShell';
 import { AlertBanner } from '../components/ui/AlertBanner';
 import { FormErrorSummary } from '../components/ui/FormErrorSummary';
+import { PasswordInput } from '../components/ui/PasswordInput';
 
 export const Login = () => {
   const { loginUser } = useAuth();
@@ -22,7 +23,6 @@ export const Login = () => {
 
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [remainingAttempts, setRemainingAttempts] = useState(null);
   const [lockedUntil, setLockedUntil] = useState(null);
   const [countdown, setCountdown] = useState('');
@@ -162,6 +162,7 @@ export const Login = () => {
             placeholder={t('auth.emailPlaceholder')}
             disabled={loading}
             aria-invalid={Boolean(errors.email)}
+            aria-describedby={errors.email ? 'login-email-error' : undefined}
             {...register('email', {
               required: t('auth.emailRequired'),
               pattern: {
@@ -169,75 +170,45 @@ export const Login = () => {
                 message: t('auth.emailInvalid'),
               },
             })}
-            className={`w-full rounded-lg border px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
+            className={`min-h-[44px] w-full rounded-lg border px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#4A6F70]/75 rtl:placeholder:text-right focus:outline-none focus:ring-2 ${
               errors.email
                 ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
                 : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
             }`}
           />
           {errors.email && (
-            <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
+            <p id="login-email-error" className="mt-1.5 text-xs font-medium text-[#DC2626]">
               {errors.email.message}
             </p>
           )}
         </div>
 
-        <div>
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <label
-              htmlFor="login-password"
-              className="block text-sm font-medium text-[#0D2E2F]"
-            >
-              {t('auth.passwordLabel')}
-            </label>
+        <PasswordInput
+          id="login-password"
+          label={t('auth.passwordLabel')}
+          labelExtra={
             <Link
               to="/forgot-password"
-              className="text-xs font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+              className="inline-block py-1 text-xs font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
             >
               {t('login.forgot')}
             </Link>
-          </div>
-          <div className="relative" dir="ltr">
-            <input
-              id="login-password"
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              placeholder={t('login.passwordPlaceholder')}
-              disabled={loading}
-              aria-invalid={Boolean(errors.password)}
-              {...register('password', {
-                required: t('auth.passwordRequired'),
-              })}
-              className={`w-full rounded-lg border py-2.5 pl-3.5 pr-11 text-left text-sm text-[#0D2E2F] placeholder:text-[#52797A]/70 focus:outline-none focus:ring-2 ${
-                errors.password
-                  ? 'border-[#DC2626] bg-[#FEF2F2]/30 focus:border-[#DC2626] focus:ring-[#DC2626]/20'
-                  : 'border-[#99F6E4] bg-[#F0FDFA]/40 focus:border-[#0D9488] focus:bg-white focus:ring-[#0D9488]/20'
-              }`}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
-              className="absolute inset-y-0 right-0 flex items-center px-3 text-[#335C5D] hover:text-[#0B3B3C] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
-            >
-              {showPassword ? (
-                <EyeSlash size={18} aria-hidden="true" />
-              ) : (
-                <Eye size={18} aria-hidden="true" />
-              )}
-            </button>
-          </div>
-          {errors.password && (
-            <p className="mt-1.5 text-xs font-medium text-[#DC2626]">
-              {errors.password.message}
-            </p>
-          )}
-        </div>
+          }
+          autoComplete="current-password"
+          placeholder={t('login.passwordPlaceholder')}
+          disabled={loading}
+          error={errors.password}
+          registration={register('password', {
+            required: t('auth.passwordRequired'),
+          })}
+          showLabel={t('auth.showPassword')}
+          hideLabel={t('auth.hidePassword')}
+        />
 
         <button
           type="submit"
           disabled={loading || Boolean(lockedUntil)}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
+          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#115E59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
         >
           <SignIn size={17} weight="bold" aria-hidden="true" className="rtl:rotate-180" />
           {loading ? t('login.submitting') : t('login.submit')}
@@ -247,7 +218,7 @@ export const Login = () => {
           {t('login.newUser')}{' '}
           <Link
             to="/register"
-            className="font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
+            className="inline-block py-1.5 font-semibold text-[#0F766E] hover:text-[#D97706] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488]"
           >
             {t('login.createOne')}
           </Link>

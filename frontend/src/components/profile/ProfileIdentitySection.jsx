@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Check } from '@phosphor-icons/react';
 import { usersAPI } from '../../services/api';
 import { useLanguage } from '../../context/LanguageContext';
+import { useToast } from '../../context/ToastContext';
 import { AlertBanner } from '../ui/AlertBanner';
 
 const EMPTY_PROFILE_FORM = { name: '', email: '', specialty: '', bio: '' };
@@ -30,7 +31,7 @@ const StaffProfileFields = ({ role, profileForm, setProfileForm, t }) => {
           value={profileForm.specialty}
           onChange={(e) => setProfileForm((prev) => ({ ...prev, specialty: e.target.value }))}
           placeholder={t('profile.specialtyPlaceholder')}
-          className="w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+          className="min-h-[44px] w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
         />
       </div>
       <div>
@@ -91,7 +92,7 @@ const IdentityFormFields = ({ profileForm, setProfileForm, role, disabled, savin
           required
           value={profileForm.name}
           onChange={(e) => setProfileForm((prev) => ({ ...prev, name: e.target.value }))}
-          className="w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+          className="min-h-[44px] w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
         />
       </div>
       <div>
@@ -105,14 +106,14 @@ const IdentityFormFields = ({ profileForm, setProfileForm, role, disabled, savin
           required
           value={profileForm.email}
           onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))}
-          className="w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+          className="min-h-[44px] w-full rounded-lg border border-[#99F6E4] bg-[#F0FDFA]/40 px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
         />
       </div>
       <StaffProfileFields role={role} profileForm={profileForm} setProfileForm={setProfileForm} t={t} />
       <button
         type="submit"
         disabled={disabled}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#0D9488] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#0F766E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
+        className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#115E59] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D9488] focus-visible:ring-offset-2 disabled:opacity-60"
       >
         <Check size={16} weight="bold" aria-hidden="true" />
         {saving ? t('common.saving') : t('profile.saveBtn')}
@@ -123,6 +124,7 @@ const IdentityFormFields = ({ profileForm, setProfileForm, role, disabled, savin
 
 export const ProfileIdentitySection = ({ currentUser, mustRotatePw, refreshUser }) => {
   const { t, tServer } = useLanguage();
+  const { addToast } = useToast();
   const [profileForm, setProfileForm] = useState(EMPTY_PROFILE_FORM);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
@@ -142,6 +144,7 @@ export const ProfileIdentitySection = ({ currentUser, mustRotatePw, refreshUser 
       await usersAPI.updateMe(buildProfilePayload(profileForm, currentUser?.role));
       await refreshUser();
       setProfileSuccess(t('profile.updated'));
+      addToast(t('profile.updated'), 'success');
     } catch (err) {
       setProfileError(err.message || 'Failed to update profile.');
     } finally {

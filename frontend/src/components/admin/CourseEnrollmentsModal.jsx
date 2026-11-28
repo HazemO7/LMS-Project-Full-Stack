@@ -36,16 +36,18 @@ const EnrollmentListItem = ({ item, removingUserIds, onUnenroll, t }) => {
   const uid = extractUserId(item);
   return (
     <li className="flex items-center justify-between gap-3 px-4 py-2.5">
-      <div className="min-w-0">
+      <div className="min-w-0 text-start">
         <p className="truncate text-sm font-medium text-[#0D2E2F]">{student?.name || uid}</p>
-        <p dir="ltr" className="truncate text-start text-xs text-[#52797A]">{student?.email}</p>
+        <p className="truncate text-xs text-[#4A6F70]">
+          <bdi dir="ltr">{student?.email}</bdi>
+        </p>
       </div>
       <button
         type="button"
         disabled={removingUserIds.has(uid)}
         onClick={() => onUnenroll(uid, item._id)}
         aria-label={t('admin.unenrollAria')}
-        className="rounded-lg p-1.5 text-[#52797A] hover:bg-[#FEF2F2] hover:text-[#DC2626] disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-lg p-2 text-[#4A6F70] hover:bg-[#FEF2F2] hover:text-[#DC2626] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#DC2626] disabled:cursor-not-allowed disabled:opacity-40"
       >
         <Trash size={16} aria-hidden="true" />
       </button>
@@ -152,15 +154,16 @@ const CourseEnrollmentsBody = ({ course, onChanged, t, tServer }) => {
           type="email"
           dir="ltr"
           required
+          aria-label={t('admin.enrollEmailAria')}
           value={state.email}
           onChange={(e) => state.setEmail(e.target.value)}
           placeholder={t('admin.enrollEmailPh')}
-          className="flex-1 rounded-lg border border-[#99F6E4] px-3.5 py-2 text-start text-sm text-[#0D2E2F] focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
+          className="min-h-[44px] flex-1 rounded-lg border border-[#99F6E4] px-3.5 py-2.5 text-start text-sm text-[#0D2E2F] placeholder:text-[#4A6F70]/75 rtl:placeholder:text-right focus:border-[#0D9488] focus:outline-none focus:ring-2 focus:ring-[#0D9488]/20"
         />
         <button
           type="submit"
           disabled={state.adding || state.loading}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#0D9488] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0F766E] disabled:opacity-60"
+          className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-lg bg-[#0F766E] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#115E59] disabled:opacity-60"
         >
           <UserPlus size={15} weight="bold" aria-hidden="true" />
           {state.adding ? t('common.saving') : t('admin.enrollStudentBtn')}

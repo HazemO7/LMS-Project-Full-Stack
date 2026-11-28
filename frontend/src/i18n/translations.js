@@ -19,6 +19,9 @@ export const TRANSLATIONS = {
     'nav.switchAria': 'التبديل إلى اللغة العربية',
     'nav.mainAria': 'Main navigation',
     'nav.mobileAria': 'Mobile navigation',
+    'nav.themeDarkAria': 'Switch to dark study mode',
+    'nav.themeLightAria': 'Switch to light mode',
+    'nav.breadcrumbAria': 'Breadcrumb navigation',
 
     // Roles
     'role.super_admin': 'Super Admin',
@@ -54,12 +57,15 @@ export const TRANSLATIONS = {
     'common.closeModal': 'Close modal',
     'common.verifyingAccess': 'Verifying access',
     'common.retry': 'Retry',
+    'common.clearFilters': 'Clear filters',
+    'common.activeSearch': 'Search: "{{query}}"',
     'form.errorSummaryTitle': 'Please review the following fields:',
 
     // 404
     'notFound.title': 'Page not found',
     'notFound.body': 'The route you opened does not exist or may have moved.',
     'notFound.cta': 'Browse courses',
+    'notFound.homeCta': 'Back to home',
 
     // Home
     'home.heroTitle': 'Structured technical courses built for uninterrupted study.',
@@ -140,7 +146,7 @@ export const TRANSLATIONS = {
     'contact.supportBody':
       'For bug reports or setup questions, you can also open an issue on the project repository on GitHub.',
     'contact.sentSuccess':
-      'Your message has been recorded locally in this preview form. Connect a mail or ticket endpoint when deploying to production.',
+      'Submission simulated in this preview form; your message was not saved. Connect a mail or ticket endpoint when deploying to production.',
     'contact.nameLabel': 'Full name',
     'contact.namePlaceholder': 'Alex Rivera',
     'contact.emailLabel': 'Email address',
@@ -148,6 +154,8 @@ export const TRANSLATIONS = {
     'contact.messageLabel': 'Message',
     'contact.messagePlaceholder': 'Share what you need help with...',
     'contact.sendBtn': 'Send message',
+    'contact.previewNotice':
+      'Preview form: submission is simulated and messages are not saved in this demo environment.',
 
     // Auth Shared & Password
     'auth.backHome': 'Back to Foundry',
@@ -309,6 +317,10 @@ export const TRANSLATIONS = {
       'Summarize what students will build, prerequisites, and the core topics covered...',
     'createCourse.submit': 'Publish course',
     'createCourse.submitting': 'Publishing...',
+    'createCourse.titleRequired': 'Course title is required.',
+    'createCourse.titleMinLength': 'Course title must be at least 3 characters.',
+    'createCourse.descRequired': 'Course overview is required.',
+    'createCourse.descMinLength': 'Course overview must be at least 10 characters.',
 
     // Course Details / Player
     'player.allCourses': 'All courses',
@@ -317,6 +329,7 @@ export const TRANSLATIONS = {
     'player.progressLabel': 'Course progress',
     'player.allCompleted': 'All lessons completed',
     'player.enrollGateTitle': 'Enroll to unlock full curriculum',
+    'player.staffGateTitle': 'Course content is restricted to enrolled students and course staff',
     'player.enrollGateBody':
       'Modules, lesson notes, video lectures, and progress tracking become available as soon as you enroll in this course.',
     'player.enrollBtn': 'Enroll in course',
@@ -328,6 +341,9 @@ export const TRANSLATIONS = {
     'player.showCurriculum': 'Course curriculum',
     'player.hideCurriculum': 'Hide curriculum',
     'player.curriculum': 'Curriculum',
+    'player.focusModeOn': 'Focus mode',
+    'player.focusModeOff': 'Show syllabus',
+    'player.enrolledSuccess': 'Enrolled in course successfully.',
     'player.activeLessonAria': 'Active lesson',
     'player.editModuleAria': 'Edit module {{title}}',
     'player.deleteModuleAria': 'Delete module {{title}}',
@@ -414,7 +430,15 @@ export const TRANSLATIONS = {
     'admin.kpiLessons': '{{count}} lessons created',
     'admin.quickActionsTitle': 'Quick governance actions',
     'admin.quickActionsDesc': 'Jump straight into onboarding staff, auditing enrollments, or inspecting logs.',
+    'admin.distributionTitle': 'Platform distribution',
+    'admin.accountHealth': 'Account health',
+    'admin.roleDistribution': 'Role composition',
+    'admin.activeFiltersLabel': 'Active filters:',
     'admin.searchUsersPh': 'Search by name or email...',
+    'admin.searchUsersAria': 'Search users by name or email',
+    'admin.searchCoursesAria': 'Search courses',
+    'admin.enrollEmailAria': 'Student email address to enroll',
+    'admin.paginationAria': 'Admin table pagination',
     'admin.filterByRole': 'Filter by role',
     'admin.filterByStatus': 'Filter by status',
     'admin.allRoles': 'All roles',
@@ -561,6 +585,9 @@ export const TRANSLATIONS = {
     'nav.switchAria': 'Switch language to English',
     'nav.mainAria': 'القائمة الرئيسية',
     'nav.mobileAria': 'قائمة الجوال',
+    'nav.themeDarkAria': 'تفعيل وضع الدراسة الليلي',
+    'nav.themeLightAria': 'تفعيل الوضع الفاتح',
+    'nav.breadcrumbAria': 'مسار التنقل',
 
     // Roles
     'role.super_admin': 'المدير العام',
@@ -596,12 +623,15 @@ export const TRANSLATIONS = {
     'common.closeModal': 'إغلاق النافذة',
     'common.verifyingAccess': 'جاري التحقق من الصلاحيات',
     'common.retry': 'إعادة المحاولة',
+    'common.clearFilters': 'مسح الفلاتر',
+    'common.activeSearch': 'البحث: "{{query}}"',
     'form.errorSummaryTitle': 'يرجى مراجعة الحقول التالية قبل المتابعة:',
 
     // 404
     'notFound.title': 'الصفحة غير موجودة',
     'notFound.body': 'الرابط الذي طلبته غير موجود أو ربما تغيّر مساره.',
     'notFound.cta': 'تصفح الكورسات',
+    'notFound.homeCta': 'العودة للرئيسية',
 
     // Home
     'home.heroTitle': 'مسارات تعليمية منظمة لتتعلّم بتركيز ودون تشتيت.',
@@ -680,7 +710,7 @@ export const TRANSLATIONS = {
     'contact.supportBody':
       'للبلاغات التقنية أو أسئلة الإعداد، يمكنك أيضاً فتح Issue على مستودع المشروع في GitHub.',
     'contact.sentSuccess':
-      'تم حفظ رسالتك محلياً في نموذج المعاينة هذا. اربط النموذج بخدمة بريد أو Endpoint خاص عند النشر الفعلي.',
+      'تمت محاكاة الإرسال في نموذج المعاينة هذا ولم يتم حفظ رسالتك. اربط النموذج بخدمة بريد أو Endpoint خاص عند النشر الفعلي.',
     'contact.nameLabel': 'الاسم الكامل',
     'contact.namePlaceholder': 'أحمد محمود',
     'contact.emailLabel': 'البريد الإلكتروني',
@@ -688,6 +718,8 @@ export const TRANSLATIONS = {
     'contact.messageLabel': 'رسالتك',
     'contact.messagePlaceholder': 'اكتب تفاصيل سؤالك أو ملاحظتك هنا...',
     'contact.sendBtn': 'إرسال الرسالة',
+    'contact.previewNotice':
+      'نموذج معاينة: الإرسال هنا محاكى فقط ولا يتم حفظ الرسائل في نسخة العرض الحالية.',
 
     // Auth Shared & Password
     'auth.backHome': 'العودة للرئيسية',
@@ -736,7 +768,7 @@ export const TRANSLATIONS = {
     'login.forgot': 'نسيت كلمة المرور؟',
     'login.submit': 'تسجيل الدخول',
     'login.submitting': 'جاري تسجيل الدخول...',
-    'login.newUser': 'مستخدم جديد على Foundry؟',
+    'login.newUser': 'مستخدم جديد على \u2066Foundry\u2069؟',
     'login.createOne': 'أنشئ حساباً جديداً',
 
     // Register
@@ -849,6 +881,10 @@ export const TRANSLATIONS = {
       'اشرح ما سيتعلمه الطالب، المتطلبات السابقة، والموضوعات الأساسية...',
     'createCourse.submit': 'نشر الكورس',
     'createCourse.submitting': 'جاري النشر...',
+    'createCourse.titleRequired': 'عنوان الكورس مطلوب.',
+    'createCourse.titleMinLength': 'يجب أن يكون عنوان الكورس 3 أحرف على الأقل.',
+    'createCourse.descRequired': 'وصف الكورس مطلوب.',
+    'createCourse.descMinLength': 'يجب أن يكون وصف الكورس 10 أحرف على الأقل.',
 
     // Course Details / Player
     'player.allCourses': 'كل الكورسات',
@@ -857,6 +893,7 @@ export const TRANSLATIONS = {
     'player.progressLabel': 'نسبة الإنجاز',
     'player.allCompleted': 'أنهيت جميع الدروس بنجاح',
     'player.enrollGateTitle': 'سجّل في الكورس لفتح المنهج الكامل',
+    'player.staffGateTitle': 'المحتوى متاح للطلاب المسجّلين أو مدرب الكورس فقط',
     'player.enrollGateBody':
       'تُفتح الوحدات، الشروحات، فيديوهات الدروس، وتتبع الإنجاز فور اشتراكك في هذا الكورس.',
     'player.enrollBtn': 'التسجيل في الكورس',
@@ -867,6 +904,9 @@ export const TRANSLATIONS = {
     'player.showCurriculum': 'منهج الكورس',
     'player.hideCurriculum': 'إخفاء المنهج',
     'player.curriculum': 'المنهج الدراسي',
+    'player.focusModeOn': 'وضع التركيز',
+    'player.focusModeOff': 'إظهار المنهج',
+    'player.enrolledSuccess': 'تم تسجيلك في الكورس بنجاح.',
     'player.activeLessonAria': 'محتوى الدرس الحالي',
     'player.editModuleAria': 'تعديل الوحدة {{title}}',
     'player.deleteModuleAria': 'حذف الوحدة {{title}}',
@@ -951,7 +991,15 @@ export const TRANSLATIONS = {
     'admin.kpiLessons': '{{count}} درس منشأ',
     'admin.quickActionsTitle': 'إجراءات سريعة',
     'admin.quickActionsDesc': 'انتقل مباشرة لإضافة مدرس جديد أو مراجعة التسجيلات وسجل الأمان.',
+    'admin.distributionTitle': 'توزيع حسابات المنصة',
+    'admin.accountHealth': 'حالة الحسابات',
+    'admin.roleDistribution': 'توزيع الأدوار',
+    'admin.activeFiltersLabel': 'الفلاتر النشطة:',
     'admin.searchUsersPh': 'ابحث بالاسم أو البريد...',
+    'admin.searchUsersAria': 'البحث عن المستخدمين بالاسم أو البريد الإلكتروني',
+    'admin.searchCoursesAria': 'البحث في الكورسات',
+    'admin.enrollEmailAria': 'البريد الإلكتروني للطالب المراد تسجيله',
+    'admin.paginationAria': 'التنقل بين صفحات الجدول',
     'admin.filterByRole': 'تصفية حسب الدور',
     'admin.filterByStatus': 'تصفية حسب الحالة',
     'admin.allRoles': 'كل الأدوار',

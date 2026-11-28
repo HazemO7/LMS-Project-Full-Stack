@@ -48,14 +48,14 @@ export const About = () => {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 to="/courses"
-                className="inline-flex items-center gap-2 rounded-lg bg-[#F59E0B] px-5 py-2.5 text-sm font-bold text-[#0B3B3C] transition-colors hover:bg-[#FBBF24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FBBF24]"
+                className="inline-flex min-h-[44px] items-center gap-2 rounded-lg bg-[#F59E0B] px-5 py-2.5 text-sm font-bold text-[#0B3B3C] transition-colors hover:bg-[#FBBF24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FBBF24]"
               >
                 {t('about.browse')}
                 <ArrowRight size={16} weight="bold" aria-hidden="true" className="rtl:rotate-180" />
               </Link>
               <Link
                 to="/contact"
-                className="inline-flex items-center rounded-lg border border-[#2DD4BF]/50 bg-[#114B4D] px-5 py-2.5 text-sm font-semibold text-[#CCFBF1] transition-colors hover:bg-[#155E61] hover:text-white"
+                className="inline-flex min-h-[44px] items-center rounded-lg border border-[#2DD4BF]/50 bg-[#114B4D] px-5 py-2.5 text-sm font-semibold text-[#CCFBF1] transition-colors hover:bg-[#155E61] hover:text-white"
               >
                 {t('about.contact')}
               </Link>

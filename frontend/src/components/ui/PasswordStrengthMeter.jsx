@@ -23,7 +23,9 @@ export const PasswordStrengthMeter = ({ password = '', showChecklist = true }) =
         <div>
           <div className="mb-1.5 flex items-center justify-between text-xs font-medium">
             <span className="text-[#335C5D]">{t('pw.strength')}</span>
-            <span className={strength.text}>{strength.label}</span>
+            <span aria-live="polite" className={strength.text}>
+              {strength.label}
+            </span>
           </div>
           <div className="grid grid-cols-5 gap-1.5">
             {[1, 2, 3, 4, 5].map((step) => (

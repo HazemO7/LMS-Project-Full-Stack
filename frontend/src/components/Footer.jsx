@@ -1,11 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { GithubLogo } from '@phosphor-icons/react';
+import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { canAuthorCourses } from '../utils/roleUtils';
 import { BrandMark } from './BrandMark';
 
 export const Footer = () => {
+  const { currentUser } = useAuth();
   const { t } = useLanguage();
+  const canCreate = canAuthorCourses(currentUser);
 
   return (
     <footer className="border-t border-[#1E6466] bg-[#0B3B3C] text-white">
@@ -28,20 +32,22 @@ export const Footer = () => {
               <h3 className="text-xs font-semibold text-[#FBBF24]">{t('footer.platform')}</h3>
               <ul className="mt-3 space-y-2.5 text-sm text-[#CCFBF1]">
                 <li>
-                  <Link to="/courses" className="transition-colors hover:text-[#FBBF24]">
+                  <Link to="/courses" className="inline-block py-1 transition-colors hover:text-[#FBBF24] sm:py-0">
                     {t('footer.catalog')}
                   </Link>
                 </li>
                 <li>
-                  <Link to="/profile" className="transition-colors hover:text-[#FBBF24]">
+                  <Link to="/profile" className="inline-block py-1 transition-colors hover:text-[#FBBF24] sm:py-0">
                     {t('footer.settings')}
                   </Link>
                 </li>
-                <li>
-                  <Link to="/course/new" className="transition-colors hover:text-[#FBBF24]">
-                    {t('footer.publish')}
-                  </Link>
-                </li>
+                {canCreate && (
+                  <li>
+                    <Link to="/course/new" className="inline-block py-1 transition-colors hover:text-[#FBBF24] sm:py-0">
+                      {t('footer.publish')}
+                    </Link>
+                  </li>
+                )}
               </ul>
             </div>
 
@@ -49,12 +55,12 @@ export const Footer = () => {
               <h3 className="text-xs font-semibold text-[#FBBF24]">{t('footer.academy')}</h3>
               <ul className="mt-3 space-y-2.5 text-sm text-[#CCFBF1]">
                 <li>
-                  <Link to="/about" className="transition-colors hover:text-[#FBBF24]">
+                  <Link to="/about" className="inline-block py-1 transition-colors hover:text-[#FBBF24] sm:py-0">
                     {t('footer.about')}
                   </Link>
                 </li>
                 <li>
-                  <Link to="/contact" className="transition-colors hover:text-[#FBBF24]">
+                  <Link to="/contact" className="inline-block py-1 transition-colors hover:text-[#FBBF24] sm:py-0">
                     {t('footer.contact')}
                   </Link>
                 </li>
@@ -65,17 +71,17 @@ export const Footer = () => {
               <h3 className="text-xs font-semibold text-[#FBBF24]">{t('footer.access')}</h3>
               <ul className="mt-3 space-y-2.5 text-sm text-[#CCFBF1]">
                 <li>
-                  <Link to="/login" className="transition-colors hover:text-[#FBBF24]">
+                  <Link to="/login" className="inline-block py-1 transition-colors hover:text-[#FBBF24] sm:py-0">
                     {t('footer.signIn')}
                   </Link>
                 </li>
                 <li>
-                  <Link to="/register" className="transition-colors hover:text-[#FBBF24]">
+                  <Link to="/register" className="inline-block py-1 transition-colors hover:text-[#FBBF24] sm:py-0">
                     {t('footer.createAccount')}
                   </Link>
                 </li>
                 <li>
-                  <Link to="/forgot-password" className="transition-colors hover:text-[#FBBF24]">
+                  <Link to="/forgot-password" className="inline-block py-1 transition-colors hover:text-[#FBBF24] sm:py-0">
                     {t('footer.resetPassword')}
                   </Link>
                 </li>

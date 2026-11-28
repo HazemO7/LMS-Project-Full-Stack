@@ -8,22 +8,24 @@ export const AuthShell = ({ title, subtitle, asideTitle, asideBody, asidePoints 
   const { t } = useLanguage();
 
   return (
-    <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-12 lg:items-start lg:py-16 lg:px-8">
-      <div className="ocean-grid-bg rounded-2xl border border-[#1E6466] p-8 text-white shadow-lg lg:col-span-5 lg:p-10">
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 text-xs font-medium text-[#99F6E4] transition-colors hover:text-[#FBBF24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
-        >
-          <ArrowLeft size={14} aria-hidden="true" className="rtl:rotate-180" />
-          {t('auth.backHome')}
-        </Link>
+    <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-12 lg:items-stretch lg:py-16 lg:px-8">
+      <div className="ocean-grid-bg flex flex-col justify-between rounded-2xl border border-[#1E6466] p-8 text-white shadow-lg lg:col-span-5 lg:p-10">
+        <div>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 py-1 text-xs font-medium text-[#99F6E4] transition-colors hover:text-[#FBBF24] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F59E0B]"
+          >
+            <ArrowLeft size={14} aria-hidden="true" className="rtl:rotate-180" />
+            {t('auth.backHome')}
+          </Link>
 
-        <div className="mt-8">
-          <BrandMark invert />
-          <h2 className="mt-6 font-display text-2xl font-bold tracking-tight text-white">
-            {asideTitle}
-          </h2>
-          <p className="mt-3 text-sm leading-relaxed text-[#CCFBF1]/90">{asideBody}</p>
+          <div className="mt-8">
+            <BrandMark invert />
+            <h2 className="mt-6 font-display text-2xl font-bold tracking-tight text-white">
+              {asideTitle}
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-[#CCFBF1]/90">{asideBody}</p>
+          </div>
         </div>
 
         {asidePoints.length > 0 && (
@@ -38,8 +40,7 @@ export const AuthShell = ({ title, subtitle, asideTitle, asideBody, asidePoints 
         )}
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-[#99F6E4] bg-white shadow-sm lg:col-span-7">
-        <div className="h-1.5 w-full bg-gradient-to-r from-[#0D9488] to-[#F59E0B]" />
+      <div className="overflow-hidden rounded-2xl border border-[#99F6E4] border-t-4 border-t-[#0F766E] bg-white shadow-sm lg:col-span-7">
         <div className="p-6 sm:p-8 lg:p-10">
           <div className="mb-6 border-b border-[#CCFBF1] pb-5">
             <h1 className="font-display text-2xl font-bold tracking-tight text-[#0D2E2F] sm:text-3xl">
