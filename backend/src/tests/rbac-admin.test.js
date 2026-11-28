@@ -21,6 +21,7 @@ const { recordAudit } = require("../services/auditService");
 const logger = require("../utils/logger");
 const seedAdmin = require("../seed/adminSeeder");
 const { escapeHtml } = require("../services/emailService");
+const seedCourses = require("../seed/courseSeeder");
 
 let mongoServer;
 
@@ -1163,6 +1164,28 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
             process.env.NODE_ENV = prevEnv;
             txSpy.mockRestore();
             warnSpy.mockRestore();
+        }
+    });
+
+    it("repairs incomplete seeded module and lesson links on retry without duplicating courses", async () => {
+        const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+        try {
+            await seedCourses();
+            expect(await Course.countDocuments()).toBe(7);
+
+            await Module.updateMany({}, { $set: { course: null } });
+            await Lesson.updateMany({}, { $set: { module: null } });
+
+            await seedCourses();
+            expect(await Course.countDocuments()).toBe(7);
+            expect(await Module.countDocuments({ course: null })).toBe(0);
+            expect(await Lesson.countDocuments({ module: null })).toBe(0);
+
+            await seedCourses();
+            expect(await Course.countDocuments()).toBe(7);
+            expect(logSpy).toHaveBeenCalledWith("Courses already seeded.");
+        } finally {
+            logSpy.mockRestore();
         }
     });
 });
