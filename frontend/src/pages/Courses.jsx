@@ -9,6 +9,8 @@ import { Pagination } from '../components/ui/Pagination';
 import {
   getCatalogSummaryText,
   getEmptyStateContent,
+} from '../components/course/catalogHelpers';
+import {
   useCatalogData,
   useCatalogState,
 } from '../components/course/useCoursesCatalog';

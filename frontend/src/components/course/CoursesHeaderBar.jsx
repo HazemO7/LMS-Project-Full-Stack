@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { MagnifyingGlass, Plus, X } from '@phosphor-icons/react';
-import { resolveTabFromKey } from './useCoursesCatalog';
+import { resolveTabFromKey } from './catalogHelpers';
 
 const CoursesSearchForm = ({ searchInput, searchQuery, onInputChange, onSubmit, onClear, t }) => (
   <form onSubmit={onSubmit} className="flex items-center gap-2">
