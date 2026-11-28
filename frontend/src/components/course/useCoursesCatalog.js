@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { coursesAPI } from '../../services/api';
 
@@ -77,20 +77,24 @@ const useCatalogList = (page, searchQuery) => {
   const [error, setError] = useState('');
   const [totalPages, setTotalPages] = useState(1);
   const [totalCourses, setTotalCourses] = useState(0);
+  const requestIdRef = useRef(0);
 
   const fetchCatalog = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    const isLatest = () => requestId === requestIdRef.current;
     setLoading(true);
     setError('');
     try {
       const data = await coursesAPI.getAll(page, 6, searchQuery);
+      if (!isLatest()) return;
       const parsed = normalizeCatalogResponse(data);
       setCourses(parsed.list);
       setTotalPages(parsed.totalPages);
       setTotalCourses(parsed.totalCourses);
     } catch (err) {
-      setError(err.message || 'Failed to fetch courses');
+      if (isLatest()) setError(err.message || 'Failed to fetch courses');
     } finally {
-      setLoading(false);
+      if (isLatest()) setLoading(false);
     }
   }, [page, searchQuery]);
 

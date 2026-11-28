@@ -159,7 +159,8 @@ export const AdminAuditLogsTab = ({
       </select>
     </div>
     <div className="overflow-hidden rounded-xl border border-[#99F6E4] bg-white shadow-xs">
-      <div className="hidden overflow-x-auto md:block">
+      <div className="hidden overflow-x-auto md:block" aria-busy={loading}>
+        {loading && <p role="status" className="sr-only">{t('common.loading')}</p>}
         <table className="w-full border-collapse text-start text-xs">
           <thead className="border-b border-[#CCFBF1] bg-[#F0FDFA] font-semibold text-[#0F766E]">
             <tr>

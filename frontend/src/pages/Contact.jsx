@@ -60,6 +60,7 @@ const ContactForm = ({ register, errors, onSubmit, t }) => (
         <input
           id="contact-name"
           type="text"
+          required
           placeholder={t('contact.namePlaceholder')}
           aria-invalid={Boolean(errors.name)}
           aria-describedby={errors.name ? 'contact-name-error' : undefined}
@@ -78,6 +79,7 @@ const ContactForm = ({ register, errors, onSubmit, t }) => (
           id="contact-email"
           type="email"
           dir="ltr"
+          required
           placeholder={t('contact.emailPlaceholder')}
           aria-invalid={Boolean(errors.email)}
           aria-describedby={errors.email ? 'contact-email-error' : undefined}
@@ -105,6 +107,7 @@ const ContactForm = ({ register, errors, onSubmit, t }) => (
       <textarea
         id="contact-message"
         rows={5}
+        required
         placeholder={t('contact.messagePlaceholder')}
         aria-invalid={Boolean(errors.message)}
         aria-describedby={errors.message ? 'contact-message-error' : undefined}

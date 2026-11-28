@@ -146,7 +146,7 @@ export const TRANSLATIONS = {
     'contact.supportBody':
       'For bug reports or setup questions, you can also open an issue on the project repository on GitHub.',
     'contact.sentSuccess':
-      'Your message has been recorded locally in this preview form. Connect a mail or ticket endpoint when deploying to production.',
+      'Submission simulated in this preview form; your message was not saved. Connect a mail or ticket endpoint when deploying to production.',
     'contact.nameLabel': 'Full name',
     'contact.namePlaceholder': 'Alex Rivera',
     'contact.emailLabel': 'Email address',
@@ -155,7 +155,7 @@ export const TRANSLATIONS = {
     'contact.messagePlaceholder': 'Share what you need help with...',
     'contact.sendBtn': 'Send message',
     'contact.previewNotice':
-      'Preview form: messages are stored locally in this demo environment.',
+      'Preview form: submission is simulated and messages are not saved in this demo environment.',
 
     // Auth Shared & Password
     'auth.backHome': 'Back to Foundry',
@@ -317,6 +317,10 @@ export const TRANSLATIONS = {
       'Summarize what students will build, prerequisites, and the core topics covered...',
     'createCourse.submit': 'Publish course',
     'createCourse.submitting': 'Publishing...',
+    'createCourse.titleRequired': 'Course title is required.',
+    'createCourse.titleMinLength': 'Course title must be at least 3 characters.',
+    'createCourse.descRequired': 'Course overview is required.',
+    'createCourse.descMinLength': 'Course overview must be at least 10 characters.',
 
     // Course Details / Player
     'player.allCourses': 'All courses',
@@ -706,7 +710,7 @@ export const TRANSLATIONS = {
     'contact.supportBody':
       'للبلاغات التقنية أو أسئلة الإعداد، يمكنك أيضاً فتح Issue على مستودع المشروع في GitHub.',
     'contact.sentSuccess':
-      'تم حفظ رسالتك محلياً في نموذج المعاينة هذا. اربط النموذج بخدمة بريد أو Endpoint خاص عند النشر الفعلي.',
+      'تمت محاكاة الإرسال في نموذج المعاينة هذا ولم يتم حفظ رسالتك. اربط النموذج بخدمة بريد أو Endpoint خاص عند النشر الفعلي.',
     'contact.nameLabel': 'الاسم الكامل',
     'contact.namePlaceholder': 'أحمد محمود',
     'contact.emailLabel': 'البريد الإلكتروني',
@@ -715,7 +719,7 @@ export const TRANSLATIONS = {
     'contact.messagePlaceholder': 'اكتب تفاصيل سؤالك أو ملاحظتك هنا...',
     'contact.sendBtn': 'إرسال الرسالة',
     'contact.previewNotice':
-      'نموذج معاينة: تُحفظ الرسالة محلياً ولا تُرسل لبريد خارجي في نسخة العرض الحالية.',
+      'نموذج معاينة: الإرسال هنا محاكى فقط ولا يتم حفظ الرسائل في نسخة العرض الحالية.',
 
     // Auth Shared & Password
     'auth.backHome': 'العودة للرئيسية',
@@ -877,6 +881,10 @@ export const TRANSLATIONS = {
       'اشرح ما سيتعلمه الطالب، المتطلبات السابقة، والموضوعات الأساسية...',
     'createCourse.submit': 'نشر الكورس',
     'createCourse.submitting': 'جاري النشر...',
+    'createCourse.titleRequired': 'عنوان الكورس مطلوب.',
+    'createCourse.titleMinLength': 'يجب أن يكون عنوان الكورس 3 أحرف على الأقل.',
+    'createCourse.descRequired': 'وصف الكورس مطلوب.',
+    'createCourse.descMinLength': 'يجب أن يكون وصف الكورس 10 أحرف على الأقل.',
 
     // Course Details / Player
     'player.allCourses': 'كل الكورسات',

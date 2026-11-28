@@ -178,6 +178,11 @@ html.dark [role="dialog"] .text-\[\#335C5D\] {
   color: #b2dfdb;
 }
 
+html.dark main [class*="hover:bg-white"]:hover {
+  background-color: #164245;
+  color: #f0fdfa;
+}
+
 html.dark main .text-\[\#4A6F70\],
 html.dark main .text-\[\#52797A\],
 html.dark header .text-\[\#4A6F70\],

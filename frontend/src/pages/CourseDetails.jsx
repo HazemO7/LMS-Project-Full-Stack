@@ -567,7 +567,6 @@ export const CourseDetails = () => {
 
   const [enrolling, setEnrolling] = useState(false);
   const [markingComplete, setMarkingComplete] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('');
   const [mobileSyllabusOpen, setMobileSyllabusOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
 
@@ -612,7 +611,6 @@ export const CourseDetails = () => {
       data.setProgressData(await progressAPI.getCourseProgress(courseId));
       const key = wasDone ? 'player.progressMarkedUndone' : 'player.progressMarkedDone';
       const msg = t(key, { title: lesson.title });
-      setStatusMessage(msg);
       addToast(msg, 'success');
     } catch (err) {
       data.setError(err.message || 'Could not update completion status.');
@@ -652,10 +650,6 @@ export const CourseDetails = () => {
 
   return (
     <div>
-      <div className="sr-only" role="status" aria-live="polite">
-        {statusMessage}
-      </div>
-
       <CourseHeader
         course={data.course}
         canManage={canManage}

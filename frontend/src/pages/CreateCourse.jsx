@@ -63,6 +63,20 @@ const CourseFormField = ({ id, errorId, label, error, children }) => (
   </div>
 );
 
+const validateCourseTitle = (value, t) => {
+  const trimmed = value.trim();
+  if (!trimmed) return t('createCourse.titleRequired');
+  if (trimmed.length < 3) return t('createCourse.titleMinLength');
+  return true;
+};
+
+const validateCourseDescription = (value, t) => {
+  const trimmed = value.trim();
+  if (!trimmed) return t('createCourse.descRequired');
+  if (trimmed.length < 10) return t('createCourse.descMinLength');
+  return true;
+};
+
 const CreateCourseForm = ({ register, errors, loading, onSubmit, t }) => (
   <form onSubmit={onSubmit} noValidate className="mt-6 space-y-5">
     <CourseFormField
@@ -75,13 +89,14 @@ const CreateCourseForm = ({ register, errors, loading, onSubmit, t }) => (
         id="course-title"
         type="text"
         dir="auto"
+        required
         disabled={loading}
         aria-invalid={Boolean(errors.title)}
         aria-describedby={errors.title ? 'course-title-error' : undefined}
         placeholder={t('createCourse.namePlaceholder')}
         {...register('title', {
-          required: t('createCourse.nameLabel'),
-          validate: (value) => value.trim().length >= 3 || t('createCourse.nameLabel'),
+          required: t('createCourse.titleRequired'),
+          validate: (value) => validateCourseTitle(value, t),
         })}
         className={getCourseInputClass(Boolean(errors.title), 'min-h-[44px]')}
       />
@@ -97,13 +112,14 @@ const CreateCourseForm = ({ register, errors, loading, onSubmit, t }) => (
         id="course-description"
         rows={5}
         dir="auto"
+        required
         disabled={loading}
         aria-invalid={Boolean(errors.description)}
         aria-describedby={errors.description ? 'course-description-error' : undefined}
         placeholder={t('createCourse.descPlaceholder')}
         {...register('description', {
-          required: t('createCourse.descLabel'),
-          validate: (value) => value.trim().length >= 10 || t('createCourse.descLabel'),
+          required: t('createCourse.descRequired'),
+          validate: (value) => validateCourseDescription(value, t),
         })}
         className={getCourseInputClass(Boolean(errors.description))}
       />
