@@ -1,10 +1,8 @@
-const mongoose = require("mongoose");
 const Course = require("../models/Course");
 const Module = require("../models/Module");
 const Lesson = require("../models/Lesson");
 const User = require("../models/User");
-
-mongoose.set("transactionAsyncLocalStorage", true);
+const { runOptionalTransaction } = require("../services/governanceLockService");
 
 const insertDemoCurriculum = async (coursesData) => {
     const lesson1 = await Lesson.create({
@@ -55,7 +53,7 @@ const insertDemoCurriculum = async (coursesData) => {
 
 const seedCourses = async () => {
     try {
-        await mongoose.connection.transaction(async () => {
+        await runOptionalTransaction(async () => {
             const count = await Course.countDocuments();
             if (count > 0) {
                 console.log("Courses already seeded.");

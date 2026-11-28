@@ -7,9 +7,35 @@ const logger = require("../utils/logger");
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const postCommitStorage = new AsyncLocalStorage();
+let standaloneWarningLogged = false;
 
 // Include all Mongoose operations in the callback (including helper queries) in the transaction.
 mongoose.set("transactionAsyncLocalStorage", true);
+
+const isStandaloneTopology = () => {
+    const description = mongoose.connection.getClient?.()?.topology?.description;
+    if (!description || description.type !== "Single") return false;
+    const servers = Array.from(description.servers?.values?.() || []);
+    return servers.length > 0 && servers.every((server) => server.type === "Standalone");
+};
+
+const isTransactionUnsupportedError = (error) =>
+    Boolean(
+        error &&
+        /Transaction numbers are only allowed on a replica set member or mongos/i.test(error.message || "")
+    );
+
+const canUseStandaloneForTopology = () =>
+    process.env.NODE_ENV !== "production" && isStandaloneTopology();
+
+const canUseStandaloneForError = (error) =>
+    process.env.NODE_ENV !== "production" && isTransactionUnsupportedError(error);
+
+const logStandaloneFallbackOnce = () => {
+    if (standaloneWarningLogged) return;
+    standaloneWarningLogged = true;
+    logger.warn("MongoDB standalone topology detected in non-production; running governance operation without ACID transaction.");
+};
 
 const afterTransactionCommit = (fn) => {
     const queue = postCommitStorage.getStore();
@@ -97,6 +123,36 @@ const runFencedTransaction = async (key, ownerToken, fn, released) => {
     return result;
 };
 
+const runStandaloneLocked = async (key, ownerToken, fn, released) => {
+    logStandaloneFallbackOnce();
+    const postCommitCallbacks = [];
+    let result;
+    try {
+        result = await postCommitStorage.run(postCommitCallbacks, async () => {
+            postCommitCallbacks.length = 0;
+            return fn();
+        });
+    } finally {
+        await releaseLock(key, ownerToken, released);
+    }
+    runPostCommitCallbacks(postCommitCallbacks);
+    return result;
+};
+
+const executeLockedWork = async (key, ownerToken, fn, released) => {
+    if (canUseStandaloneForTopology()) {
+        return runStandaloneLocked(key, ownerToken, fn, released);
+    }
+    try {
+        return await runFencedTransaction(key, ownerToken, fn, released);
+    } catch (error) {
+        if (canUseStandaloneForError(error)) {
+            return runStandaloneLocked(key, ownerToken, fn, released);
+        }
+        throw error;
+    }
+};
+
 const resolveLockOptions = (options) => ({
     leaseMs: options?.leaseMs ?? 10000,
     timeoutMs: options?.timeoutMs ?? 5000,
@@ -111,9 +167,25 @@ const withGovernanceLock = async (key, fn, options = {}) => {
     await acquireLock(key, ownerToken, resolved);
     const released = { ownerToken: null, expiresAt: new Date(0) };
     try {
-        return await runFencedTransaction(key, ownerToken, fn, released);
+        return await executeLockedWork(key, ownerToken, fn, released);
     } catch (error) {
         await releaseLock(key, ownerToken, released);
+        throw error;
+    }
+};
+
+const runOptionalTransaction = async (fn) => {
+    if (canUseStandaloneForTopology()) {
+        logStandaloneFallbackOnce();
+        return fn();
+    }
+    try {
+        return await mongoose.connection.transaction(fn);
+    } catch (error) {
+        if (canUseStandaloneForError(error)) {
+            logStandaloneFallbackOnce();
+            return fn();
+        }
         throw error;
     }
 };
@@ -126,6 +198,7 @@ const withSuperAdminLock = (fn, options) => withGovernanceLock("super_admin_muta
 
 module.exports = {
     afterTransactionCommit,
+    runOptionalTransaction,
     withGovernanceLock,
     withSuperAdminLock,
 };

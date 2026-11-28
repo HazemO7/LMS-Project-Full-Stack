@@ -1139,4 +1139,30 @@ describe("Phase 1: 4-Tier RBAC, Super Admin Governance & Ownership Hardening", (
         expect(ranSecond).toBe(true);
         spy.mockRestore();
     });
+
+    it("falls back for standalone MongoDB in non-production and still rejects in production", async () => {
+        const prevEnv = process.env.NODE_ENV;
+        const warnSpy = jest.spyOn(logger, "warn").mockImplementation(() => {});
+        const txSpy = jest.spyOn(mongoose.connection, "transaction")
+            .mockRejectedValue(new Error("Transaction numbers are only allowed on a replica set member or mongos"));
+        try {
+            process.env.NODE_ENV = "development";
+            let postCommitRan = false;
+            const res = await withSuperAdminLock(async () => {
+                afterTransactionCommit(() => { postCommitRan = true; });
+                return "standalone-ok";
+            });
+            expect(res).toBe("standalone-ok");
+            expect(postCommitRan).toBe(true);
+            expect((await GovernanceLock.findById("super_admin_mutation"))?.ownerToken).toBeNull();
+
+            process.env.NODE_ENV = "production";
+            await expect(withSuperAdminLock(async () => "nope")).rejects.toThrow("Transaction numbers");
+            expect((await GovernanceLock.findById("super_admin_mutation"))?.ownerToken).toBeNull();
+        } finally {
+            process.env.NODE_ENV = prevEnv;
+            txSpy.mockRestore();
+            warnSpy.mockRestore();
+        }
+    });
 });
