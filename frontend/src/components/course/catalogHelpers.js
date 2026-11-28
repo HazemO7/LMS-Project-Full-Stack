@@ -12,28 +12,49 @@ const KEY_TARGET_RTL = {
   ArrowRight: 'all',
 };
 
+const getCourseId = (course) => course._id ?? course.id;
+
+const parsePageParam = (raw) => {
+  const parsed = parseInt(raw, 10);
+  return parsed > 0 ? parsed : 1;
+};
+
+const extractCourseList = (data) => {
+  if (Array.isArray(data)) return data;
+  if (data.courses) return data.courses;
+  return data.data ?? [];
+};
+
+const formatAllTabCount = (searchQuery, catalogCountLabel, t) => {
+  if (!searchQuery) return catalogCountLabel;
+  return t('courses.catalogCountMatching', { label: catalogCountLabel, query: searchQuery });
+};
+
+const getAllTabEmptyState = (canCreate, t) => ({
+  title: t('courses.emptyAllTitle'),
+  body: canCreate ? t('courses.emptyAllBodyAdmin') : t('courses.emptyAllBodyStudent'),
+  actionType: canCreate ? 'createCourse' : 'none',
+});
+
 export const buildCatalogParams = (nextTab, nextPage, nextQuery) => {
+  if (nextTab === 'enrolled') return { tab: 'enrolled' };
   const params = {};
-  if (nextTab === 'enrolled') params.tab = 'enrolled';
-  if (nextPage > 1 && nextTab !== 'enrolled') params.page = String(nextPage);
-  if (nextQuery && nextTab !== 'enrolled') params.q = nextQuery;
+  if (nextPage > 1) params.page = String(nextPage);
+  if (nextQuery) params.q = nextQuery;
   return params;
 };
 
-export const parseInitialCatalogState = (searchParams) => {
-  const parsedPage = parseInt(searchParams.get('page') || '1', 10);
-  return {
-    page: parsedPage > 0 ? parsedPage : 1,
-    query: searchParams.get('q') || '',
-    tab: searchParams.get('tab') === 'enrolled' ? 'enrolled' : 'all',
-  };
-};
+export const parseInitialCatalogState = (searchParams) => ({
+  page: parsePageParam(searchParams.get('page')),
+  query: searchParams.get('q') ?? '',
+  tab: searchParams.get('tab') === 'enrolled' ? 'enrolled' : 'all',
+});
 
 export const normalizeCatalogResponse = (data) => {
-  const list = Array.isArray(data) ? data : data.courses || data.data || [];
+  const list = extractCourseList(data);
   return {
     list,
-    totalPages: data.totalPages || 1,
+    totalPages: data.totalPages ?? 1,
     totalCourses: data.totalCourses ?? list.length,
   };
 };
@@ -43,17 +64,15 @@ export const extractEnrolledCourses = (res) => {
   const enrolledList = enrollments.map((item) => item.course).filter(Boolean);
   return {
     enrolledList,
-    enrolledIds: enrolledList.map((c) => c._id || c.id),
+    enrolledIds: enrolledList.map(getCourseId),
   };
 };
 
-export const withoutCourseId = (list, id) => list.filter((c) => (c._id || c.id) !== id);
+export const withoutCourseId = (list, id) => list.filter((c) => getCourseId(c) !== id);
 
 export const resolveTabFromKey = (key, activeTab, isRtl) => {
-  const table = isRtl ? KEY_TARGET_RTL : KEY_TARGET_LTR;
-  const target = table[key];
-  if (!target || target === activeTab) return null;
-  return target;
+  const target = (isRtl ? KEY_TARGET_RTL : KEY_TARGET_LTR)[key] ?? null;
+  return target === activeTab ? null : target;
 };
 
 export const getCatalogSummaryText = ({
@@ -67,10 +86,7 @@ export const getCatalogSummaryText = ({
 }) => {
   if (loading && !hasDisplayed) return t('courses.loadingCount');
   if (activeTab === 'enrolled') return t('courses.enrolledCount', { count: enrolledCount });
-  if (searchQuery) {
-    return t('courses.catalogCountMatching', { label: catalogCountLabel, query: searchQuery });
-  }
-  return catalogCountLabel;
+  return formatAllTabCount(searchQuery, catalogCountLabel, t);
 };
 
 export const getEmptyStateContent = ({ activeTab, searchQuery, canCreate, t }) => {
@@ -88,9 +104,5 @@ export const getEmptyStateContent = ({ activeTab, searchQuery, canCreate, t }) =
       actionType: 'clearSearch',
     };
   }
-  return {
-    title: t('courses.emptyAllTitle'),
-    body: canCreate ? t('courses.emptyAllBodyAdmin') : t('courses.emptyAllBodyStudent'),
-    actionType: canCreate ? 'createCourse' : 'none',
-  };
+  return getAllTabEmptyState(canCreate, t);
 };
